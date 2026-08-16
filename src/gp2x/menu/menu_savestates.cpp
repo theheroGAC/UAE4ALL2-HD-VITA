@@ -91,10 +91,10 @@ static inline void cp(char* source_name, char* dest_name)
 	char *buffer;
 	long lsize;
 	if (src && dst) {
-		fseek(src, 0, SEEK_END);                  
+		fseek(src, 0, SEEK_END);   // non-portable
 		lsize = ftell(src);
 		fseek(src, 0, SEEK_SET);
-		              
+		//rewind(src);
 		buffer = (char*) malloc (sizeof(char)*lsize);
 
 		fread(buffer, 1, lsize, src);
@@ -197,7 +197,7 @@ static inline void draw_savestatesMenu(int c)
 	int menuLineForThumb = menuLine;
 	if (!savestate_empty) {
 		if (thumbnail_image != NULL) {
-			                                                                                 
+			//draw_image_pos(thumbnail_image, (320 - thumbnail_image->w) / 2 , menuLine * 7);
 		} else {
 			write_text(tabstop1,menuLine+9,"No preview found");
 		}
@@ -264,9 +264,9 @@ static inline int key_saveMenu(int *cp)
 	int left=0, right=0, up=0, down=0, hit0=0, hit1=0;
 	int hit2=0, hit3=0, hit4=0, hit5=0;
 	SDL_Event event;
-	           
-	                          
-	          
+	//delay ++;
+	//if (delay<3) return end;
+	//delay=0;
 
 	static int holdingUp=0;
 	static int holdingDown=0;
@@ -306,8 +306,8 @@ static inline int key_saveMenu(int *cp)
 			case SDLK_LEFT: left=1; break;
 			case SDLK_UP: up=1; break;
 			case SDLK_DOWN: down=1; break;
-			case SDLK_LCTRL: hit2=1; break;                                                 
-			                                                    
+			case SDLK_LCTRL: hit2=1; break; //allow user to quit menu completely at any time
+			//note SDLK_CTRL corresponds to ButtonSelect on Vita
 #if defined(__PSP2__) || defined(__SWITCH__)
 			case SDLK_PAGEDOWN: hit0=1; break;
 			case SDLK_END: hit1=1; break;
@@ -363,13 +363,13 @@ static inline int key_saveMenu(int *cp)
 			menu_last_press_time=now;
 		}
 
-		if (hit2)                                                   
+		if (hit2) // does the user want to shut-down the whole menu?
 		{
 			if (emulating)
 			{
-				saveMenu_case=SAVE_MENU_CASE_CANCEL;                  
+				saveMenu_case=SAVE_MENU_CASE_CANCEL; // quit this menu
 				end=1;
-				quit_pressed_in_submenu=1;                                                            
+				quit_pressed_in_submenu=1; //also change mainMenu state so that it automatically exits
 			}
 		}
 		if (hit1)
@@ -537,8 +537,8 @@ void make_savestate_filenames(char *save, char *thumb)
 		thumb[0]='\0';
 	int i=0;
 	char *hd_name=NULL;
-	                                  
-	                                                              
+	// savestate is named by boot unit
+	// use first floppy as filename, if empty, use boot hdf/hd dir
 	if (uae4all_image_file0[0]!='\0')
 	{
 		copy_state_path(save, uae4all_image_file0);
@@ -581,7 +581,7 @@ void make_savestate_filenames(char *save, char *thumb)
 				save[0]='\0';
 			}
 		} 
-	}                                          
+	} //Still nothing? Use floppy numbers 2,3,4
 	if (save[0]=='\0')
 	{
 		if (uae4all_image_file1[0]!='\0')
@@ -730,12 +730,12 @@ int run_menuSavestates()
 					if(run_menuLoad(path, MENU_LOAD_IMPORT_SAVE)) {
 						FILE *f=fopen(save_import_filename,"rb");
 						if (f) {
-							                   
+							// import savestate
 							fclose(f);
 							remove(savestate_filename);
 							cp(save_import_filename,savestate_filename);
 
-							                                
+							// import thumbnail if it exists
 							remove(screenshot_filename);
 							char thumb[255] = "";
 							stateFilenameToThumbFilename(save_import_filename,thumb);
@@ -825,7 +825,7 @@ int run_menuSavestates()
 							fclose(f);
 							remove(save_import_filename);
 
-							                   
+							// delete thumbnail
 							char thumb[255] = "";
 							stateFilenameToThumbFilename(save_import_filename, thumb);
 							FILE *f2=fopen(thumb,"rb");

@@ -22,7 +22,7 @@
 #include "sdl2_to_sdl1.h"
 #endif
 
-#if defined(__PSP2__)                  
+#if defined(__PSP2__) // NOT __SWITCH__
 #include "psp2_shader.h"
 #include "vita2d_fbo/includes/vita2d.h"
 PSP2Shader *shader = NULL;
@@ -33,15 +33,15 @@ typedef struct private_hwdata {
 	vita2d_texture *texture;
 	SDL_Rect dst;
 } private_hwdata;
-#endif                  
+#endif //PRIVATE_HW_DATA
 #endif
 
 #ifdef __SWITCH__
 #include <switch.h>
 #endif
 
-#if defined(__PSP2__)                  
-                         
+#if defined(__PSP2__) // NOT __SWITCH__
+//Allow locking PS Button
 #include <psp2/shellutil.h>
 #endif
 
@@ -113,8 +113,8 @@ void exit_safely(int quit_via_home) {
 #endif
     saveAdfDir();	
     
-#if defined(__PSP2__)                  
-                      
+#if defined(__PSP2__) // NOT __SWITCH__
+    //unlock PS Button
     sceShellUtilUnlock(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN);
 #endif
     
@@ -223,10 +223,10 @@ void update_display() {
 
 #if defined(__PSP2__) || defined(__SWITCH__)
 #if defined(__PSP2__)
-                                                                          
-                                                                             
-                                                                          
-                                            
+    /* Drain and release the menu surface here, immediately before the SDL
+       mode switch. Keeping this transition in one place matches the original
+       Vita SDL path and avoids asking SDL for a second mode while its old
+       video surface is still registered. */
     if (prSDLScreen != NULL) {
         write_log("[VITA] update_display: releasing previous video surface\n");
         for (int i = 0; i < 4; i++) {
@@ -249,9 +249,9 @@ void update_display() {
         write_log("[VITA] update_display: previous video surface released\n");
     }
 
-                                                                           
-                                                                            
-                                      
+    /* The menu surface uses GPU memory. Before allocating the smaller game
+       framebuffer, force Vita2D to use writable user memory as the original
+       Vita display transition did. */
     vita2d_texture_set_alloc_memblock_type(SCE_KERNEL_MEMBLOCK_TYPE_USER_RW);
 #endif
 	displaying_menu = 0;
@@ -261,8 +261,8 @@ void update_display() {
 #if defined(__PSP2__)
     write_log("[VITA] update_display: hardware SDL_SetVideoMode returned %p\n", (void *)prSDLScreen);
     if (prSDLScreen == NULL) {
-                                                                         
-                                                                             
+        /* Some SDL-Vita builds reject a small hardware surface after the
+           960x544 menu surface was released. Retry as a software surface. */
         write_log("[VITA] update_display: retrying software framebuffer\n");
         prSDLScreen = SDL_SetVideoMode(visibleAreaWidth, mainMenu_displayedLines, 16, SDL_SWSURFACE | SDL_DOUBLEBUF);
         write_log("[VITA] update_display: software SDL_SetVideoMode returned %p\n", (void *)prSDLScreen);
@@ -270,10 +270,10 @@ void update_display() {
 #endif
     if (prSDLScreen == NULL) {
 #if defined(__PSP2__)
-                                                                           
-                                                                            
-                                                                          
-                                              
+        /* The SDL-Vita version shipped with some VitaSDK releases does not
+           advertise 320x240, although UAE's default Amiga mode requests it.
+           320x200 is a supported native Vita SDL mode and is safe for the
+           classic low-resolution ADF path. */
         if (visibleAreaWidth == 320 && mainMenu_displayedLines != 200) {
             write_log("[VITA] update_display: retrying supported 320x200 mode\n");
             mainMenu_displayedLines = 200;
@@ -298,34 +298,46 @@ void update_display() {
     int y;
 
 #if defined(__PSP2__)
-      
-                                                                      
-                                                                            
-                                                                          
-                                                                             
-                                                                            
-                     
-      
-                                                                           
-                                                                           
-                                                                         
-                                                 
-       
+    /*
+     * The Amiga's low-resolution pixels are not square on a 16:9 Vita
+     * display.  The old calculation used visibleAreaWidth / lines directly,
+     * so 320x200 became 16:10 while 320x240 became 4:3.  The result was a
+     * different stretch for every video mode and the "NTSC" and "fullscreen"
+     * presets were indistinguishable because screenWidth is not used by the
+     * Vita renderer.
+     *
+     * Presets 0-6 are aspect-correct 4:3 modes. Preset 7 is deliberately a
+     * full-screen stretch.  Keep this geometry independent of the fallback
+     * 320x200 SDL surface: the fallback is a backend limitation, not the
+     * display aspect ratio selected by the user.
+     */
     int preset_variant = presetModeId % 10;
     bool fullscreen_scaling = (preset_variant == 7);
+    bool five_four_scaling = (preset_variant == 8);
     if (fullscreen_scaling) {
         x = 0;
         y = 0;
         sw = 960.0f;
         sh = 544.0f;
+    } else if (five_four_scaling && mainMenu_shader != 0) {
+        sh = 544.0f;
+        sw = sh * (5.0f / 4.0f);
+        x = (int)((960.0f - sw) * 0.5f + 0.5f);
+        y = 0;
     } else if (mainMenu_shader != 0) {
         sh = 544.0f;
         sw = sh * (4.0f / 3.0f);
         x = (int)((960.0f - sw) * 0.5f + 0.5f);
         y = 0;
+    } else if (five_four_scaling) {
+        /* Keep point filtering while using a 5:4 viewport for PAL games. */
+        sw = 675.0f;
+        sh = 540.0f;
+        x = (960 - (int)sw) / 2;
+        y = (544 - (int)sh) / 2;
     } else {
-                                                                         
-                                                                         
+        /* Keep point filtering for the sharp path, but correct the Amiga
+           display to 4:3 instead of preserving the raw 320x200 ratio. */
         sw = 720.0f;
         sh = 540.0f;
         x = (960 - (int)sw) / 2;
@@ -333,11 +345,12 @@ void update_display() {
     }
     SDL_SetVideoModeScaling(x, y, sw, sh);
     SDL_SetVideoModeBilinear(mainMenu_shader != 0 ? 1 : 0);
+    const char *aspect_name = fullscreen_scaling ? "fullscreen" : (five_four_scaling ? "5:4" : "4:3");
     write_log("[VITA] update_display: preset=%d aspect=%s dst=%dx%d+%d+%d\n",
-        presetModeId, fullscreen_scaling ? "fullscreen" : "4:3",
+        presetModeId, aspect_name,
         (int)sw, (int)sh, x, y);
 #else
-                         
+    //is a shader active?
     if (mainMenu_shader != 0)
     {
     	sh = 544;
@@ -351,7 +364,7 @@ void update_display() {
    	SDL_SetVideoModeScaling(x, y, sw, sh);
    	SDL_SetVideoModeBilinear(1);
     }
-    else                                                                                           
+    else //otherwise do regular integer 2* scaling without filtering to ensure good picture quality
     {
     	sh = (float) (2 * mainMenu_displayedLines);
     	if (mainMenu_displayHires)
@@ -371,7 +384,7 @@ void update_display() {
     write_log("[VITA] update_display: scaling and sync done\n");
 #endif
 
-                   
+    // clear screen
     for (int i=0; i<2; i++)
 	{        SDL_FillRect(prSDLScreen,NULL,SDL_MapRGB(prSDLScreen->format, 0, 0, 0));
         SDL_Flip(prSDLScreen);

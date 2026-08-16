@@ -8,7 +8,7 @@
 #include<SDL.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#if defined(__PSP2__)                  
+#if defined(__PSP2__) // NOT __SWITCH__
 #include "psp2-dirent.h"
 #else
 #include<dirent.h>
@@ -64,7 +64,7 @@ static void draw_fileinfoMenu(int c)
 	write_text(3, menuLine, "----------");
 	menuLine+=2;
 
-	                                             
+	// now wrap the filename if necessary (at 32)
 	int i = 0;
 	char line [40];
 	const int LINELEN = 32;
@@ -77,7 +77,7 @@ static void draw_fileinfoMenu(int c)
 		menuLine+=2;
 	}
 
-	                                  
+	// Try loading cover preview image
 	char coverPath[512];
 	char baseName[256];
 	strcpy(baseName, fileInfo_fileName);

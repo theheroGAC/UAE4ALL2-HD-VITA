@@ -27,7 +27,7 @@ void gp2x_adjust_display(void);
 void gp2x_gamelist_zero(void);
 void gp2x_text_pause(void);
 
-extern int gp2x_rotate;		                     
+extern int gp2x_rotate;		/* Screen Rotation */
 
 struct KeySettings {
 	int JOY_FIRE1;
@@ -48,4 +48,4 @@ struct KeySettings {
 #if defined(__cplusplus) && !defined(USE_CPLUS)
 }
 #endif
-#endif	                         
+#endif	/* defined GP2X_MAME_H */

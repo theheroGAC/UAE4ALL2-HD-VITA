@@ -113,7 +113,7 @@ void gp2x_init(int argc, char **argv)
 #endif
 	
 	SDL_ShowCursor(SDL_DISABLE);
-#if defined(__PSP2__)                  
+#if defined(__PSP2__) // NOT __SWITCH__
 	strcpy(launchDir, "ux0:/data/uae4all");
 	strcpy(currentDir, "ux0:/data/uae4all");
 #elif defined(__SWITCH__)
@@ -132,7 +132,7 @@ void gp2x_close( void )
 
 int is_overridden_button(int button)
 {
-	                       
+	// TODO: load from file
 	return button == GP2X_BUTTON_L || button == GP2X_BUTTON_R || 
 		   button == GP2X_BUTTON_A || button == GP2X_BUTTON_B ||
 		   button == GP2X_BUTTON_X || button == GP2X_BUTTON_Y;
@@ -143,7 +143,7 @@ int get_key_for_button(int button)
 	return 0;
 }
 
-                                      
+// apply the remapped button keystroke
 void handle_remapped_button_down(int button)
 {
 	int key = get_key_for_button(button);
@@ -175,7 +175,7 @@ void switch_to_hw_sdl(int first_time)
 	usleep(100*1000);
 #endif
 
-	               
+	// reinit video
 	graphics_init();
 	update_display();
 }

@@ -7,7 +7,7 @@
 #include "menu.h"
 #include <sys/stat.h>
 #include <unistd.h>
-#if defined(__PSP2__)                  
+#if defined(__PSP2__) // NOT __SWITCH__
 #include "psp2-dirent.h"
 #else
 #include <dirent.h>
@@ -52,7 +52,7 @@ enum {
 	MENUDISPLAY_PRESETWIDTH,
 	MENUDISPLAY_PRESETHEIGHT,
 	MENUDISPLAY_DISPLINES,
-#if !defined(__PSP2__) && !defined(__SWITCH__)                                                       
+#if !defined(__PSP2__) && !defined(__SWITCH__) //screenwidth has no meaning on Vita and is never used
 	MENUDISPLAY_SCREENWIDTH,
 #endif
 	MENUDISPLAY_VERTPOS,
@@ -91,7 +91,7 @@ enum {
 	SHADER_BICUBIC,
 	SHADER_XBR_2X,
 	SHADER_GTU,
-	NUM_SHADERS,                                                               
+	NUM_SHADERS, //NUM_SHADERS - 1 is the max allowed number in mainMenu_shader
 };
 #endif
 
@@ -101,7 +101,7 @@ enum {
 	SHADER_SHARP_BILINEAR_SIMPLE,
 	SHADER_BILINEAR,
 	SHADER_POINT,
-	NUM_SHADERS,                                                               
+	NUM_SHADERS, //NUM_SHADERS - 1 is the max allowed number in mainMenu_shader
 };
 #endif
 
@@ -131,7 +131,7 @@ static void draw_displayMenu(int c)
 	text_draw_background();
 	text_draw_window(2,2,40,30,text_str_display_title);
 
-	                         
+	// MENUDISPLAY_RETURNMAIN
 	if (menuDisplay == MENUDISPLAY_RETURNMAIN && bb)
 		write_text_inv(3, menuLine, "Return to main menu");
 	else
@@ -141,7 +141,7 @@ static void draw_displayMenu(int c)
 	write_text(leftMargin,menuLine,text_str_display_separator);
 	menuLine++;
 
-	                          
+	// MENUDISPLAY_PRESETWIDTH
 	write_text(leftMargin,menuLine,"Preset Width");
 	snprintf(value, 20, "%d", visibleAreaWidth);
 	if ((menuDisplay!=MENUDISPLAY_PRESETWIDTH)||(bb))
@@ -149,7 +149,7 @@ static void draw_displayMenu(int c)
 	else
 		write_text_inv(tabstop3,menuLine,value);
 
-	                           
+	// MENUDISPLAY_PRESETHEIGHT
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Preset Height");
 	if ((menuDisplay!=MENUDISPLAY_PRESETHEIGHT)||(bb))
@@ -165,7 +165,7 @@ static void draw_displayMenu(int c)
 	write_text(leftMargin,menuLine,"---------------");
 	menuLine++;
 
-	                        
+	// MENUDISPLAY_DISPLINES
 	write_text(leftMargin,menuLine,"Displayed Lines");
 	sprintf(value, "%d", mainMenu_displayedLines);
 	if ((menuDisplay!=MENUDISPLAY_DISPLINES)||(bb))
@@ -173,7 +173,7 @@ static void draw_displayMenu(int c)
 	else
 		write_text_inv(tabstop3,menuLine,value);
 #if !defined(__PSP2__) && !defined(__SWITCH__)
-	                          
+	// MENUDISPLAY_SCREENWIDTH
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Screen Width");
 	sprintf(value, "%d", screenWidth);
@@ -182,7 +182,7 @@ static void draw_displayMenu(int c)
 	else
 		write_text_inv(tabstop3,menuLine,value);
 #endif
-	                      
+	// MENUDISPLAY_VERTPOS
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Vertical Position");
 	sprintf(value, "%d", moveY);
@@ -191,7 +191,7 @@ static void draw_displayMenu(int c)
 	else
 		write_text_inv(tabstop3,menuLine,value);
 #if !defined(__PSP2__) && !defined(__SWITCH__)
-	                      
+	// MENUDISPLAY_CUTLEFT
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Cut Left");
 	sprintf(value, "%d", mainMenu_cutLeft);
@@ -200,7 +200,7 @@ static void draw_displayMenu(int c)
 	else
 		write_text_inv(tabstop3,menuLine,value);
 
-	                       
+	// MENUDISPLAY_CUTRIGHT
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Cut Right");
 	sprintf(value, "%d", mainMenu_cutRight);
@@ -209,12 +209,12 @@ static void draw_displayMenu(int c)
 	else
 		write_text_inv(tabstop3,menuLine,value);
 
-#else                                              
+#else // !defined(__PSP2__) && !defined(__SWITCH__)
 	menuLine++;
 	write_text(leftMargin,menuLine,text_str_display_separator);
 	menuLine++;
 #endif
-	                          
+	// MENUDISPLAY_REFRESHRATE
 	write_text(leftMargin,menuLine,"Refresh Rate");
 	if ((!mainMenu_ntsc)&&((menuDisplay!=MENUDISPLAY_REFRESHRATE)||(bb)))
 		write_text_inv(tabstop1,menuLine,"50Hz");
@@ -226,7 +226,7 @@ static void draw_displayMenu(int c)
 	else
 		write_text(tabstop3+1,menuLine,"60Hz");
 
-	                        
+	// MENUDISPLAY_FRAMESKIP
 #ifdef PANDORA
 	write_text(tabstop3+7,menuLine,"Frameskip");
 	if ((mainMenu_frameskip==0)&&((menuDisplay!=MENUDISPLAY_FRAMESKIP)||(bb)))
@@ -277,8 +277,8 @@ static void draw_displayMenu(int c)
 #endif
 
 #if defined(__PSP2__) || defined(__SWITCH__)	
-	                         
-	                    
+	//Shader settings on Vita
+	//MENUDISPLAY_SHADER
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Shader");
   
@@ -340,7 +340,7 @@ static void draw_displayMenu(int c)
 	else
 		write_text(tabstop1,menuLine,value);
 #endif
-	                         
+	// MENUDISPLAY_STATUSLINE
 	menuLine+=2;
 	write_text(leftMargin, menuLine,text_str_status_line);
 	if ((!mainMenu_showStatus)&&((menuDisplay!=MENUDISPLAY_STATUSLINE)||(bb)))
@@ -353,7 +353,7 @@ static void draw_displayMenu(int c)
 		write_text(tabstop3, menuLine,"On");
 
 #if defined(USE_UAE4ALL_VKBD)
-	                           
+	// MENUDISPLAY_VKBDLANGUAGE
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Keyb. Lang.");
 	if ((mainMenu_vkbdLanguage==0)&&((menuDisplay!=MENUDISPLAY_VKBDLANGUAGE)||(bb)))
@@ -376,7 +376,7 @@ static void draw_displayMenu(int c)
 	else
 		write_text(tabstop5+8,menuLine,"French");
 
-	                        
+	// MENUDISPLAY_VKBDSTYLE
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Keyb. Style");
 	if ((mainMenu_vkbdStyle==0)&&((menuDisplay!=MENUDISPLAY_VKBDSTYLE)||(bb)))
@@ -400,7 +400,7 @@ static void draw_displayMenu(int c)
 		write_text(tabstop1+19,menuLine,"Dark");
 #endif
 
-	                         
+	// MENUDISPLAY_BACKGROUND
 	menuLine+=2;
 	write_text(leftMargin, menuLine,"Menu Background");
 	if ((mainMenu_background==0)&&((menuDisplay!=MENUDISPLAY_BACKGROUND)||(bb)))
@@ -412,7 +412,7 @@ static void draw_displayMenu(int c)
 	else
 		write_text(tabstop8-2, menuLine,"Moving");
 		
-	                   
+	// MENUDISPLAY_FONT
 	menuLine+=2;
 	write_text(leftMargin, menuLine,"Menu Font");
 	if ((mainMenu_font==0)&&((menuDisplay!=MENUDISPLAY_FONT)||(bb)))
@@ -434,7 +434,7 @@ static void draw_displayMenu(int c)
 	write_text(leftMargin,menuLine,text_str_display_separator);
 	menuLine++;
 
-	                    
+	// MENUDISPLAY_SOUND
 	write_text(leftMargin,menuLine,text_str_sound);
 	if ((mainMenu_sound==0)&&((menuDisplay!=MENUDISPLAY_SOUND)||(bb)))
 		write_text_inv(tabstop1,menuLine,text_str_off);
@@ -451,7 +451,7 @@ static void draw_displayMenu(int c)
 	else
 		write_text(tabstop5+1,menuLine,text_str_accurate);
 
-	                      
+	// MENUDISPLAY_SNDRATE
 	menuLine+=2;
 	write_text(leftMargin,menuLine,text_str_sndrate);
 
@@ -485,7 +485,7 @@ static void draw_displayMenu(int c)
 	else
 		write_text(tabstop11,menuLine,text_str_48k);
 
-	                     
+	// MENUDISPLAY_STEREO
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Stereo Sep.");
 	if ((mainMenu_soundStereo==0)&&((menuDisplay!=MENUDISPLAY_STEREO)||(bb)))
@@ -570,8 +570,8 @@ static int key_displayMenu(int *c)
 			case SDLK_END: hit0=1; break;
 			case SDLK_PAGEUP: hit0=1;				
 #endif
-			case SDLK_LCTRL: hit2=1; break;                                                 
-				                                                    
+			case SDLK_LCTRL: hit2=1; break; //allow user to quit menu completely at any time
+				//note SDLK_CTRL corresponds to ButtonSelect on Vita
 			}
 		}
 
@@ -617,12 +617,12 @@ static int key_displayMenu(int *c)
 			menu_last_press_time=now;
 		}
 
-		if (hit2)                                                    
+		if (hit2) //Does the user want to cancel the menu completely?
 		{
 			if (emulating)
 			{
 				end = -1; 
-				quit_pressed_in_submenu = 1;                                   
+				quit_pressed_in_submenu = 1; //Tell the mainMenu to cancel, too
 			}
 		}	
 #if !defined(__PSP2__) && !defined(__SWITCH__)
@@ -792,7 +792,7 @@ static int key_displayMenu(int *c)
 				if ((left)||(right))
 						mainMenu_ntsc = !mainMenu_ntsc;
 				break;
-#if defined(__PSP2__) || defined(__SWITCH__)                        
+#if defined(__PSP2__) || defined(__SWITCH__) //shader choice on VITA
 			case MENUDISPLAY_SHADER:
 				if (left)
 				{

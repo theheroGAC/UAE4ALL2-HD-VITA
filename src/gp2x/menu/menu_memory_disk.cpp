@@ -10,7 +10,7 @@
 
 #include <sys/stat.h>
 #include <unistd.h>
-#if defined(__PSP2__)                  
+#if defined(__PSP2__) // NOT __SWITCH__
 #include "psp2-dirent.h"
 #else
 #include <dirent.h>
@@ -25,7 +25,7 @@
 #include "gp2x.h"
 #include <SDL_ttf.h>
 
-                                                                     
+/* PocketUAE config file. Used for parsing PocketUAE-like options. */
 #include "cfgfile.h" 
 
 #if defined(__PSP2__) || defined(__SWITCH__)
@@ -66,7 +66,7 @@ extern char currentDir[300];
 static void draw_memDiskMenu(int c)
 {
 	static int b=0;
-	int bb=(b%6)/3;		                                       
+	int bb=(b%6)/3;		/* Inverted/normal selection drawing */
 
 	int leftMargin=3;
 	int tabstop1 = 17;
@@ -386,8 +386,8 @@ static int key_memDiskMenu(int *c)
 				case SDLK_END: hit1=1; break;
 				case SDLK_DELETE: case SDLK_BACKSPACE: 
 				case SDLK_ESCAPE: case SDLK_PAGEUP: del=1; break;
-				case SDLK_LCTRL: hit2=1; break;                                                 
-				                                                     
+				case SDLK_LCTRL: hit2=1; break; //allow user to quit menu completely at any time
+				//note SDLK_LCTRL corresponds to ButtonSelect on Vita
 #if !defined(__PSP2__) && !defined(__SWITCH__)
 				case SDLK_HOME: hit0=1; break;
 				case SDLK_LALT: hit1=1; break;
@@ -441,12 +441,12 @@ static int key_memDiskMenu(int *c)
 			menu_last_press_time=now;
 		}
 	
-		if (hit2)                                                    
+		if (hit2) //Does the user want to cancel the menu completely?
 		{
 			if (emulating)
 			{
 				end = -1; 
-				quit_pressed_in_submenu = 1;                                   
+				quit_pressed_in_submenu = 1; //Tell the mainMenu to cancel, too
 			}
 		}	
 		else if (hit1)
@@ -531,7 +531,7 @@ static int key_memDiskMenu(int *c)
 							mainMenu_fastMemory = 4;
 					}
 				
-					                                            
+					/* Fast memory > 0 => max 2MB chip memory */
 					if ((mainMenu_fastMemory > 0) && (mainMenu_chipMemory > 2))
 						mainMenu_chipMemory = 2;
 					UpdateMemorySettings();

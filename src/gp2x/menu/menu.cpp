@@ -24,7 +24,7 @@
 #include "sdl2_to_sdl1.h"
 #endif
 
-#if defined(__PSP2__)                  
+#if defined(__PSP2__) // NOT __SWITCH__
 #include "psp2_shader.h"
 #include "vita2d_fbo/includes/vita2d.h"
 #include "uae_gui_vita.h"
@@ -36,7 +36,7 @@ typedef struct private_hwdata {
 	vita2d_texture *texture;
 	SDL_Rect dst;
 } private_hwdata;
-#endif                 
+#endif //PRIVATE_HWDATA
 #endif
 
 extern int mainMenu_background;
@@ -183,9 +183,9 @@ for(y = 0; y < sizeY; y++)
    {
      unsigned short v = p[x];
 
-     *b++ = ((v & systemRedMask  ) >> systemRedShift  ) << 3;     
-     *b++ = ((v & systemGreenMask) >> systemGreenShift) << 2;     
-     *b++ = ((v & systemBlueMask ) >> systemBlueShift ) << 3;     
+     *b++ = ((v & systemRedMask  ) >> systemRedShift  ) << 3; // R
+     *b++ = ((v & systemGreenMask) >> systemGreenShift) << 2; // G
+     *b++ = ((v & systemBlueMask ) >> systemBlueShift ) << 3; // B
    }
    p += surface->pitch / 2;
    png_write_row(png_ptr,writeBuffer);
@@ -230,7 +230,7 @@ void CreateScreenshot(int code)
 
 int save_thumb(int code,char *path)
 {
-                          
+//	CreateScreenshot(code);
 	int ret = 0;
 	if(current_screenshot != NULL)
 	  ret = save_png(current_screenshot, path);
@@ -400,7 +400,7 @@ void init_kickstart()
 	{
 #ifdef __PSP2__
 		vita_gui_init();
-		vita_show_message_box("Kickstart Missing", "Kickstart ROM not found!\nPlease copy Kickstart 1.3/3.1 to ux0:/data/uae4all/kickstarts/", "OK (X)");
+		vita_show_message_box("Kickstart Missing", "Kickstart ROM not found!\nPlease copy kick13.rom and kick31.rom to ux0:/data/uae4all/kickstarts/", "OK (X)");
 		kickstart_warning=1;
 #else
 		init_text(0);
@@ -438,14 +438,14 @@ void init_kickstart()
 void init_text(int splash)
 {
 #if defined(__PSP2__) || defined(__SWITCH__)
-	                                        
+	//Display menu always in 320*240 on Vita
 	if(prSDLScreen != NULL) {
 		for (int i=0; i<10; i++)
 		{
 			SDL_FillRect(prSDLScreen,NULL,0);
 			SDL_Flip(prSDLScreen);
 		}
-#ifdef __PSP2__                  
+#ifdef __PSP2__ // NOT __SWITCH__
 		if (prSDLScreen->hwdata != NULL) {
 			private_hwdata *myhwdata = (private_hwdata *)prSDLScreen->hwdata;
 			vita2d_wait_rendering_done();
@@ -473,12 +473,12 @@ void init_text(int splash)
 	SDL_SetVideoModeScaling(x, y, sw, sh);
 	printf("init_text: SDL_SetVideoModeScaling(%i, %i, %i, %i)\n", x, y, (int)sw, (int)sh);
 
-	                                                          
-                                                   
-               
+	//This requires a recent SDL-Vita branch SDL12 for example
+   //https://github.com/rsn8887/SDL-Vita/tree/SDL12
+   //to compile
 	SDL_SetVideoModeBilinear(1);
 
-#ifdef __PSP2__                  
+#ifdef __PSP2__ // NOT __SWITCH__
 	if(shader != NULL) {
         delete(shader);
         shader = NULL;
@@ -574,7 +574,7 @@ void init_text(int splash)
 		dest.h=24;
 		for (int y=0;y<10;y++)
 		{
-			                        
+			//text_window_background
 			dest.y=24*y;
 			for(int x=0;x<15;x++)
 			{
@@ -710,7 +710,7 @@ void write_text_pos(int x, int y, const char * str)
 		  src.h = 8;
 
 		  dest.x = x + i * 7;
-		  dest.y = y;      
+		  dest.y = y; //10;
 		  dest.w = 7;
 		  dest.h = 8;
 		  switch (mainMenu_font) {
@@ -737,9 +737,9 @@ void write_text_pos(int x, int y, const char * str)
 		  dest.x = x + i * 7;
 
 		  if (c == -2)
-			dest.y = y        + 7;
+			dest.y = y /*10*/ + 7;
 		  else if (c == -3)
-			dest.y = y        + 3;
+			dest.y = y /*10*/ + 3;
 		  dest.w = 7;
 		  dest.h = 1;
 
@@ -754,7 +754,7 @@ void write_text_inv(int x, int y, const char * str)
 {
   SDL_Rect dest;
   dest.x = (text_screen->w - 320) / 2 + (x * 7) -2 ;
-  dest.y = (y * 7)        - 2;
+  dest.y = (y * 7) /*10*/ - 2;
   dest.w = (strlen(str) * 7) + 4;
   dest.h = 12;
 
@@ -788,7 +788,7 @@ void write_num_inv(int x, int y, int v)
 		break;
 
   dest.x = (x * 7) -2 ;
-  dest.y = (y * 8)        - 2;
+  dest.y = (y * 8) /*10*/ - 2;
   dest.w = (l * 7) + 4;
   dest.h = 12;
 

@@ -69,7 +69,7 @@ enum { SCREENSHOT, ICON };
 enum { MAIN_MENU_CASE_QUIT, MAIN_MENU_CASE_LOAD, MAIN_MENU_CASE_RUN, MAIN_MENU_CASE_RESET, MAIN_MENU_CASE_CANCEL, MAIN_MENU_CASE_SAVESTATES, MAIN_MENU_CASE_EJECT, MAIN_MENU_CASE_MISC, MAIN_MENU_CASE_SAVE, MAIN_MENU_CASE_CONTROLS, MAIN_MENU_CASE_DISPLAY, MAIN_MENU_CASE_MEMDISK, MAIN_MENU_CASE_LOAD_CONFIG, MAIN_MENU_CASE_DELETE_CONFIG};
 enum { MEMDISK_MENU_CASE_MAIN, MEMDISK_MENU_CASE_MISC };
 
-                                                                           
+/* Just 0x0 and not 680x0, so that constants can fit in ARM instructions */
 #define M68000 000
 #define M68020 020
 
@@ -80,7 +80,7 @@ enum { MEMDISK_MENU_CASE_MAIN, MEMDISK_MENU_CASE_MISC };
 #define DEFAULT_SYSTEMCLOCK 0
 #define DEFAULT_SYNCTHRESHOLD 2
 #define DEFAULT_SKIPINTRO 1
-#define DEFAULT_CHIPSET_SELECT 0x100;                                  
+#define DEFAULT_CHIPSET_SELECT 0x100;//blitter=immediate is new default
 #define DEFAULT_NTSC 0
 #define DEFAULT_JOYCONF 2
 #define DEFAULT_CHIPMEM_SELECT 1
@@ -98,11 +98,11 @@ enum { MEMDISK_MENU_CASE_MAIN, MEMDISK_MENU_CASE_MISC };
 
 #define MENU_MEMDISK_WINDOW_WIDTH 40
 
-                     
-#define SELECTION_DRAWING_INTERVAL	250	                               
-#define EVENT_POLLING_INTERVAL		50	                             
+/* Event intervals */
+#define SELECTION_DRAWING_INTERVAL	250	/* [ms] inverted/normal text */
+#define EVENT_POLLING_INTERVAL		50	/* [ms] SDL events polling */
 
-                          
+/* What is being loaded */
 #define MENU_LOAD_FLOPPY 1
 #define MENU_LOAD_HD_DIR 2
 #define MENU_LOAD_HDF 3

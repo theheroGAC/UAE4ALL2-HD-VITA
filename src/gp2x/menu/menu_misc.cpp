@@ -9,7 +9,7 @@
 
 #include <sys/stat.h>
 #include <unistd.h>
-#if defined(__PSP2__)                  
+#if defined(__PSP2__) // NOT __SWITCH__
 #include "psp2-dirent.h"
 #else
 #include<dirent.h>
@@ -64,7 +64,7 @@ enum {
 #ifdef PANDORA
 	MENUMISC_PANDORASPEED,
 #endif
-#endif            
+#endif // __PSP2__
 #ifdef ANDROIDSDL
 	MENUMISC_ONSCREEN,
 #endif
@@ -82,7 +82,7 @@ enum {
 	MENUMISC_LEFTSTICKMOUSE,
 #endif
 	MENUMISC_MOUSEMULTIPLIER,
-#if !defined(__PSP2__) && !defined(__SWITCH__)                     
+#if !defined(__PSP2__) && !defined(__SWITCH__) // No stylus on Vita
 	MENUMISC_STYLUSOFFSET,
 #endif
 #ifdef __SWITCH__
@@ -123,7 +123,7 @@ static void draw_miscMenu(int c)
 	text_draw_background();
 	text_draw_window(2,2,42,30,text_str_misc_title);
 
-	                      
+	// MENUMISC_RETURNMAIN
 	if (menuMisc == MENUMISC_RETURNMAIN && bb)
 		write_text_inv(3, menuLine, "Return to main menu");
 	else
@@ -133,7 +133,7 @@ static void draw_miscMenu(int c)
 	write_text(leftMargin,menuLine,text_str_misc_separator);
 	menuLine++;
 
-	               
+	// MENUMISC_CPU
 	write_text(leftMargin,menuLine,"CPU");
 	if ((mainMenu_CPU_model==0)&&((menuMisc!=MENUMISC_CPU)||(bb)))
 	  write_text_inv(tabstop2,menuLine,"68000");
@@ -145,7 +145,7 @@ static void draw_miscMenu(int c)
 	else
 	  write_text(tabstop5,menuLine,"68020");
 
-	                   
+	// MENUMISC_CHIPSET
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Chipset");
 	
@@ -164,7 +164,7 @@ static void draw_miscMenu(int c)
 	else
 		write_text(tabstop6,menuLine,"AGA");
 				
-	                     
+	// MENUMISC_KICKSTART
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Kickstart");
 	if ((kickstart==0)&&((menuMisc!=MENUMISC_KICKSTART)||(bb)))
@@ -192,7 +192,7 @@ static void draw_miscMenu(int c)
 	else
 		write_text(tabstop9+2,menuLine,"Custom");
 
-	                    
+	// MENUMISC_CPUSPEED
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"CPU Speed");
 	if ((mainMenu_CPU_speed==0)&&((menuMisc!=MENUMISC_CPUSPEED)||(bb)))
@@ -215,7 +215,7 @@ static void draw_miscMenu(int c)
 	else
 		write_text(tabstop9+4,menuLine,"56MHz");
 
-	                   
+	// MENUMISC_BLITTER
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Blitter");
 	
@@ -234,7 +234,7 @@ static void draw_miscMenu(int c)
 	else
 		write_text(tabstop9+2,menuLine,"Improved");
 
-	                            
+	// MENUMISC_SPRITECOLLISIONS
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Sprite Collisions");
 	if ((mainMenu_spriteCollisions==0)&&((menuMisc!=MENUMISC_SPRITECOLLISIONS)||(bb)))
@@ -249,7 +249,7 @@ static void draw_miscMenu(int c)
 
 #if !defined(__PSP2__) && !defined(__SWITCH__)
 #ifdef PANDORA
-                          
+  // MENUMISC_PANDORASPEED
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Pandora CPU-Speed");
 	snprintf((char*)cpuSpeed, 8, "%d",mainMenu_cpuSpeed);
@@ -259,10 +259,10 @@ static void draw_miscMenu(int c)
 		write_text(tabstop4-1,menuLine,cpuSpeed);
 	write_text(tabstop6-1,menuLine,"MHz");
 #endif
-#endif            
+#endif // __PSP2__
 
 #ifdef ANDROIDSDL
-                      
+  // MENUMISC_ONSCREEN
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"On-Screen Control");
 	if ((mainMenu_onScreen==1)&&((menuMisc!=MENUMISC_ONSCREEN)||(bb)))
@@ -279,7 +279,7 @@ static void draw_miscMenu(int c)
 	write_text(leftMargin,menuLine,text_str_misc_separator);
 	menuLine++;
 
-	                      
+	// MENUMISC_CONTROLCFG
 	write_text(leftMargin,menuLine,"Control Config");
 
 	if ((mainMenu_joyConf==0)&&((menuMisc!=MENUMISC_CONTROLCFG)||(bb)))
@@ -320,7 +320,7 @@ static void draw_miscMenu(int c)
 	else if (mainMenu_joyConf==3) write_text(3,menuLine,"(A=Fire X=Jump Y=Autofire B=2nd)");
 #endif
 
-                      
+  // MENUMISC_JOYSTICK
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Controller 1");
   
@@ -334,7 +334,7 @@ static void draw_miscMenu(int c)
 	else
 		write_text(tabstop9-1,menuLine,"Amiga Port1");
   
-	                        
+	// MENUMISC_AUTOFIRERATE
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Autofire Rate");
 
@@ -354,7 +354,7 @@ static void draw_miscMenu(int c)
 		write_text(tabstop9-1,menuLine,"Heavy");
 
 #if defined(__PSP2__) || defined(__SWITCH__)
-	                                
+	// MENUMISC_CUSTOMAUTOFIREBUTTON
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Custom Autofire Button");
 
@@ -417,7 +417,7 @@ static void draw_miscMenu(int c)
 	menuLine++;
 
 #if defined(__PSP2__) || defined(__SWITCH__)
-	                          
+	// MENUMISC_MOUSEEMULATION
 	write_text(leftMargin,menuLine,"Mouse");	
 	if ((mainMenu_mouseEmulation==0) && ((menuMisc!=MENUMISC_MOUSEEMULATION)||(bb)))
 		write_text_inv(tabstop1-8,menuLine,"Off");
@@ -428,7 +428,7 @@ static void draw_miscMenu(int c)
 	else
 		write_text(tabstop3-8,menuLine,"On");	
 #ifdef __SWITCH__
-	                         
+	// MENUMISC_SINGLEJOYCONS
 	write_text(tabstop2,menuLine,"Split JoyCons");
 	if (mainMenu_singleJoycons==0)
 	{
@@ -447,7 +447,7 @@ static void draw_miscMenu(int c)
 #else
 	write_text(tabstop3-5,menuLine,"(can disturb 2nd player)");
 #endif
-	                          
+	// MENUMISC_LEFTSTICKMOUSE
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Mouse Control");	
 	if (mainMenu_leftStickMouse==0)
@@ -466,7 +466,7 @@ static void draw_miscMenu(int c)
 	}
 #endif
 
-	                           
+	// MENUMISC_MOUSEMULTIPLIER
 	menuLine+=2;
 	write_text(leftMargin,menuLine,text_str_mouse_multiplier);
 
@@ -477,7 +477,7 @@ static void draw_miscMenu(int c)
 		write_text(tabstop2,menuLine,cpuSpeed);
 
 #ifdef __SWITCH__
-	                  
+	// MENUMISC_SWAPAB
 	write_text(tabstop6-2,menuLine,"Menu OK");
 	if (mainMenu_swapAB==0)
 	{
@@ -496,7 +496,7 @@ static void draw_miscMenu(int c)
 #endif
 
 #if !defined(__PSP2__) && !defined(__SWITCH__)
-	                        
+	// MENUMISC_STYLUSOFFSET
 	menuLine+=2;
 	write_text(leftMargin,menuLine,text_str_stylus_offset);
 
@@ -524,11 +524,11 @@ static void draw_miscMenu(int c)
 		write_text_inv(tabstop9,menuLine,text_str_8px);
 	else
 		write_text(tabstop9,menuLine,text_str_8px);
-#endif           
+#endif //__PSP2__
 #if defined(__PSP2__) || defined(__SWITCH__)
 
-	                                        
-	                   
+	//Analog Stick Deadzone settings on Vita
+	//MENUMISC_DEADZONE
 	menuLine+=2;
 	write_text(leftMargin,menuLine,"Mouse Deadzone");
   	snprintf((char*)cpuSpeed, 8, "%d", mainMenu_deadZone);
@@ -537,7 +537,7 @@ static void draw_miscMenu(int c)
 	else
 		write_text(tabstop2,menuLine,cpuSpeed);
 
-	                         
+	// MENUMISC_TOUCHCONTROLS
 	write_text(tabstop6-2,menuLine,"Touch");
 	if (mainMenu_touchControls==0)
 	{
@@ -570,7 +570,7 @@ static void draw_miscMenu(int c)
 	}
 
 #else
-	                    
+	// MENUMISC_TAPDELAY
 	menuLine+=2;
 	write_text(leftMargin,menuLine,text_str_tap_delay);
 
@@ -641,8 +641,8 @@ static int key_miscMenu(int *c)
 			case SDLK_UP: up=1; break;
 			case SDLK_DOWN: down=1; break;
 			case SDLK_PAGEDOWN: hit0=1; break;
-			case SDLK_LCTRL: hit2=1; break;                                                 
-			                                                    
+			case SDLK_LCTRL: hit2=1; break; //allow user to quit menu completely at any time
+			//note SDLK_CTRL corresponds to ButtonSelect on Vita
 #if defined(__PSP2__) || defined(__SWITCH__)
 			case SDLK_END: hit1=1; break;
 #else
@@ -704,12 +704,12 @@ static int key_miscMenu(int *c)
 		}
 #endif
 
-		if (hit2)                                                    
+		if (hit2) //Does the user want to cancel the menu completely?
 		{
 			if (emulating)
 			{
 				end = -1; 
-				quit_pressed_in_submenu = 1;                                   
+				quit_pressed_in_submenu = 1; //Tell the mainMenu to cancel, too
 			}
 		}	
 #if !defined(__PSP2__) && !defined(__SWITCH__)
@@ -758,7 +758,7 @@ static int key_miscMenu(int *c)
 			case MENUMISC_CHIPSET:
 				if (left)
 				{
-					switch (mainMenu_chipset & 0xff)                                  
+					switch (mainMenu_chipset & 0xff) //low is chipset, high is blitter
 					{
 						case 1:
 							mainMenu_chipset=(mainMenu_chipset & 0xff00) | 0;
@@ -798,7 +798,7 @@ static int key_miscMenu(int *c)
 			case MENUMISC_BLITTER:
 				if (left)
 				{
-					switch (mainMenu_chipset & 0xff00)                                  
+					switch (mainMenu_chipset & 0xff00) //low is chipset, high is blitter
 					{
 						case 0x200:
 							mainMenu_chipset=(mainMenu_chipset & 0xff) | 0x100;
@@ -882,7 +882,7 @@ static int key_miscMenu(int *c)
 					mainMenu_cpuSpeed+=10;
 				break;
 #endif
-#endif           
+#endif //__PSP2__
 #if defined(__PSP2__) || defined(__SWITCH__)
 			case MENUMISC_LEFTSTICKMOUSE:
 				if (left || right) 
@@ -1055,7 +1055,7 @@ static int key_miscMenu(int *c)
 						mainMenu_stylusOffset = 0;
 				}
 				break;
-#endif           
+#endif //__PSP2__
 
 #if defined(__PSP2__) || defined(__SWITCH__)
 			case MENUMISC_DEADZONE:

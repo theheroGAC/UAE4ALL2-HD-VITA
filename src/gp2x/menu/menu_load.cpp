@@ -5,7 +5,7 @@
 #include "sysdeps.h"
 #include "config.h"
 #include "menu.h"
-#if defined(__PSP2__)                  
+#if defined(__PSP2__) // NOT __SWITCH__
 #include <unistd.h>
 #include "psp2-dirent.h"
 #else
@@ -37,7 +37,7 @@
 
 char romFileName[PATH_MAX];
 
-                                             
+/* What is being loaded, floppy/hd dir/hdf */
 int menu_load_type;
 
 extern char filename0[256];
@@ -122,7 +122,7 @@ static void draw_dirlist(char *curdir, struct dirent **namelist, int n, int sel)
 	SDL_Rect r;
 	extern SDL_Surface *text_screen;
 	text_draw_background();
-	                                                          
+	// widescreen file list allows for longer filename display
 	r.x=80-64; r.y=0; r.w=150-24+64+64+(text_screen->w-320)/2+32; r.h=240;
 	int x_win = 2 - (text_screen->w - 320) / 2 / 7;
 	int y_win = 2;
@@ -272,7 +272,7 @@ static int cmpDirentString(const void *first, const void *second)
 {
 	dirent *direntA = *(dirent * const *) first;
 	dirent *direntB = *(dirent * const *) second;
-	                         
+	// Directories on the top
 	if (direntA->d_type != direntB->d_type)
 	{
 		if (direntA->d_type == DT_DIR)
@@ -280,7 +280,7 @@ static int cmpDirentString(const void *first, const void *second)
 		else
 			return 1;
 	}
-	                                    
+	// Filenames sorted case-insensitive
 	char *a = direntA->d_name;
 	char *b = direntB->d_name;
 	while (*a && *b) {
@@ -292,9 +292,9 @@ static int cmpDirentString(const void *first, const void *second)
    }
    int r = tolower(*a) - tolower(*b);
 	if (r) return r;
-                                                                    
-                        
-   return -strcmp(a, b);                           
+   // if equal ignoring case, use opposite of strcmp() result to get
+   // lower before upper
+   return -strcmp(a, b); //aka: return strcmp(b, a)
 }
 #endif
 
@@ -372,13 +372,13 @@ static int menuLoadLoop(char *curr_path)
 		return 0;
 	}
 	
-	                     
+	//sort alphabetically
 	qsort(namelist, n, sizeof(dirent*), cmpDirentString);
 	
 	if (n<10) SDL_Delay(70);
 	else SDL_Delay(40);
 #else
-	                                
+	// is this a dir or a full path?
 	if ((dir = opendir(curr_path)))
 		closedir(dir);
 	else 
@@ -393,11 +393,11 @@ static int menuLoadLoop(char *curr_path)
 
 	if (n < 0) 
 	{
-		           
+		// try root
 		n = scandir("/", &namelist, scandir_filter, scandir_cmp);
 		if (n < 0) 
 		{
-			                  
+			// oops, we failed
 			printf("dir: "); printf(curr_path); printf("\n");
 			perror("scandir");
 			return 0;
@@ -406,7 +406,7 @@ static int menuLoadLoop(char *curr_path)
 	if (n<10) usleep(70*1024);
 	else usleep(40*1024);
 #endif
-	                  
+	// try to find sel
 	if (fname != NULL) 
 	{
 		int i;
@@ -426,7 +426,7 @@ static int menuLoadLoop(char *curr_path)
 	int left=0, right=0, up=0, down=0, hit0=0, hit1=0, hit2=0, hit3=0, hit4=0, hitL=0;
 	while(hit0+hit1+hitL==0)
 	{
-		                     
+		//unsigned long keys;
 		draw_dirlist(curr_path, namelist, n, sel);
 		delay ++;
 		
@@ -479,11 +479,11 @@ static int menuLoadLoop(char *curr_path)
 					case SDLK_RSHIFT: hit3=1; break;
 					case SDLK_RCTRL: hit4=1; break;
 #if defined(__PSP2__) || defined(__SWITCH__)
-					                          
+					// SELECT to select HD dir
 					case SDLK_LCTRL: hitL=1; break;
-					                        
+					// TRIANGLE for fileinfo
 					case SDLK_PAGEUP: hit2=1; break;
-					                    
+					// CIRCLE for cancel
 					case SDLK_END: hit1=1; break;
 #endif
 					case SDLK_l: hitL=1;
@@ -532,12 +532,12 @@ static int menuLoadLoop(char *curr_path)
 				menu_last_press_time=now;
 			}
 			
-			if(up)  { sel--;   if (sel < 0)   sel = n-2;                      }
-			if(down)  { sel++;   if (sel > n-2) sel = 0;                    }
-			if(left)  { sel-=10; if (sel < 0)   sel = 0;                    }
-			if(hit3)     { sel-=24; if (sel < 0)   sel = 0;                    }
-			if(right) { sel+=10; if (sel > n-2) sel = n-2;                    }
-			if(hit4)     { sel+=24; if (sel > n-2) sel = n-2;                    }
+			if(up)  { sel--;   if (sel < 0)   sel = n-2; /*usleep(10*1024);*/ }
+			if(down)  { sel++;   if (sel > n-2) sel = 0;/*usleep(10*1024);*/}
+			if(left)  { sel-=10; if (sel < 0)   sel = 0;/*usleep(10*1024);*/}
+			if(hit3)     { sel-=24; if (sel < 0)   sel = 0;/*usleep(10*1024);*/}
+			if(right) { sel+=10; if (sel > n-2) sel = n-2;/*usleep(10*1024);*/}
+			if(hit4)     { sel+=24; if (sel > n-2) sel = n-2;/*usleep(10*1024);*/}
 			if(hit2)     { run_menuFileinfo(namelist[sel+1]->d_name);}
 			if(hit0 || hitL)
 			{
@@ -602,7 +602,7 @@ static int menuLoadLoop(char *curr_path)
 					int newlen = strlen(curr_path) + strlen(namelist[sel+1]->d_name) + 2;
 					char *p;
 					char *newdir;
-					                                                                     
+					/* Hard file dir is being selected ? (L-key is used to select dir) */
 					if ((menu_load_type == MENU_LOAD_HD_DIR) && hitL)
 					{
 						strcpy(uae4all_hard_dir, curr_path);
@@ -631,10 +631,10 @@ static int menuLoadLoop(char *curr_path)
 						{
 							strcpy(newdir, "ux0:/");
 						}
-						                                                         
-						   
-						                            
-						   
+						//else if (strcmp(namelist[sel+1]->d_name, "sdmc:") == 0)
+						//{
+						//	strcpy(newdir, "sdmc:/");
+						//}
 						else 
 						{
 							strcpy(newdir, curr_path);
