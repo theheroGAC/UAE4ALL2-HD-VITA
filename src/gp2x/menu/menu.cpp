@@ -1,0 +1,894 @@
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include "sysconfig.h"
+#include "sysdeps.h"
+#include "config.h"
+#include "menu.h"
+
+#include <SDL.h>
+#include <SDL_image.h>
+#include "uae.h"
+#include "options.h"
+#include "zfile.h"
+#include "sound.h"
+#include <png.h>
+#include "fade.h"
+#include "xwin.h"
+
+#if !defined(__PSP2__) && !defined(__SWITCH__)
+#include <SDL_gp2x.h>
+#endif
+
+#ifdef USE_SDL2
+#include "sdl2_to_sdl1.h"
+#endif
+
+#if defined(__PSP2__)                  
+#include "psp2_shader.h"
+#include "vita2d_fbo/includes/vita2d.h"
+#include "uae_gui_vita.h"
+extern PSP2Shader *shader;
+extern int mainMenu_shader;
+#ifndef PRIVATE_HWDATA
+#define PRIVATE_HWDATA
+typedef struct private_hwdata {
+	vita2d_texture *texture;
+	SDL_Rect dst;
+} private_hwdata;
+#endif                 
+#endif
+
+extern int mainMenu_background;
+extern int mainMenu_font;
+extern int bReloadKickstart;
+
+#ifdef USE_GUICHAN
+extern int mainMenu_displayHires;
+extern int visibleAreaWidth;
+extern int mainMenu_displayedLines;
+#endif
+
+SDL_Surface *current_screenshot = NULL;
+
+#define VIDEO_FLAGS_INIT SDL_SWSURFACE|SDL_FULLSCREEN
+#ifdef ANDROIDSDL
+#define VIDEO_FLAGS VIDEO_FLAGS_INIT
+#else
+#define VIDEO_FLAGS VIDEO_FLAGS_INIT | SDL_DOUBLEBUF
+#endif
+SDL_Surface *text_screen=NULL, *text_image_0, *text_image_1, *text_image_2, *text_background_0, *text_background_1, *text_window_background, *window_screen;
+
+static Uint32 menu_inv_color=0, menu_win0_color=0, menu_win1_color=0;
+static Uint32 menu_barra0_color=0, menu_barra1_color=0;
+static Uint32 menu_win0_color_base=0, menu_win1_color_base=0;
+
+void write_text_pos(int x, int y, const char * str);
+void write_num(int x, int y, int v);
+int menu_msg_pos=330;
+int menu_moving=1;
+Uint32 menu_msg_time=0x12345678;
+int skipintro=1;
+int kickstart_warning=0;
+int displaying_menu = 1;
+
+#ifdef __PSP2__
+int menu_screen_width = 848;
+int menu_screen_height = 480;
+#else
+int menu_screen_width = 854;
+int menu_screen_height = 480;
+#endif
+
+static void obten_colores(void)
+{
+	FILE *f=fopen(DATA_PREFIX "colors.txt", "rt");
+	if (f)
+	{
+		Uint32 r,g,b;
+		fscanf(f,"menu_inv_color=0x%X,0x%X,0x%X\n",&r,&g,&b);
+		menu_inv_color=SDL_MapRGB(text_screen->format,r,g,b);
+		fscanf(f,"menu_win0_color=0x%X,0x%X,0x%X\n",&r,&g,&b);
+		menu_win0_color=SDL_MapRGB(text_screen->format,r,g,b);
+		fscanf(f,"menu_win1_color=0x%X,0x%X,0x%X\n",&r,&g,&b);
+		menu_win1_color=SDL_MapRGB(text_screen->format,r,g,b);
+		fscanf(f,"menu_barra0_color=0x%X,0x%X,0x%X\n",&r,&g,&b);
+		menu_barra0_color=SDL_MapRGB(text_screen->format,r,g,b);
+		fscanf(f,"menu_barra1_color=0x%X,0x%X,0x%X\n",&r,&g,&b);
+		menu_barra1_color=SDL_MapRGB(text_screen->format,r,g,b);
+		fclose(f);
+	}
+	else
+	{
+		menu_inv_color=SDL_MapRGB(text_screen->format, 0x20, 0x20, 0x40);
+		menu_win0_color=SDL_MapRGB(text_screen->format, 0x10, 0x08, 0x08);
+		menu_win1_color=SDL_MapRGB(text_screen->format, 0x20, 0x10, 0x10);
+		menu_barra0_color=SDL_MapRGB(text_screen->format, 0x30, 0x20, 0x20);
+		menu_barra1_color=SDL_MapRGB(text_screen->format, 0x50, 0x40, 0x40);
+	}
+	menu_win0_color_base=menu_win0_color;
+	menu_win1_color_base=menu_win1_color;
+}
+
+#define  systemRedShift      (prSDLScreen->format->Rshift)
+#define  systemGreenShift    (prSDLScreen->format->Gshift)
+#define  systemBlueShift     (prSDLScreen->format->Bshift)
+#define  systemRedMask       (prSDLScreen->format->Rmask)
+#define  systemGreenMask     (prSDLScreen->format->Gmask)
+#define  systemBlueMask      (prSDLScreen->format->Bmask)
+
+int save_png(SDL_Surface* surface,char *path)
+{
+  int w = surface->w;
+  int h = surface->h;
+  unsigned char * pix = (unsigned char *)surface->pixels;
+  unsigned char *writeBuffer = (unsigned char *)malloc(w * 3);
+  if (!writeBuffer) return 0;
+  FILE *f  = fopen(path,"wb");
+  if(!f) {
+    free(writeBuffer);
+    return 0;
+  }
+  png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING,
+                                                NULL,
+                                                NULL,
+                                                NULL);
+  if(!png_ptr) {
+    fclose(f);
+    free(writeBuffer);
+    return 0;
+  }
+
+  png_infop info_ptr = png_create_info_struct(png_ptr);
+
+  if(!info_ptr) {
+    png_destroy_write_struct(&png_ptr,NULL);
+    fclose(f);
+    free(writeBuffer);
+    return 0;
+  }
+
+  if (setjmp(png_jmpbuf(png_ptr))) {
+    png_destroy_write_struct(&png_ptr, &info_ptr);
+    fclose(f);
+    free(writeBuffer);
+    return 0;
+  }
+
+  png_init_io(png_ptr,f);
+
+  png_set_IHDR(png_ptr,
+               info_ptr,
+               w,
+               h,
+               8,
+               PNG_COLOR_TYPE_RGB,
+               PNG_INTERLACE_NONE,
+               PNG_COMPRESSION_TYPE_DEFAULT,
+               PNG_FILTER_TYPE_DEFAULT);
+
+  png_write_info(png_ptr,info_ptr);
+
+  unsigned char *b = writeBuffer;
+
+  int sizeX = w;
+  int sizeY = h;
+  int y;
+  int x;
+
+unsigned short *p = (unsigned short *)pix;
+for(y = 0; y < sizeY; y++)
+{
+   for(x = 0; x < sizeX; x++)
+   {
+     unsigned short v = p[x];
+
+     *b++ = ((v & systemRedMask  ) >> systemRedShift  ) << 3;     
+     *b++ = ((v & systemGreenMask) >> systemGreenShift) << 2;     
+     *b++ = ((v & systemBlueMask ) >> systemBlueShift ) << 3;     
+   }
+   p += surface->pitch / 2;
+   png_write_row(png_ptr,writeBuffer);
+   b = writeBuffer;
+}
+
+  png_write_end(png_ptr, info_ptr);
+
+  png_destroy_write_struct(&png_ptr, &info_ptr);
+
+  fclose(f);
+  free(writeBuffer);
+  return 1;
+}
+
+
+void CreateScreenshot(int code)
+{
+	int w, h;
+
+  if(current_screenshot != NULL)
+  {
+    SDL_FreeSurface(current_screenshot);
+    current_screenshot = NULL;
+  }
+
+  if (code == SCREENSHOT)
+  {
+		w=prSDLScreen->w;
+		h=prSDLScreen->h;
+	}
+	else
+	{
+		w=32;
+		h=32;
+	}
+	
+	current_screenshot = SDL_CreateRGBSurface(prSDLScreen->flags,w,h,prSDLScreen->format->BitsPerPixel,prSDLScreen->format->Rmask,prSDLScreen->format->Gmask,prSDLScreen->format->Bmask,prSDLScreen->format->Amask);
+	SDL_BlitSurface(prSDLScreen, NULL, current_screenshot, NULL);
+}
+
+
+int save_thumb(int code,char *path)
+{
+                          
+	int ret = 0;
+	if(current_screenshot != NULL)
+	  ret = save_png(current_screenshot, path);
+	return ret;
+}
+
+
+void menu_raise(void)
+{
+#if !defined(__PSP2__) && !defined(__SWITCH__)
+	int i;
+	for(i=80;i>=0;i-=16)
+	{
+#if !defined(NO_SOUND) && defined(MENU_MUSIC)
+		Mix_VolumeMusic(MUSIC_VOLUME-(i<<1));
+#endif
+		text_draw_background();
+		fade16(text_screen,i);
+		text_flip();
+		SDL_Delay(10);
+	}
+#endif
+}
+
+void menu_unraise(void)
+{
+#if !defined(__PSP2__) && !defined(__SWITCH__)
+	int i;
+	for(i=0;i<=80;i+=16)
+	{
+#if !defined(NO_SOUND) && defined(MENU_MUSIC)
+		Mix_VolumeMusic(MUSIC_VOLUME-(i<<1));
+#endif
+		text_draw_background();
+		fade16(text_screen,i);
+		text_flip();
+		SDL_Delay(10);
+	}
+	text_draw_background();
+	text_flip();
+	SDL_Delay(10);
+#endif
+}
+
+static void update_window_color(void)
+{
+	static int cambio=0;
+	static int spin=0;
+
+	Uint8 r,g,b;
+	int cambio2=cambio>>3;
+	SDL_GetRGB(menu_win0_color_base,text_screen->format,&r,&g,&b);
+	if (((int)r)-cambio2>0) r-=cambio2;
+	else r=0;
+	if (((int)g)-cambio2>0) g-=cambio2;
+	else g=0;
+	if (((int)b)-cambio2>0) b-=cambio2;
+	else b=0;
+	menu_win0_color=SDL_MapRGB(text_screen->format,r,g,b);
+	SDL_GetRGB(menu_win1_color_base,text_screen->format,&r,&g,&b);
+	if (((int)r)-cambio>0) r-=cambio;
+	else r=0;
+	if (((int)g)-cambio>0) g-=cambio;
+	else g=0;
+	if (((int)b)-cambio>0) b-=cambio;
+	else b=0;
+	menu_win1_color=SDL_MapRGB(text_screen->format,r,g,b);
+	if (spin)
+	{
+		if (cambio<=0) spin=0;
+		else cambio-=2;
+
+	}
+	else
+	{
+		if (cambio>=24) spin=1;
+		else cambio+=2;
+	}
+}
+
+void text_draw_background()
+{
+	static int pos_x=12345678;
+	static int pos_y=12345678;
+	SDL_Rect r;
+	int i,j;
+	SDL_Surface *text_background;
+
+if (mainMenu_background==0)
+{
+	text_background = text_background_0;
+	r.x=0;
+	r.y=0;
+	r.w=text_background->w;
+	r.h=text_background->h;
+	SDL_BlitSurface(text_background,NULL,text_screen,&r);
+}
+else
+{
+	text_background = text_background_1;
+	int w=(text_screen->w+text_background->w-1);
+	int h=(text_screen->h+text_background->h-1);
+	if (menu_moving)
+	{
+		if (pos_x>=0) 
+			pos_x=-640;
+		else
+			pos_x++;
+		if (pos_y>=0)
+			pos_y=-480;
+		else
+			pos_y++;
+	}
+
+	for(i=pos_x;i<w;i+=text_background->w)
+		for(j=pos_y;j<h;j+=text_background->h)
+		{
+			r.x=i;
+			r.y=j;
+			r.w=text_background->w;
+			r.h=text_background->h;
+			if (r.x + r.w > 0 || r.y + r.h > 0) {
+				SDL_BlitSurface(text_background,NULL,text_screen,&r);
+			}
+		}
+};
+	if (menu_moving)
+		update_window_color();
+}
+
+void text_flip_with_image(SDL_Surface *img, int x, int y)
+{
+#if !defined(__PSP2__) && !defined(__SWITCH__)
+	SDL_Delay(10);
+#endif
+	SDL_Rect dst;
+	dst.x = 0;
+	dst.y = 0;
+	dst.w = 2 * text_screen->w;
+	dst.h = 2 * text_screen->h;
+	SDL_SoftStretch(text_screen,NULL,prSDLScreen,&dst);
+	dst.x = x;
+	dst.y = y;
+	dst.w = img->w;
+	dst.h = img->h;
+	SDL_BlitSurface(img, NULL, prSDLScreen, &dst);
+	SDL_Flip(prSDLScreen);
+}
+
+void text_flip(void)
+{
+#if !defined(__PSP2__) && !defined(__SWITCH__)
+	SDL_Delay(10);
+#endif
+	SDL_Rect dst;
+	dst.x = 0;
+	dst.y = 0;
+	dst.w = 2 * text_screen->w;
+	dst.h = 2 * text_screen->h;
+	SDL_SoftStretch(text_screen,NULL,prSDLScreen,&dst);
+	SDL_Flip(prSDLScreen);
+}
+
+void init_kickstart()
+{
+	if (uae4all_init_rom(romfile))
+	{
+#ifdef __PSP2__
+		vita_gui_init();
+		vita_show_message_box("Kickstart Missing", "Kickstart ROM not found!\nPlease copy Kickstart 1.3/3.1 to ux0:/data/uae4all/kickstarts/", "OK (X)");
+		kickstart_warning=1;
+#else
+		init_text(0);
+		text_draw_background();
+		text_draw_window(2, 6, 42, 12, "--- ERROR ---");
+		write_text(6, 12, "kickstart rom(s) not found!");
+		write_text(8, 14, "Press any button to exit");
+		text_flip();
+		SDL_Delay(333);
+
+		SDL_Event ev;
+		while(true) {
+			while (SDL_PollEvent(&ev)) {
+				switch (ev.type) {
+					case SDL_QUIT:
+						exit(0);
+					case SDL_KEYDOWN:
+					case SDL_JOYBUTTONDOWN:
+					case SDL_MOUSEBUTTONDOWN:
+						exit(0);
+				}
+			}
+			SDL_Delay(10);
+		}
+		kickstart_warning=1;
+#endif
+	}
+	else
+	{
+		kickstart_warning=0;
+		bReloadKickstart=1;
+	}
+}
+
+void init_text(int splash)
+{
+#if defined(__PSP2__) || defined(__SWITCH__)
+	                                        
+	if(prSDLScreen != NULL) {
+		for (int i=0; i<10; i++)
+		{
+			SDL_FillRect(prSDLScreen,NULL,0);
+			SDL_Flip(prSDLScreen);
+		}
+#ifdef __PSP2__                  
+		if (prSDLScreen->hwdata != NULL) {
+			private_hwdata *myhwdata = (private_hwdata *)prSDLScreen->hwdata;
+			vita2d_wait_rendering_done();
+			if (myhwdata->texture != NULL) {
+				vita2d_free_texture(myhwdata->texture);
+			}
+			SDL_free(prSDLScreen->hwdata);
+			prSDLScreen->hwdata = NULL;
+			prSDLScreen->pixels = NULL;
+		}
+#endif
+		SDL_FreeSurface(prSDLScreen);
+      prSDLScreen = NULL;
+	};
+
+	displaying_menu = 1;
+
+	prSDLScreen = SDL_SetVideoMode(menu_screen_width, menu_screen_height, 16, SDL_HWSURFACE|SDL_DOUBLEBUF);
+	printf("init_text: SDL_SetVideoMode(%i, %i, 16)\n", menu_screen_width, menu_screen_height);
+
+	float sh = 480;
+	float sw = (sh * menu_screen_width) / menu_screen_height;
+	int x = (960 - sw) / 2;
+	int y = (544 - sh) / 2;
+	SDL_SetVideoModeScaling(x, y, sw, sh);
+	printf("init_text: SDL_SetVideoModeScaling(%i, %i, %i, %i)\n", x, y, (int)sw, (int)sh);
+
+	                                                          
+                                                   
+               
+	SDL_SetVideoModeBilinear(1);
+
+#ifdef __PSP2__                  
+	if(shader != NULL) {
+        delete(shader);
+        shader = NULL;
+   }
+   shader = new PSP2Shader((PSP2Shader::Shader)5);
+#endif
+
+#elif PANDORA
+	setenv("SDL_OMAP_LAYER_SIZE","640x480",1);
+	setenv("SDL_OMAP_BORDER_CUT","0,0,0,30",1);
+	prSDLScreen = SDL_SetVideoMode(320, 270, 16, SDL_SWSURFACE|SDL_FULLSCREEN|SDL_DOUBLEBUF);
+#else
+	prSDLScreen = SDL_SetVideoMode(320, 240, 16, SDL_SWSURFACE|SDL_FULLSCREEN);
+#endif
+
+
+	char fname[256];
+
+	SDL_Surface *tmp;
+
+	if (!text_screen)
+	{
+		text_screen=SDL_CreateRGBSurface(prSDLScreen->flags,prSDLScreen->w/2,prSDLScreen->h/2,prSDLScreen->format->BitsPerPixel,prSDLScreen->format->Rmask,prSDLScreen->format->Gmask,prSDLScreen->format->Bmask,prSDLScreen->format->Amask);
+		window_screen=SDL_CreateRGBSurface(prSDLScreen->flags,prSDLScreen->w/2,prSDLScreen->h/2,prSDLScreen->format->BitsPerPixel,prSDLScreen->format->Rmask,prSDLScreen->format->Gmask,prSDLScreen->format->Bmask,prSDLScreen->format->Amask);
+
+		tmp=SDL_LoadBMP(MENU_FILE_TEXT_0);
+		if (text_screen==NULL || tmp==NULL)
+			exit(-1);
+		text_image_0=SDL_DisplayFormat(tmp);
+		SDL_FreeSurface(tmp);
+		if (text_image_0==NULL)
+			exit(-2);
+#ifdef USE_SDL2
+		SDL_SetColorKey(text_image_0,SDL_TRUE,SDL_MapRGB(text_image_0 -> format, 0, 0, 0));
+		SDL_SetSurfaceRLE(text_image_0, 1);
+#else
+		SDL_SetColorKey(text_image_0,(SDL_SRCCOLORKEY | SDL_RLEACCEL),SDL_MapRGB(text_image_0 -> format, 0, 0, 0));
+#endif
+
+		tmp=SDL_LoadBMP(MENU_FILE_TEXT_1);
+		if (tmp==NULL)
+			text_image_1 = NULL;
+		else {
+			text_image_1=SDL_DisplayFormat(tmp);
+			SDL_FreeSurface(tmp);
+			if (text_image_1==NULL)
+				exit(-2);
+#ifdef USE_SDL2
+			SDL_SetColorKey(text_image_1,SDL_TRUE,SDL_MapRGB(text_image_1 -> format, 0, 0, 0));
+			SDL_SetSurfaceRLE(text_image_1, 1);
+#else
+			SDL_SetColorKey(text_image_1,(SDL_SRCCOLORKEY | SDL_RLEACCEL),SDL_MapRGB(text_image_1 -> format, 0, 0, 0));
+#endif
+		}
+
+		tmp=SDL_LoadBMP(MENU_FILE_TEXT_2);
+		if (tmp==NULL)
+			text_image_2 = NULL;
+		else {
+			text_image_2=SDL_DisplayFormat(tmp);
+			SDL_FreeSurface(tmp);
+			if (text_image_2==NULL)
+				exit(-2);
+#ifdef USE_SDL2
+			SDL_SetColorKey(text_image_2,SDL_TRUE,SDL_MapRGB(text_image_2 -> format, 0, 0, 0));
+			SDL_SetSurfaceRLE(text_image_2, 1);
+#else
+			SDL_SetColorKey(text_image_2,(SDL_SRCCOLORKEY | SDL_RLEACCEL),SDL_MapRGB(text_image_2 -> format, 0, 0, 0));
+#endif
+		}
+
+		tmp=SDL_LoadBMP(MENU_FILE_BACKGROUND_0);
+		if (tmp==NULL)
+			exit(-3);
+		text_background_0=SDL_DisplayFormat(tmp);
+		SDL_FreeSurface(tmp);
+		if (text_background_0==NULL)
+			exit(-3);
+
+		tmp=SDL_LoadBMP(MENU_FILE_BACKGROUND_1);
+		if (tmp==NULL)
+			exit(-3);
+		text_background_1=SDL_DisplayFormat(tmp);
+		SDL_FreeSurface(tmp);
+		if (text_background_1==NULL)
+			exit(-3);
+
+		tmp=SDL_LoadBMP(MENU_FILE_WINDOW);
+		if (tmp==NULL)
+			exit(-4);
+		SDL_Rect dest;
+		dest.w=32;
+		dest.h=24;
+		for (int y=0;y<10;y++)
+		{
+			                        
+			dest.y=24*y;
+			for(int x=0;x<15;x++)
+			{
+				dest.x=32*x;
+				SDL_BlitSurface(tmp,NULL,window_screen,&dest);
+			}
+		}
+		SDL_FreeSurface(tmp);
+	}
+	if (splash)
+	{
+		SDL_Surface *sur;
+		SDL_Rect r;
+		int i,j;
+
+		obten_colores();
+#if !defined(__SWITCH__) && !defined(__PSP2__)
+		if (skipintro)
+#endif
+			goto skipintro;
+		tmp=SDL_LoadBMP(MENU_FILE_SPLASH);
+		if (tmp==NULL)
+			exit(-6);
+		sur = SDL_DisplayFormat(tmp);
+		SDL_FreeSurface(tmp);
+		r.x=(text_screen->w - sur->w)/2;
+		r.y=(text_screen->h - sur->h)/2;
+		r.h=sur->w;
+		r.w=sur->h;
+		SDL_FillRect(text_screen,NULL,0xFFFFFFFF);
+		for (i=128;i>-8;i-=8)
+		{
+			SDL_Delay(50);
+			SDL_FillRect(text_screen,NULL,0xFFFFFFFF);
+			SDL_BlitSurface(sur,NULL,text_screen,&r);
+			fade16(text_screen,i);
+			text_flip();
+		}
+		SDL_Delay(3000);
+		for(i=0;i<128;i+=16)
+		{
+			SDL_Delay(50);
+			SDL_FillRect(text_screen,NULL,0xFFFFFFFF);
+			SDL_BlitSurface(sur,NULL,text_screen,&r);
+			fade16(text_screen,i);
+			text_flip();
+		}
+		for(i=128;i>-8;i-=8)
+		{
+			SDL_Delay(50);
+			text_draw_background();
+			fade16(text_screen,i);
+			text_flip();
+		}
+		SDL_FreeSurface(sur);
+	}
+	else
+	{
+#if !defined(__PSP2__) && !defined(__SWITCH__)
+		SDL_FillRect(text_screen,NULL,0xFFFFFFFF);
+#endif
+		text_flip();
+		uae4all_resume_music();
+	}
+skipintro:
+	menu_msg_time=SDL_GetTicks();
+}
+
+void quit_text(void)
+{
+	SDL_FreeSurface(text_image_0);
+	if (text_image_1)
+		SDL_FreeSurface(text_image_1);
+	if (text_image_2)
+		SDL_FreeSurface(text_image_2);
+	text_image_0 = NULL;
+	text_image_1 = NULL;
+	text_image_2 = NULL;
+	SDL_FreeSurface(text_background_0);
+	SDL_FreeSurface(text_background_1);
+	text_background_0 = NULL;
+	text_background_1 = NULL;
+	SDL_FreeSurface(text_window_background);
+	text_window_background = NULL;
+	SDL_FreeSurface(text_screen);
+	text_screen = NULL;
+	SDL_FreeSurface(window_screen);
+	window_screen = NULL;
+}
+
+void write_text(int x, int y, const char * str)
+{
+	write_text_pos((text_screen->w - 320) / 2 + x * 7, y * 7, str);
+}
+
+void write_text_pos(int x, int y, const char * str)
+{
+	int i, c;
+	SDL_Rect src, dest;
+	SDL_Surface *text_image;
+
+	for (i = 0; i < strlen(str); i++)
+    {
+      c = -1;
+
+
+      if (str[i] >= '0' && str[i] <= '9')
+		c = str[i] - '0';
+      else if (str[i] >= 'A' && str[i] <= 'Z')
+		c = str[i] - 'A' + 10;
+      else if (str[i] >= 'a' && str[i] <= 'z')
+		c = str[i] - 'a' + 36;
+      else if (str[i] == '#')
+		c = 62;
+      else if (str[i] == '=')
+		c = 63;
+      else if (str[i] == '.')
+		c = 64;
+      else if (str[i] == '_')
+		c = -2;
+      else if (str[i] == '-')
+		c = -3;
+      else if (str[i] == '(')
+		c = 65;
+      else if (str[i] == ')')
+		c = 66;
+
+		if (c >= 0)
+		{
+		  src.x = c * 7;
+		  src.y = 0;
+		  src.w = 7;
+		  src.h = 8;
+
+		  dest.x = x + i * 7;
+		  dest.y = y;      
+		  dest.w = 7;
+		  dest.h = 8;
+		  switch (mainMenu_font) {
+			  case 0:
+			  	text_image = text_image_0;
+				break;
+			  case 1:
+			  	text_image = text_image_1;
+				break;
+			  case 2:
+			  	text_image = text_image_2;
+				break;
+			  default:
+			  	text_image = text_image_0;
+		  }
+		  if (text_image == NULL) {
+			  text_image = text_image_0;
+		  }
+		  SDL_BlitSurface(text_image, &src,
+				  text_screen, &dest);
+		}
+		else if (c == -2 || c == -3)
+		{
+		  dest.x = x + i * 7;
+
+		  if (c == -2)
+			dest.y = y        + 7;
+		  else if (c == -3)
+			dest.y = y        + 3;
+		  dest.w = 7;
+		  dest.h = 1;
+
+		  SDL_FillRect(text_screen, &dest, menu_barra0_color);
+		}
+		if (i>60)
+			break;
+    }
+}
+
+void write_text_inv(int x, int y, const char * str)
+{
+  SDL_Rect dest;
+  dest.x = (text_screen->w - 320) / 2 + (x * 7) -2 ;
+  dest.y = (y * 7)        - 2;
+  dest.w = (strlen(str) * 7) + 4;
+  dest.h = 12;
+
+  SDL_FillRect(text_screen, &dest, menu_inv_color);
+
+  write_text(x, y, str);
+}
+
+void write_centered_text(int y, char * str)
+{
+  write_text(40 - (strlen(str) / 2), y/2, str);
+}
+
+void write_num(int x, int y, int v)
+{
+  char str[24];
+
+  snprintf(str, 24, "%d", v);
+  write_text(x, y, str);
+}
+
+void write_num_inv(int x, int y, int v)
+{
+  SDL_Rect dest;
+  int i,l=1;
+
+  for(i=10;i<1000000;i*=10)
+	if (v/i)
+		l++;
+  	else
+		break;
+
+  dest.x = (x * 7) -2 ;
+  dest.y = (y * 8)        - 2;
+  dest.w = (l * 7) + 4;
+  dest.h = 12;
+
+  SDL_FillRect(text_screen, &dest, menu_inv_color);
+
+  write_num(x, y, v);
+}
+
+void text_draw_window(int x, int y, int w, int h, const char *title)
+{
+	int offset_x = (text_screen->w - 320) / 2;
+	int i,j;
+	int x_screen = offset_x + x * 7;
+	int y_screen = y * 7 + 2;
+
+	int x_corn = x_screen-2;
+	int y_corn = y_screen-13;
+	int w_corn = (w*7)+4;
+	int h_corn = (h*8)+4+13;
+
+	int x_shadow = x_corn+w_corn;
+	int y_shadow = y_corn+6;
+	int w_shadow = 10;
+	int h_shadow = h_corn+4;
+
+	int x_shadow_d = x_corn+5;
+	int y_shadow_d = y_corn+h_corn;
+	int w_shadow_d = w_corn-5;
+	int h_shadow_d = 10;
+
+	SDL_Rect dest;
+
+	dest.x = x_shadow;
+	dest.y = y_shadow;
+	dest.w = w_shadow;
+	dest.h = h_shadow;
+
+	SDL_FillRect(text_screen, &dest, menu_win0_color);
+
+	dest.x = x_shadow_d;
+	dest.y = y_shadow_d;
+	dest.w = w_shadow_d;
+	dest.h = h_shadow_d;
+
+	SDL_FillRect(text_screen, &dest, menu_win0_color);
+
+	dest.x = x_corn;
+	dest.y = y_corn;
+	dest.w = w_corn;
+	dest.h = h_corn;
+
+	SDL_FillRect(text_screen, &dest, menu_win1_color);
+
+	dest.x=x_screen;
+	dest.y=y_screen;
+	dest.w=w*7;
+	dest.h=h*8;
+	SDL_BlitSurface(window_screen,&dest,text_screen,&dest);
+
+	write_text_pos(offset_x + (x + ((w - strlen(title)) / 2)) * 7, (y - 1) * 7 - 1, title);
+}
+
+void _text_draw_window(SDL_Surface *sf, int x, int y, int w, int h, const char *title)
+{
+	SDL_Surface *back=text_screen;
+	text_screen=sf;
+	text_draw_window(x,y,w,h,title);
+	text_screen=back;
+}
+
+void text_draw_barra(int x, int y, int w, int h, int per, int max)
+{
+	SDL_Rect dest;
+	if (h>5)
+		h-=4;
+	dest.x=x-1;
+	dest.y=y-1;
+	dest.w=w+2;
+	dest.h=h+2;
+	SDL_FillRect(text_screen, &dest, menu_barra1_color);
+	if (per>max)
+		per=max;
+	dest.x=x;
+	dest.y=y;
+	dest.h=h;
+	dest.w=(w*per)/max;
+	SDL_FillRect(text_screen, &dest, menu_barra0_color);
+}
+
+void text_draw_window_bar(int x, int y, int w, int h, int per, int max, const char *title)
+{
+	text_draw_window(x,y,w,h,title);
+	text_draw_barra(x+4, y+28, w-24, 12, per, max);
+	write_text((x/8)+4,(y/8)+1,"Please wait");
+}
+
+void _text_draw_window_bar(SDL_Surface *sf, int x, int y, int w, int h, int per, int max, const char *title)
+{
+	SDL_Surface *back=text_screen;
+	text_screen=sf;
+	text_draw_window_bar(x,y,w,h,per,max,title);
+	text_screen=back;
+}
