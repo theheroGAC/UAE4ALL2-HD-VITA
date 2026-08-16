@@ -80,7 +80,7 @@ This project is a derivative work and would not exist without the original UAE4A
 - Lubomyr
 - pelya
 - Cpasjuste for the original Vita port, SDL-Vita work, shader support and performance improvements
-- rsn8887 for the Vita/Switch work and the UAE4ALL2 improvements
+- rsn8887 for the Vita/Switch work and the UAE4ALL2 improvements https://github.com/rsn8887/uae4all2
 - ScHlAuChi for testing, ideas and virtual-keyboard contributions
 - wronghands for the menu font, keyboard styles and design ideas
 - CrashMidnick for the French virtual keyboard
