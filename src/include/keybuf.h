@@ -1,0 +1,16 @@
+   
+                                 
+   
+                                                                          
+                      
+   
+                          
+    
+
+extern int get_next_key (void);
+extern int keys_available (void);
+extern void record_key (int);
+extern void keybuf_init (void);
+                                                                   
+#define getjoystate(NR,DIR,BUT) read_joystick(NR,DIR,BUT)
+extern void joystick_setting_changed (void);
