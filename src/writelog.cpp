@@ -1,0 +1,42 @@
+   
+                                 
+   
+                                                 
+   
+                                
+    
+#include "sysconfig.h"
+#include "sysdeps.h"
+#include "config.h"
+
+#if defined(DEBUG_UAE4ALL) && defined(UAE_CONSOLE)
+
+#if !defined(__PSP2__) && !defined(__SWITCH__)
+
+void write_log_standard (const char *fmt, ...)
+{
+    va_list ap;
+    va_start (ap, fmt);
+#ifdef HAVE_VFPRINTF
+    vfprintf (stdout, fmt, ap);
+#else
+                                     
+    {
+	int x1, x2, x3, x4, x5, x6, x7, x8;
+	x1 = va_arg (ap, int);
+	x2 = va_arg (ap, int);
+	x3 = va_arg (ap, int);
+	x4 = va_arg (ap, int);
+	x5 = va_arg (ap, int);
+	x6 = va_arg (ap, int);
+	x7 = va_arg (ap, int);
+	x8 = va_arg (ap, int);
+	fprintf (stdout, fmt, x1, x2, x3, x4, x5, x6, x7, x8);
+    }
+#endif
+}
+
+#endif            
+
+#endif
+
