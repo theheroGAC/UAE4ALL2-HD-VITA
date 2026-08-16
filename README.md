@@ -33,8 +33,10 @@ ux0:/data/uae4all/kickstarts/
 At minimum, use:
 
 ```text
-kick13.rom
-kick31.rom
+kick12.rom (256 kB): (MD5) 85AD74194E87C08904327DE1A9443B7A
+kick13.rom (256 kB): (MD5) 82A21C1890CAE844B3DF741F2762D48D  
+kick20.rom (512 kB): (MD5) FA4ACC75B49E880679FE02716AF24D71  
+kick31.rom (512 kB): (MD5) 646773759326FBAC3B2311FD8C8793EE  
 ```
 
 Kickstart ROMs are copyrighted. Do not distribute them with this project.
