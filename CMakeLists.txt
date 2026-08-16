@@ -217,8 +217,8 @@ if(BUILD_PSP2)
           DEPENDS ${PROJECT_NAME}.self-self
           COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Generating param.sfo"
           COMMAND ${VITASDK}/bin/vita-mksfoex -s TITLE_ID=${TITLEID} "UAE4All2 HD" param.sfo
-          COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Packaging uae4all2.vpk"
-          COMMAND ${VITASDK}/bin/vita-pack-vpk -s param.sfo -b ${PROJECT_NAME}.self -a ${CMAKE_SOURCE_DIR}/psp2data/data=data -a ${CMAKE_SOURCE_DIR}/psp2data/sce_sys=sce_sys uae4all2.vpk
+          COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Packaging uae4all2hd.vpk"
+          COMMAND ${VITASDK}/bin/vita-pack-vpk -s param.sfo -b ${PROJECT_NAME}.self -a ${CMAKE_SOURCE_DIR}/psp2data/data=data -a ${CMAKE_SOURCE_DIR}/psp2data/sce_sys=sce_sys uae4all2hd.vpk
   )
   add_custom_target(AmigaGame.vpk DEPENDS ${PROJECT_NAME}.vpk)
 endif(BUILD_PSP2)
