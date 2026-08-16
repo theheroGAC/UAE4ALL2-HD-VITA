@@ -1,0 +1,14 @@
+  
+                                       
+                              
+  
+
+                                                                                   
+#ifndef _crt_easymode_f_h_
+#define _crt_easymode_f_h_
+                                                                                   
+extern const unsigned char crt_easymode_f[];
+extern const int crt_easymode_f_size;
+                                                                                   
+#endif                     
+                                                                                   
