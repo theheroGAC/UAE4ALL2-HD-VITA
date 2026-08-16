@@ -68,13 +68,13 @@ int initImeDialog(char *title, const char *initial_text, int max_text_length, in
 	if (ime_dialog_running)
 		return -1;
 
-	                        
+	// Convert UTF8 to UTF16
 	memset(ime_title_utf16, 0, sizeof(ime_title_utf16));
 	memset(ime_initial_text_utf16, 0, sizeof(ime_initial_text_utf16));
 	utf8_to_utf16((uint8_t *)title, ime_title_utf16);
 	utf8_to_utf16((uint8_t *)initial_text, ime_initial_text_utf16);
 
-	                        
+	//clear previous results
 	memset(ime_input_text_utf16, 0, sizeof(ime_input_text_utf16));
 	memset(ime_input_text_utf8, 0, sizeof(ime_input_text_utf8));
 
@@ -125,7 +125,7 @@ int updateImeDialog() {
 
 		if ((ime_dialog_option == SCE_IME_OPTION_MULTILINE && result.button == SCE_IME_DIALOG_BUTTON_CLOSE) ||
 			(ime_dialog_option != SCE_IME_OPTION_MULTILINE && (result.button == SCE_IME_DIALOG_BUTTON_ENTER || result.button == SCE_IME_DIALOG_BUTTON_CLOSE))) {
-			                        
+			// Convert UTF16 to UTF8
 			utf16_to_utf8(ime_input_text_utf16, ime_input_text_utf8);
 		} else {
 			status = IME_DIALOG_RESULT_CANCELED;

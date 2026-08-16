@@ -99,7 +99,7 @@ int vita_ipf_read_track(VitaIpfImage *image, int cylinder, int head,
     CapsTrackInfo track;
     memset(&track, 0, sizeof(track));
 
-                                                           
+    /* Ask CAPS for an aligned, decoded MFM byte stream. */
     int result = CAPSLockTrack(&track, image->id, (UDWORD)cylinder,
                                (UDWORD)head, DI_LOCK_INDEX | DI_LOCK_ALIGN);
     if (result != imgeOk || !track.trackbuf || track.tracklen == 0) {

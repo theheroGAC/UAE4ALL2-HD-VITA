@@ -46,7 +46,7 @@ static char s_current_dir[MAX_PATH_LEN] = "ux0:/data/uae4all/roms";
 static SDL_Surface *s_cover_surf = NULL;
 static char s_cover_loaded_path[MAX_PATH_LEN] = "";
 
-                                                 
+/* Check if file has supported Amiga extension */
 static bool is_supported_ext(const char *name)
 {
     const char *ext = strrchr(name, '.');
@@ -73,11 +73,11 @@ static int compare_entries(const void *a, const void *b)
     const FileEntry *ea = (const FileEntry *)a;
     const FileEntry *eb = (const FileEntry *)b;
 
-                                 
+    /* Always keep '..' at top */
     if (strcmp(ea->name, "..") == 0) return -1;
     if (strcmp(eb->name, "..") == 0) return 1;
 
-                                       
+    /* Directories first, then files */
     if (ea->is_dir && !eb->is_dir) return -1;
     if (!ea->is_dir && eb->is_dir) return 1;
 
@@ -88,7 +88,7 @@ static void scan_directory(const char *path)
 {
     s_num_entries = 0;
     
-                                                           
+    /* Always add parent directory option if not at root */
     if (strcmp(path, "ux0:") != 0 && strcmp(path, "ux0:/") != 0 && strlen(path) > 4) {
         strncpy(s_entries[0].name, "..", sizeof(s_entries[0].name));
         s_entries[0].is_dir = true;
@@ -101,7 +101,7 @@ static void scan_directory(const char *path)
         SceIoDirent dir;
         while (sceIoDread(dfd, &dir) > 0 && s_num_entries < MAX_ENTRIES) {
             if (dir.d_name[0] == '.' && dir.d_name[1] != '.') {
-                continue;                        
+                continue; /* Skip hidden files */
             }
 
             bool is_dir = SCE_S_ISDIR(dir.d_stat.st_mode);
@@ -157,7 +157,7 @@ static void try_load_cover(const char *dir_path, const char *filename)
     }
 }
 
-                                                        
+/* Helper to get initial letter ignoring leading tags */
 static char get_entry_letter(const char *name)
 {
     if (!name || name[0] == '\0') return ' ';
@@ -169,7 +169,7 @@ static char get_entry_letter(const char *name)
     return (char)toupper((unsigned char)name[idx]);
 }
 
-                                                     
+/* Fast Alphabetical Jump (A-Z across all entries) */
 static int find_next_letter_index(int current_idx, int direction)
 {
     if (s_num_entries <= 1) return 0;
@@ -184,7 +184,7 @@ static int find_next_letter_index(int current_idx, int direction)
                 return i;
             }
         }
-        return 0;                        
+        return 0; /* Wrap to beginning */
     } else {
         for (int i = current_idx - 1; i >= 0; i--) {
             char c = get_entry_letter(s_entries[i].name);
@@ -195,7 +195,7 @@ static int find_next_letter_index(int current_idx, int direction)
                 return i;
             }
         }
-        return s_num_entries - 1;                  
+        return s_num_entries - 1; /* Wrap to end */
     }
 }
 
@@ -224,7 +224,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
         vita_gui_update_input(&input);
         vita_gui_update_system_info(&sysinfo);
 
-                                     
+        /* Single Press Navigation */
         if (input.pressed & SCE_CTRL_UP && s_num_entries > 0) {
             selected_idx--;
             if (selected_idx < 0) selected_idx = s_num_entries - 1;
@@ -234,7 +234,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
             if (selected_idx >= s_num_entries) selected_idx = 0;
         }
 
-                                                            
+        /* Fast Auto-Repeat Scroll when holding Up / Down */
         if (input.held & SCE_CTRL_UP && s_num_entries > 0) {
             hold_up_counter++;
             if (hold_up_counter > 12 && (hold_up_counter % 3 == 0)) {
@@ -255,7 +255,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
             hold_down_counter = 0;
         }
 
-                                             
+        /* Fast Page Scroll (L/R triggers) */
         if (input.pressed & SCE_CTRL_LTRIGGER) {
             selected_idx -= items_per_page;
             if (selected_idx < 0) selected_idx = 0;
@@ -265,7 +265,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
             if (selected_idx >= s_num_entries) selected_idx = s_num_entries - 1;
         }
 
-                                                                              
+        /* Fast Alphabetical Jump (A-Z) with Left / Right D-Pad or Triangle */
         if (input.pressed & SCE_CTRL_LEFT) {
             selected_idx = find_next_letter_index(selected_idx, -1);
         }
@@ -273,7 +273,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
             selected_idx = find_next_letter_index(selected_idx, 1);
         }
 
-                                  
+        /* Adjust scroll window */
         if (selected_idx < scroll_offset) {
             scroll_offset = selected_idx;
         }
@@ -281,7 +281,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
             scroll_offset = selected_idx - items_per_page + 1;
         }
 
-                                               
+        /* Touch interaction in browser list */
         if (input.touch_tap) {
             float list_x = 20.0f;
             float list_y = 92.0f;
@@ -301,7 +301,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
             }
         }
 
-                                                             
+        /* Update Cover Art preview when selection changes */
         if (selected_idx != last_cover_idx && selected_idx >= 0 && selected_idx < s_num_entries) {
             last_cover_idx = selected_idx;
             if (!s_entries[selected_idx].is_dir) {
@@ -314,7 +314,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
             }
         }
 
-                                           
+        /* Select File / Enter Directory */
         if (input.pressed & SCE_CTRL_CROSS) {
             if (selected_idx >= 0 && selected_idx < s_num_entries) {
                 FileEntry *ent = &s_entries[selected_idx];
@@ -346,7 +346,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
             }
         }
 
-                           
+        /* Cancel / Back */
         if (input.pressed & SCE_CTRL_CIRCLE) {
             if (s_cover_surf) {
                 SDL_FreeSurface(s_cover_surf);
@@ -355,26 +355,26 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
             return 0;
         }
 
-                                     
+        /* Eject Disk Quick Action */
         if (input.pressed & SCE_CTRL_SQUARE) {
             out_path[0] = '\0';
             if (s_cover_surf) {
                 SDL_FreeSurface(s_cover_surf);
                 s_cover_surf = NULL;
             }
-            return 2;                  
+            return 2; /* 2 = Ejected */
         }
 
-                                                                               
-                                                                               
-                                                                               
+        /* ================================================================= */
+        /* Rendering Frame                                                   */
+        /* ================================================================= */
         SDL_FillRect(prSDLScreen, NULL, to_sdl_color(VITA_COLOR_BG));
 
         char browser_title[128];
         snprintf(browser_title, sizeof(browser_title), "INSERT DISK INTO DF%d", disk_drive_idx);
         vita_draw_header(browser_title, VITA_TAB_FLOPPY, &sysinfo);
 
-                                 
+        /* Path breadcrumb bar */
         vita_draw_card_custom(20.0f, 52.0f, VITA_SCREEN_W - 40.0f, 34.0f, RGBA8(22, 28, 40, 255), VITA_COLOR_CARD_BORDER);
         vita_draw_text(34.0f, 60.0f, VITA_COLOR_AMIGA_BLUE, 0.95f, "DIR:");
 
@@ -386,7 +386,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
         snprintf(count_str, sizeof(count_str), "%d files", s_num_entries);
         vita_draw_text_right(VITA_SCREEN_W - 36.0f, 60.0f, VITA_COLOR_TEXT_MUTED, 0.85f, count_str);
 
-                                                          
+        /* Left Side: File List (width: 580px, 9 items) */
         float list_x = 20.0f;
         float list_y = 90.0f;
         float list_w = 580.0f;
@@ -415,7 +415,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
                     vita_draw_badge(list_x + 12.0f, item_y + 10.0f, type_tag, RGBA8(50, 35, 45, 255), VITA_COLOR_AMIGA_RED);
                     vita_draw_text(list_x + 62.0f, item_y + 11.0f, is_sel ? VITA_COLOR_TEXT_WHITE : RGBA8(220, 230, 245, 255), 0.95f, name_buf);
 
-                                   
+                    /* File Size */
                     char sz_buf[32];
                     if (entry->size >= 1024 * 1024) {
                         snprintf(sz_buf, sizeof(sz_buf), "%.1f MB", (float)entry->size / (1024.0f * 1024.0f));
@@ -427,7 +427,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
             }
         }
 
-                                                 
+        /* Right Side: Preview & Box Art Panel */
         float preview_x = 616.0f;
         float preview_y = 90.0f;
         float preview_w = 324.0f;
@@ -438,11 +438,11 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
         if (selected_idx >= 0 && selected_idx < s_num_entries) {
             FileEntry *sel_entry = &s_entries[selected_idx];
 
-                                       
+            /* Header of Preview Box */
             vita_draw_badge(preview_x + 16.0f, preview_y + 12.0f, sel_entry->is_dir ? "DIRECTORY INFO" : "AMIGA DISK INFO", VITA_COLOR_AMIGA_RED, VITA_COLOR_TEXT_WHITE);
 
             if (s_cover_surf) {
-                                                    
+                /* Render Box Art smoothly scaled */
                 float img_max_w = preview_w - 32.0f;
                 float img_max_h = 240.0f;
                 float surf_w = (float)s_cover_surf->w;
@@ -461,7 +461,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
                 SDL_Rect dst_r = { (Sint16)draw_x, (Sint16)draw_y, (Uint16)draw_w, (Uint16)draw_h };
                 SDL_SoftStretch(s_cover_surf, NULL, prSDLScreen, &dst_r);
             } else {
-                                         
+                /* Placeholder Art Box */
                 float ph_w = preview_w - 32.0f;
                 float ph_h = 220.0f;
                 float ph_x = preview_x + 16.0f;
@@ -473,7 +473,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
                 vita_draw_text_centered(ph_x + (ph_w * 0.5f), ph_y + 160.0f, VITA_COLOR_TEXT_DIM, 0.85f, "Cover: <name>.png");
             }
 
-                                                
+            /* File Info metadata below cover */
             char name_buf[128];
             vita_truncate_text(sel_entry->name, preview_w - 70.0f, 0.90f, name_buf, sizeof(name_buf));
             vita_draw_text(preview_x + 16.0f, preview_y + 298.0f, VITA_COLOR_TEXT_WHITE, 0.95f, "File:");
@@ -486,7 +486,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
             }
         }
 
-                                                                                     
+        /* Bottom Footer with clean PlayStation button glyphs and generous spacing */
         SDL_Rect ftr_r = { 0, VITA_SCREEN_H - 42, VITA_SCREEN_W, 42 };
         SDL_FillRect(prSDLScreen, &ftr_r, to_sdl_color(VITA_COLOR_FOOTER));
         vita_draw_rounded_rect_outline(0, VITA_SCREEN_H - 42, VITA_SCREEN_W, 42, 0.0f, 1.0f, VITA_COLOR_CARD_BORDER);
@@ -501,7 +501,8 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
         cur_x += 100.0f;
 
         vita_draw_hint_item(cur_x, btn_y, VITA_BTN_TRIANGLE, "Jump A-Z");
-        cur_x += 135.0f;
+        /* Leave enough room after "Jump A-Z" before the Eject button. */
+        cur_x += 170.0f;
 
         vita_draw_hint_item(cur_x, btn_y, VITA_BTN_SQUARE, "Eject");
 
@@ -513,4 +514,4 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
     }
 }
 
-#endif               
+#endif /* __PSP2__ */

@@ -678,7 +678,8 @@ void vita_draw_hint_item(float x, float y, VitaButtonGlyph glyph, const char *la
     vita_draw_button_glyph(x, y, glyph);
     float offset_x = (glyph == VITA_BTN_START) ? 84.0f : (glyph == VITA_BTN_SELECT ? 90.0f : (glyph == VITA_BTN_L || glyph == VITA_BTN_R ? 38.0f : 34.0f));
     if (label && label[0] != '\0') {
-        vita_draw_text(x + offset_x, y + 4.0f, RGBA8(220, 230, 245, 255), 0.90f, label);
+        float label_scale = (strcmp(label, "RESUME/START") == 0) ? 0.65f : 0.90f;
+        vita_draw_text(x + offset_x, y + 4.0f, RGBA8(220, 230, 245, 255), label_scale, label);
     }
 }
 
@@ -719,7 +720,13 @@ void vita_draw_header(const char *title, VitaGuiTab current_tab, const VitaSyste
     vita_draw_badge(210.0f, 13.0f, "HD VITA", VITA_COLOR_AMIGA_RED, VITA_COLOR_TEXT_WHITE);
 
     /* Model Badge */
-    const char *model_str = (changed_prefs.cpu_level == M68020) ? "Amiga 1200 (AGA)" : "Amiga 500 (OCS)";
+    const char *model_str;
+    if (changed_prefs.cpu_level == M68020 && mainMenu_chipset == 2 && mainMenu_fastMemory == 0)
+        model_str = "Amiga CD32";
+    else if (changed_prefs.cpu_level == M68020)
+        model_str = "Amiga 1200 (AGA)";
+    else
+        model_str = "Amiga 500 (OCS)";
     vita_draw_badge(340.0f, 13.0f, model_str, RGBA8(30, 41, 59, 255), VITA_COLOR_TEXT_MUTED);
 
     /* Clock & Battery on top right */
@@ -766,6 +773,7 @@ void vita_draw_footer(const char *left_hint, const char *right_hint)
     /* Only show actions that are handled by the active tab. */
     if (s_active_tab == VITA_TAB_FLOPPY) {
         vita_draw_hint_item(145.0f, btn_y, VITA_BTN_TRIANGLE, "EJECT");
+        vita_draw_hint_item(275.0f, btn_y, VITA_BTN_SQUARE, "REBOOT");
     } else if (s_active_tab == VITA_TAB_SAVESTATES) {
         vita_draw_hint_item(145.0f, btn_y, VITA_BTN_SQUARE, "LOAD");
     }
@@ -773,7 +781,9 @@ void vita_draw_footer(const char *left_hint, const char *right_hint)
     /* Right navigation hints */
     vita_draw_hint_item(610.0f, btn_y, VITA_BTN_L,     "");
     vita_draw_hint_item(660.0f, btn_y, VITA_BTN_R,     "TAB");
-    vita_draw_hint_item(780.0f, btn_y, VITA_BTN_START, "RESUME");
+    float start_x = (s_active_tab == VITA_TAB_FLOPPY) ? 745.0f : 780.0f;
+    const char *start_label = (s_active_tab == VITA_TAB_FLOPPY) ? "RESUME/START" : "RESUME";
+    vita_draw_hint_item(start_x, btn_y, VITA_BTN_START, start_label);
 }
 
 void vita_draw_button_item(float x, float y, float w, float h, const char *title, const char *subtitle, const char *badge, bool focused, bool active)
@@ -806,12 +816,16 @@ void vita_draw_selector_item(float x, float y, float w, float h, const char *tit
     vita_draw_card(x, y, w, h, focused, false);
     vita_draw_text(x + 16.0f, y + 16.0f, focused ? VITA_COLOR_TEXT_WHITE : RGBA8(220, 230, 245, 255), 0.95f, title);
 
+    char value_buf[128];
     char val_str[128];
+    const char *value = current_value ? current_value : "None";
+    /* Keep long scaling descriptions away from the selector title. */
+    vita_truncate_text(value, w - 350.0f, focused ? 0.95f : 0.90f, value_buf, sizeof(value_buf));
     if (focused) {
-        snprintf(val_str, sizeof(val_str), "<  %s  >", current_value ? current_value : "None");
+        snprintf(val_str, sizeof(val_str), "<  %s  >", value_buf);
         vita_draw_text_right(x + w - 16.0f, y + 16.0f, VITA_COLOR_FOCUS_BORDER, 0.95f, val_str);
     } else {
-        snprintf(val_str, sizeof(val_str), "%s", current_value ? current_value : "None");
+        snprintf(val_str, sizeof(val_str), "%s", value_buf);
         vita_draw_text_right(x + w - 16.0f, y + 16.0f, VITA_COLOR_TEXT_MUTED, 0.90f, val_str);
     }
 }

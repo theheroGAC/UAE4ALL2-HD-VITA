@@ -46,6 +46,7 @@ extern int mainMenu_showStatus;
 extern int mainMenu_leftStickMouse;
 extern int mainMenu_touchControls;
 extern int mainMenu_autofire;
+extern int moveY;
 extern int mainMenu_soundStereo;
 extern int mainMenu_soundStereoSep;
 extern unsigned int sound_rate;
@@ -78,13 +79,13 @@ static const char *get_filename_only(const char *path)
     return path;
 }
 
-                                                                               
-                                                                               
-                                                                               
+/* ========================================================================= */
+/* TAB 1: FLOPPY DRIVES (DF0 - DF3)                                          */
+/* ========================================================================= */
 
 void vita_view_floppy(VitaInputState *input, int *selected_item)
 {
-    const int total_items = 6;                                          
+    const int total_items = 6; /* 4 drives + Floppy Speed + Eject All */
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
 
@@ -97,9 +98,13 @@ void vita_view_floppy(VitaInputState *input, int *selected_item)
         if (*selected_item >= total_items) *selected_item = 0;
     }
 
-                              
+    /* Drive slot selection */
     if (input->pressed & SCE_CTRL_CROSS) {
         if (*selected_item >= 0 && *selected_item < 4) {
+            /* Selecting DF1-DF3 also enables the requested drive count. */
+            if (mainMenu_drives < *selected_item + 1)
+                mainMenu_drives = *selected_item + 1;
+
             char new_file[512];
             new_file[0] = '\0';
             int res = vita_gui_run_browser(new_file, currentDir, *selected_item);
@@ -120,13 +125,13 @@ void vita_view_floppy(VitaInputState *input, int *selected_item)
                 gui_update();
             }
         } else if (*selected_item == 4) {
-                                     
+            /* Toggle Floppy Speed */
             if (mainMenu_floppyspeed == 100) mainMenu_floppyspeed = 200;
             else if (mainMenu_floppyspeed == 200) mainMenu_floppyspeed = 400;
             else if (mainMenu_floppyspeed == 400) mainMenu_floppyspeed = 800;
             else mainMenu_floppyspeed = 100;
         } else if (*selected_item == 5) {
-                                 
+            /* Eject all disks */
             uae4all_image_file0[0] = '\0';
             uae4all_image_file1[0] = '\0';
             uae4all_image_file2[0] = '\0';
@@ -135,7 +140,7 @@ void vita_view_floppy(VitaInputState *input, int *selected_item)
         }
     }
 
-                                                 
+    /* Triangle -> Eject single selected drive */
     if (input->pressed & SCE_CTRL_TRIANGLE) {
         if (*selected_item == 0) uae4all_image_file0[0] = '\0';
         if (*selected_item == 1) uae4all_image_file1[0] = '\0';
@@ -144,7 +149,12 @@ void vita_view_floppy(VitaInputState *input, int *selected_item)
         gui_update();
     }
 
-                         
+    /* Square -> Reboot Amiga emulation */
+    if (input->pressed & SCE_CTRL_SQUARE) {
+        mainMenu_case = MAIN_MENU_CASE_RESET;
+    }
+
+    /* Render UI Cards */
     float card_x = 20.0f;
     float card_w = VITA_SCREEN_W - 40.0f;
     float start_y = 90.0f;
@@ -160,12 +170,12 @@ void vita_view_floppy(VitaInputState *input, int *selected_item)
 
         vita_draw_card(card_x, cy, card_w, slot_h, focused, false);
 
-                         
+        /* Drive badge */
         char drive_tag[8];
         snprintf(drive_tag, sizeof(drive_tag), "DF%d", i);
         vita_draw_badge(card_x + 14.0f, cy + 18.0f, drive_tag, has_disk ? VITA_COLOR_AMIGA_RED : RGBA8(40, 50, 70, 255), VITA_COLOR_TEXT_WHITE);
 
-                                                             
+        /* Drive title and loaded filename with truncation */
         vita_draw_text(card_x + 64.0f, cy + 10.0f, VITA_COLOR_TEXT_MUTED, 0.85f, drive_labels[i]);
 
         char filename_buf[128];
@@ -173,23 +183,23 @@ void vita_view_floppy(VitaInputState *input, int *selected_item)
         unsigned int file_col = has_disk ? (focused ? VITA_COLOR_TEXT_WHITE : RGBA8(230, 240, 255, 255)) : VITA_COLOR_TEXT_DIM;
         vita_draw_text(card_x + 64.0f, cy + 28.0f, file_col, 1.00f, filename_buf);
 
-                                 
+        /* Status LED on right */
         vita_draw_led(card_x + card_w - 110.0f, cy + 18.0f, has_disk ? "LOADED" : "EMPTY", has_disk, VITA_COLOR_AMIGA_ORANGE);
     }
 
-                           
+    /* Floppy Speed Card */
     float spd_y = start_y + 4.0f * (slot_h + 8.0f);
     char spd_str[32];
     snprintf(spd_str, sizeof(spd_str), "%dx (%s)", mainMenu_floppyspeed / 100, (mainMenu_floppyspeed == 100) ? "1x Standard" : "Turbo");
     vita_draw_selector_item(card_x, spd_y, (card_w * 0.5f) - 6.0f, 44.0f, "Floppy Speed", spd_str, *selected_item == 4);
 
-                          
+    /* Eject All Button */
     vita_draw_button_item(card_x + (card_w * 0.5f) + 6.0f, spd_y, (card_w * 0.5f) - 6.0f, 44.0f, "Eject All Disks", NULL, "EJECT", *selected_item == 5, false);
 }
 
-                                                                               
-                                                                               
-                                                                               
+/* ========================================================================= */
+/* TAB 2: QUICK PRESETS                                                      */
+/* ========================================================================= */
 
 void vita_view_presets(VitaInputState *input, int *selected_item)
 {
@@ -206,14 +216,14 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
         if (*selected_item >= total_items) *selected_item = 0;
     }
 
-                      
+    /* Apply Preset */
     if (input->pressed & SCE_CTRL_CROSS) {
         if (*selected_item == 0) {
-            kickstart = 1;             
-            mainMenu_CPU_model = 0;            
-            mainMenu_chipset = 0;          
-            mainMenu_chipMemory = 1;            
-            mainMenu_slowMemory = 1;            
+            kickstart = 1; /* KS 1.3 */
+            mainMenu_CPU_model = 0; /* 68000 */
+            mainMenu_chipset = 0; /* OCS */
+            mainMenu_chipMemory = 1; /* 512KB */
+            mainMenu_slowMemory = 1; /* 512KB */
             mainMenu_fastMemory = 0;
             UpdateCPUModelSettings();
             UpdateMemorySettings();
@@ -224,12 +234,12 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
             saveconfig(1);
             vita_show_message_box("Preset Applied", "Amiga 500 (OCS 1.3, 512K+512K RAM) configured!", "OK (X)");
         } else if (*selected_item == 1) {
-            kickstart = 2;              
-            mainMenu_CPU_model = 0;            
-            mainMenu_chipset = 1;          
-            mainMenu_chipMemory = 2;          
+            kickstart = 2; /* KS 2.04 */
+            mainMenu_CPU_model = 0; /* 68000 */
+            mainMenu_chipset = 1; /* ECS */
+            mainMenu_chipMemory = 2; /* 1MB */
             mainMenu_slowMemory = 0;
-            mainMenu_fastMemory = 1;          
+            mainMenu_fastMemory = 1; /* 1MB */
             UpdateCPUModelSettings();
             UpdateMemorySettings();
             UpdateChipsetSettings();
@@ -239,12 +249,12 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
             saveconfig(1);
             vita_show_message_box("Preset Applied", "Amiga 500+ (ECS 2.04, 1MB+1MB RAM) configured!", "OK (X)");
         } else if (*selected_item == 2) {
-            kickstart = 3;             
-            mainMenu_CPU_model = 1;            
-            mainMenu_chipset = 2;          
-            mainMenu_chipMemory = 3;          
+            kickstart = 3; /* KS 3.1 */
+            mainMenu_CPU_model = 1; /* 68020 */
+            mainMenu_chipset = 2; /* AGA */
+            mainMenu_chipMemory = 2; /* 2MB */
             mainMenu_slowMemory = 0;
-            mainMenu_fastMemory = 3;               
+            mainMenu_fastMemory = 3; /* 4MB Fast */
             UpdateCPUModelSettings();
             UpdateMemorySettings();
             UpdateChipsetSettings();
@@ -257,7 +267,7 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
             kickstart = 3;
             mainMenu_CPU_model = 1;
             mainMenu_chipset = 2;
-            mainMenu_chipMemory = 3;
+            mainMenu_chipMemory = 2; /* 2MB */
             mainMenu_slowMemory = 0;
             mainMenu_fastMemory = 0;
             UpdateCPUModelSettings();
@@ -271,7 +281,7 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
         }
     }
 
-                              
+    /* Render Presets Cards */
     float card_x = 20.0f;
     float card_w = VITA_SCREEN_W - 40.0f;
     float start_y = 90.0f;
@@ -295,14 +305,14 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
 
         vita_draw_card(card_x, cy, card_w, item_h, focused, false);
 
-                           
+        /* Badge on left */
         unsigned int badge_col = (i == 2) ? VITA_COLOR_AMIGA_RED : ((i == 0) ? VITA_COLOR_AMIGA_BLUE : RGBA8(40, 50, 70, 255));
         vita_draw_badge(card_x + 14.0f, cy + 14.0f, presets[i].tag, badge_col, VITA_COLOR_TEXT_WHITE);
 
-                   
+        /* Title */
         vita_draw_text(card_x + 72.0f, cy + 12.0f, focused ? VITA_COLOR_TEXT_WHITE : RGBA8(230, 240, 255, 255), 1.05f, presets[i].title);
 
-                                                                
+        /* Description & Recommendation with clean truncation */
         char desc_buf[256];
         vita_truncate_text(presets[i].desc, card_w - 180.0f, 0.85f, desc_buf, sizeof(desc_buf));
         vita_draw_text(card_x + 72.0f, cy + 34.0f, VITA_COLOR_TEXT_MUTED, 0.85f, desc_buf);
@@ -311,16 +321,16 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
         vita_truncate_text(presets[i].recom, card_w - 180.0f, 0.82f, rec_buf, sizeof(rec_buf));
         vita_draw_text(card_x + 72.0f, cy + 52.0f, VITA_COLOR_AMIGA_ORANGE, 0.82f, rec_buf);
 
-                         
+        /* Action hint */
         if (focused) {
             vita_draw_hint_item(card_x + card_w - 140.0f, cy + 28.0f, VITA_BTN_CROSS, "Apply");
         }
     }
 }
 
-                                                                               
-                                                                               
-                                                                               
+/* ========================================================================= */
+/* TAB 3: HARDWARE SETTINGS                                                  */
+/* ========================================================================= */
 
 void vita_view_hardware(VitaInputState *input, int *selected_item)
 {
@@ -392,13 +402,13 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
     vita_draw_selector_item(card_x, start_y + 5.0f * (item_h + 8.0f), card_w, item_h, "Slow / Trapdoor RAM", slow_ram_names[mainMenu_slowMemory % 4], *selected_item == 5);
 }
 
-                                                                               
-                                                                               
-                                                                               
+/* ========================================================================= */
+/* TAB 4: DISPLAY & SHADERS                                                  */
+/* ========================================================================= */
 
 void vita_view_display(VitaInputState *input, int *selected_item)
 {
-    const int total_items = 4;
+    const int total_items = 5;
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
 
@@ -427,12 +437,18 @@ void vita_view_display(VitaInputState *input, int *selected_item)
                 mainMenu_showStatus = (mainMenu_showStatus + dir + 3) % 3;
                 break;
             case 3: {
-                                                                                 
+                /* Cycle the aspect and height presets inside the current width group. */
                 int width_group = (presetModeId / 10) * 10;
-                int height_mode = (presetModeId % 10 + dir + 8) % 8;
+                int height_mode = (presetModeId % 10 + dir + 9) % 9;
                 SetPresetMode(width_group + height_mode);
                 break;
             }
+            case 4:
+                /* Positive values move the visible Amiga image upward. */
+                moveY += dir;
+                if (moveY < -26) moveY = -26;
+                if (moveY > 128) moveY = 128;
+                break;
         }
     }
 
@@ -448,12 +464,23 @@ void vita_view_display(VitaInputState *input, int *selected_item)
     vita_draw_selector_item(card_x, start_y + 0.0f * (item_h + 10.0f), card_w, item_h, "Hardware Vita Shader", shader_names[mainMenu_shader % 9], *selected_item == 0);
     vita_draw_selector_item(card_x, start_y + 1.0f * (item_h + 10.0f), card_w, item_h, "Screen Refresh & Region", ntsc_names[mainMenu_ntsc % 2], *selected_item == 1);
     vita_draw_selector_item(card_x, start_y + 2.0f * (item_h + 10.0f), card_w, item_h, "Status Bar (Floppy LED/FPS)", status_names[mainMenu_showStatus % 3], *selected_item == 2);
-    vita_draw_selector_item(card_x, start_y + 3.0f * (item_h + 10.0f), card_w, item_h, "Aspect Ratio / Scaling", presetMode, *selected_item == 3);
+    char aspect_mode[64];
+    if (presetModeId % 10 == 7)
+        snprintf(aspect_mode, sizeof(aspect_mode), "Fullscreen 16:9 - %s", presetMode);
+    else if (presetModeId % 10 == 8)
+        snprintf(aspect_mode, sizeof(aspect_mode), "5:4 Correct - %s", presetMode);
+    else
+        snprintf(aspect_mode, sizeof(aspect_mode), "4:3 Correct - %s", presetMode);
+    vita_draw_selector_item(card_x, start_y + 3.0f * (item_h + 10.0f), card_w, item_h, "Aspect Ratio / Scaling", aspect_mode, *selected_item == 3);
+
+    char vertical_position[32];
+    snprintf(vertical_position, sizeof(vertical_position), "%d (higher = up)", moveY);
+    vita_draw_selector_item(card_x, start_y + 4.0f * (item_h + 10.0f), card_w, item_h, "Vertical Position", vertical_position, *selected_item == 4);
 }
 
-                                                                               
-                                                                               
-                                                                               
+/* ========================================================================= */
+/* TAB 5: CONTROLS & INPUT                                                   */
+/* ========================================================================= */
 
 void vita_view_controls(VitaInputState *input, int *selected_item)
 {
@@ -504,9 +531,9 @@ void vita_view_controls(VitaInputState *input, int *selected_item)
     vita_draw_button_item(card_x, start_y + 3.0f * (item_h + 10.0f), card_w, item_h, "Physical Controller Layout", "Cross = Fire 1 | Circle = Fire 2 | Square = Space | Triangle = Virtual Keyboard", "LAYOUT", *selected_item == 3, false);
 }
 
-                                                                               
-                                                                               
-                                                                               
+/* ========================================================================= */
+/* TAB 6: SAVESTATES                                                         */
+/* ========================================================================= */
 
 static bool vita_savestate_file_exists(const char *path)
 {
@@ -532,14 +559,14 @@ void vita_view_savestates(VitaInputState *input, int *selected_item)
         if (*selected_item >= total_items) *selected_item = 0;
     }
 
-                      
+    /* Save to Slot */
     if (input->pressed & SCE_CTRL_CROSS) {
         if (emulating) {
             saveMenu_n_savestate = *selected_item + 1;
             make_savestate_filenames(savestate_filename, screenshot_filename);
             savestate_state = STATE_DOSAVE;
-                                                                             
-                                                                   
+            /* The actual write happens on the next emulation frame after the
+               menu closes, so do not claim it is already saved. */
             vita_show_message_box("Save State", "Save queued. The state will be written when the game resumes.", "Resume (X)");
             mainMenu_case = MAIN_MENU_CASE_RUN;
         } else {
@@ -547,7 +574,7 @@ void vita_view_savestates(VitaInputState *input, int *selected_item)
         }
     }
 
-                        
+    /* Load from Slot */
     if (input->pressed & SCE_CTRL_SQUARE) {
         if (emulating) {
             saveMenu_n_savestate = *selected_item + 1;
@@ -564,7 +591,7 @@ void vita_view_savestates(VitaInputState *input, int *selected_item)
         }
     }
 
-                                          
+    /* 4 Visual Slot Cards side-by-side */
     float slot_w = (VITA_SCREEN_W - 40.0f - 36.0f) / 4.0f;
     float slot_h = 320.0f;
     float start_x = 20.0f;
@@ -576,12 +603,12 @@ void vita_view_savestates(VitaInputState *input, int *selected_item)
 
         vita_draw_card(sx, start_y, slot_w, slot_h, focused, false);
 
-                              
+        /* Slot Title Badge */
         char slot_tag[32];
         snprintf(slot_tag, sizeof(slot_tag), "SLOT %d", i + 1);
         vita_draw_badge(sx + 14.0f, start_y + 14.0f, slot_tag, focused ? VITA_COLOR_AMIGA_RED : RGBA8(40, 50, 70, 255), VITA_COLOR_TEXT_WHITE);
 
-                                         
+        /* Thumbnail frame placeholder */
         float thumb_x = sx + 12.0f;
         float thumb_y = start_y + 44.0f;
         float thumb_w = slot_w - 24.0f;
@@ -591,8 +618,8 @@ void vita_view_savestates(VitaInputState *input, int *selected_item)
         vita_draw_boing_ball_icon(thumb_x + (thumb_w * 0.5f), thumb_y + 65.0f, 26.0f, 0.0f);
         vita_draw_text_centered(thumb_x + (thumb_w * 0.5f), thumb_y + 110.0f, VITA_COLOR_TEXT_MUTED, 0.90f, "Save State");
 
-                                                                         
-                                                       
+        /* Clean action rows: use real Vita glyphs instead of the cramped
+           literal strings "[Cross]" and "[Square]". */
         float action_x = sx + 10.0f;
         float action_w = slot_w - 20.0f;
         float save_y = start_y + 215.0f;
@@ -610,9 +637,9 @@ void vita_view_savestates(VitaInputState *input, int *selected_item)
     }
 }
 
-                                                                               
-                                                                               
-                                                                               
+/* ========================================================================= */
+/* TAB 7: SYSTEM & PREFERENCES                                               */
+/* ========================================================================= */
 
 void vita_view_system(VitaInputState *input, int *selected_item)
 {
@@ -668,4 +695,4 @@ void vita_view_system(VitaInputState *input, int *selected_item)
     vita_draw_button_item(card_x, start_y + 3.0f * (item_h + 12.0f), card_w, item_h, "Exit UAE4All2", "Quit emulator and return to PlayStation Vita LiveArea", "QUIT", *selected_item == 3, false);
 }
 
-#endif               
+#endif /* __PSP2__ */

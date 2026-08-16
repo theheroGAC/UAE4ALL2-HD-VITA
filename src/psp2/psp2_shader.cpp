@@ -1,9 +1,9 @@
-  
-                                    
-  
+//
+// Created by cpasjuste on 18/12/16.
+//
 
-                                                      
-                                                                   
+// use https://github.com/frangarcj/vita2dlib/tree/fbo
+// and https://github.com/frangarcj/vita-shader-collection/releases
 
 #include <sysconfig.h>
 #include "psp2_shader.h"
@@ -28,8 +28,8 @@
 #include "vita-shader-collection/includes/sharp_bilinear_v.h"
 #include "vita-shader-collection/includes/sharp_bilinear_simple_f.h"
 #include "vita-shader-collection/includes/sharp_bilinear_simple_v.h"
-                               
-                               
+//#include "xbr_2x_noblend_f.h"
+//#include "xbr_2x_noblend_v.h"
 #include "vita-shader-collection/includes/fxaa_v.h"
 #include "vita-shader-collection/includes/fxaa_f.h"
 #include "vita-shader-collection/includes/crt_easymode_f.h"

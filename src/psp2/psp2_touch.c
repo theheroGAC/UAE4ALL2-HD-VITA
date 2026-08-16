@@ -1,11 +1,11 @@
-  
-                                  
+//
+// Created by rsn8887 on 02/05/18.
 
 #include <SDL.h>
 #include <psp2/kernel/processmgr.h>
 #include <psp2/touch.h>
 #include "psp2_touch.h"
-                   
+//#include "math.h"
 
 #include <stdbool.h>
 
@@ -29,20 +29,20 @@ static int hiresdx = 0;
 static int hiresdy = 0;
 
 enum {
-	MAX_NUM_FINGERS = 3,                                        
-	MAX_TAP_TIME = 250,                                                               
-	MAX_TAP_MOTION_DISTANCE = 10,                                                                           
-	SIMULATED_CLICK_DURATION = 50,                                                        
-};                                 
+	MAX_NUM_FINGERS = 3, // number of fingers to track per panel
+	MAX_TAP_TIME = 250, // taps longer than this will not result in mouse click events
+	MAX_TAP_MOTION_DISTANCE = 10, // max distance finger motion in Vita screen pixels to be considered a tap
+	SIMULATED_CLICK_DURATION = 50, // time in ms how long simulated mouse clicks should be
+}; // track three fingers per panel
 
 typedef struct {
-	int id;                
+	int id; // -1: no touch
 	int timeLastDown;
 	float lastDownX;
 	float lastDownY;
 } Touch;
 
-Touch _finger[SCE_TOUCH_PORT_MAX_NUM][MAX_NUM_FINGERS];                               
+Touch _finger[SCE_TOUCH_PORT_MAX_NUM][MAX_NUM_FINGERS]; // keep track of finger status
 
 typedef enum DraggingType {
 	DRAG_NONE = 0,
@@ -50,9 +50,9 @@ typedef enum DraggingType {
 	DRAG_THREE_FINGER,
 } DraggingType;
 
-DraggingType _multiFingerDragging[SCE_TOUCH_PORT_MAX_NUM];                                                         
+DraggingType _multiFingerDragging[SCE_TOUCH_PORT_MAX_NUM]; // keep track whether we are currently drag-and-dropping
 
-int _simulatedClickStartTime[SCE_TOUCH_PORT_MAX_NUM][2];                                                                            
+int _simulatedClickStartTime[SCE_TOUCH_PORT_MAX_NUM][2]; // initiation time of last simulated left or right click (zero if no click)
 
 void psp2InitTouch(void) {
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
@@ -100,16 +100,16 @@ void psp2PollTouch(void) {
 			psp2FinishSimulatedMouseClicks(port, touch[port].timeStamp / 1000);
 			if (touch[port].reportNum > 0) {
 				for (int i = 0; i < touch[port].reportNum; i++) {
-					                                                            
-					                                                                       
-					                                                   
-					                                                                 
+					// adjust coordinates and forces to return normalized values
+					// for the front, screen area is used as a reference (for direct touch)
+					// e.g. touch_x = 1.0 corresponds to screen_x = 960
+					// for the back panel, the active touch area is used as reference
 					float x = 0;
 					float y = 0;
 					psp2ConvertTouchXYToSDLXY(&x, &y, touch[port].report[i].x, touch[port].report[i].y, port);
 					finger_id = touch[port].report[i].id;
 
-					                                                   
+					// Send an initial touch if finger hasn't been down
 					bool hasBeenDown = false;
 					int j = 0;
 					if (touch_old[port].reportNum > 0) {
@@ -130,7 +130,7 @@ void psp2PollTouch(void) {
 						ev.tfinger.y = y;
 						psp2ProcessTouchEvent(&ev);
 					} else {
-						                                             
+						// If finger moved, send motion event instead
 						if (touch_old[port].report[j].x != touch[port].report[i].x ||
 							touch_old[port].report[j].y != touch[port].report[i].y) {
 							float oldx = 0;
@@ -150,7 +150,7 @@ void psp2PollTouch(void) {
 					}
 				}
 			}
-			                                      
+			// some fingers might have been let go
 			if (touch_old[port].reportNum > 0) {
 				for (int i = 0; i < touch_old[port].reportNum; i++) {
 					int finger_up = 1;
@@ -166,7 +166,7 @@ void psp2PollTouch(void) {
 						float y = 0;
 						psp2ConvertTouchXYToSDLXY(&x, &y, touch_old[port].report[i].x, touch_old[port].report[i].y, port);
 						finger_id = touch_old[port].report[i].id;
-						                              
+						// Finger released from screen
 						TouchEvent ev;
 						ev.type = FINGERUP;
 						ev.tfinger.timestamp = touch[port].timeStamp / 1000;
@@ -207,13 +207,13 @@ void psp2ConvertTouchXYToSDLXY(float *sdl_x, float *sdl_y, int vita_x, int vita_
 }
 
 void psp2ProcessTouchEvent(TouchEvent *event) {
-	                            
-	                                            
-	                                                                              
-	                                     
-	                                  
+	// Supported touch gestures:
+	// left mouse click: single finger short tap
+	// right mouse click: second finger short tap while first finger is still down
+	// pointer motion: single finger drag
+	// drag and drop: dual finger drag
 	if (event->type == FINGERDOWN || event->type == FINGERUP || event->type == FINGERMOTION) {
-		                              
+		// front (0) or back (1) panel
 		int port = event->tfinger.touchId;
 		if (port >= 0 && port < SCE_TOUCH_PORT_MAX_NUM) {
 			switch (event->type) {
@@ -232,9 +232,9 @@ void psp2ProcessTouchEvent(TouchEvent *event) {
 }
 
 void psp2ProcessFingerDown(TouchEvent *event) {
-	                              
+	// front (0) or back (1) panel
 	int port = event->tfinger.touchId;
-	                      
+	// id (for multitouch)
 	int id = event->tfinger.fingerId;
 
 	if (vkbd_mode) {
@@ -248,16 +248,16 @@ void psp2ProcessFingerDown(TouchEvent *event) {
 	int x = lastmx;
 	int y = lastmy;
 
-	                                                            
+	// make sure each finger is not reported down multiple times
 	for (int i = 0; i < MAX_NUM_FINGERS; i++) {
 		if (_finger[port][i].id == id) {
 			_finger[port][i].id = -1;
 		}
 	}
 
-	                                                                                   
-	                       
-	                                                                              
+	// we need the timestamps to decide later if the user performed a short tap (click)
+	// or a long tap (drag)
+	// we also need the last coordinates for each finger to keep track of dragging
 	for (int i = 0; i < MAX_NUM_FINGERS; i++) {
 		if (_finger[port][i].id == -1) {
 			_finger[port][i].id = id;
@@ -270,9 +270,9 @@ void psp2ProcessFingerDown(TouchEvent *event) {
 }
 
 void psp2ProcessFingerUp(TouchEvent *event) {
-	                              
+	// front (0) or back (1) panel
 	int port = event->tfinger.touchId;
-	                      
+	// id (for multitouch)
 	int id = event->tfinger.fingerId;
 
 	if (vkbd_mode) {
@@ -284,7 +284,7 @@ void psp2ProcessFingerUp(TouchEvent *event) {
 		return;
 	}
 
-	                                                        
+	// find out how many fingers were down before this event
 	int numFingersDown = 0;
 	for (int i = 0; i < MAX_NUM_FINGERS; i++) {
 		if (_finger[port][i].id >= 0) {
@@ -300,8 +300,8 @@ void psp2ProcessFingerUp(TouchEvent *event) {
 			_finger[port][i].id = -1;
 			if (!_multiFingerDragging[port]) {
 				if ((event->tfinger.timestamp - _finger[port][i].timeLastDown) <= MAX_TAP_TIME) {
-					                                                                                                            
-					                                                                                                            
+					// short (<MAX_TAP_TIME ms) tap is interpreted as right/left mouse click depending on # fingers already down
+					// but only if the finger hasn't moved since it was pressed down by more than MAX_TAP_MOTION_DISTANCE pixels
 					float xrel = ((event->tfinger.x * 960.0) - (_finger[port][i].lastDownX * 960.0));
 					float yrel = ((event->tfinger.y * 544.0) - (_finger[port][i].lastDownY * 544.0));
 					float maxRSquared = (float) (MAX_TAP_MOTION_DISTANCE * MAX_TAP_MOTION_DISTANCE);
@@ -310,11 +310,11 @@ void psp2ProcessFingerUp(TouchEvent *event) {
 							Uint8 simulatedButton = 0;
 							if (numFingersDown == 2) {
 								simulatedButton = SDL_BUTTON_RIGHT;
-								                                 
+								// need to raise the button later
 								_simulatedClickStartTime[port][1] = event->tfinger.timestamp;
 							} else if (numFingersDown == 1) {
 								simulatedButton = SDL_BUTTON_LEFT;
-								                                 
+								// need to raise the button later
 								_simulatedClickStartTime[port][0] = event->tfinger.timestamp;
 							}
 
@@ -328,7 +328,7 @@ void psp2ProcessFingerUp(TouchEvent *event) {
 					}
 				}
 			} else if (numFingersDown == 1) {
-				                                                                 
+				// when dragging, and the last finger is lifted, the drag is over
 				Uint8 simulatedButton = 0;
 				if (_multiFingerDragging[port] == DRAG_THREE_FINGER)
 					simulatedButton = SDL_BUTTON_RIGHT;
@@ -351,12 +351,12 @@ void psp2ProcessFingerMotion(TouchEvent *event) {
 	if (vkbd_mode)
 		return;
 
-	                              
+	// front (0) or back (1) panel
 	int port = event->tfinger.touchId;
-	                      
+	// id (for multitouch)
 	int id = event->tfinger.fingerId;
 
-	                                                        
+	// find out how many fingers were down before this event
 	int numFingersDown = 0;
 	for (int i = 0; i < MAX_NUM_FINGERS; i++) {
 		if (_finger[port][i].id >= 0) {
@@ -365,10 +365,10 @@ void psp2ProcessFingerMotion(TouchEvent *event) {
 	}
 
 	if (numFingersDown >= 1) {
-		                                                                              
+		// If we are starting a multi-finger drag, start holding down the mouse button
 		if (numFingersDown >= 2) {
 			if (!_multiFingerDragging[port]) {
-				                                                                                    
+				// only start a multi-finger drag if at least two fingers have been down long enough
 				int numFingersDownLong = 0;
 				for (int i = 0; i < MAX_NUM_FINGERS; i++) {
 					if (_finger[port][i].id >= 0) {
@@ -398,7 +398,7 @@ void psp2ProcessFingerMotion(TouchEvent *event) {
 			}
 		}
 
-		                                                                                                                
+		//check if this is the "oldest" finger down (or the only finger down), otherwise it will not affect mouse motion
 		bool updatePointer = true;
 		if (numFingersDown > 1) {
 			for (int i = 0; i < MAX_NUM_FINGERS; i++) {

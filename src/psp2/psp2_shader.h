@@ -1,6 +1,6 @@
-  
-                                    
-  
+//
+// Created by cpasjuste on 18/12/16.
+//
 
 #ifndef UAE4ALL2_PSP2_SHADER_H
 #define UAE4ALL2_PSP2_SHADER_H
@@ -32,4 +32,4 @@ private:
     vita2d_shader *shader = NULL;
 };
 
-#endif                         
+#endif //UAE4ALL2_PSP2_SHADER_H

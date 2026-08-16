@@ -9,7 +9,7 @@ int PSP2_PollEvent(SDL_Event *event);
 void exit_safely(int quit_via_home);
 #endif
 
-#ifdef __PSP2__                  
+#ifdef __PSP2__ // NOT __SWITCH__
 #define PAD_UP 8
 #define PAD_DOWN 6
 #define PAD_LEFT 7

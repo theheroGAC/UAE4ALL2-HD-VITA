@@ -1,5 +1,5 @@
-  
-                                  
+//
+// Created by rsn8887 on 02/05/18.
 
 #ifndef UAE4ALL2_PSP2_TOUCH_H
 #define UAE4ALL2_PSP2_TOUCH_H
@@ -32,7 +32,7 @@ typedef struct {
 	FingerType tfinger;
 } TouchEvent;
 
-                     
+/* Touch functions */
 void psp2InitTouch(void);
 void psp2QuitTouch(void);
 void psp2PollTouch(void);
