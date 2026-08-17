@@ -191,7 +191,7 @@ static const unsigned char s_font_8x8[96][8] = {
 /* Proportional character width table (in pixels) */
 static const unsigned char s_char_widths[96] = {
     4, 3, 5, 7, 7, 7, 7, 3, 4, 4, 6, 7, 3, 6, 3, 6, // 32-47
-    7, 5, 7, 7, 7, 7, 7, 7, 7, 7, 3, 3, 5, 7, 5, 7, // 48-63
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 3, 3, 5, 7, 5, 7, // 48-63
     7, 7, 7, 7, 7, 7, 7, 7, 7, 4, 6, 7, 6, 8, 7, 7, // 64-79
     7, 7, 7, 7, 7, 7, 7, 8, 7, 7, 7, 4, 6, 4, 5, 7, // 80-95
     3, 6, 6, 6, 6, 6, 5, 6, 3, 4, 6, 3, 8, 6, 6, 6, // 96-111
@@ -507,7 +507,7 @@ void vita_draw_text(float x, float y, unsigned int color, float scale, const cha
 
             for (int r = 0; r < 8; r++) {
                 unsigned char row = glyph[r];
-                for (int col = 0; col < char_w; col++) {
+                for (int col = 0; col < 8; col++) {
                     if (row & (0x80 >> col)) {
                         SDL_Rect p = {
                             (Sint16)(cur_x + (int)(col * factor)),
