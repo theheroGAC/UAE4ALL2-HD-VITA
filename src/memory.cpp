@@ -1,10 +1,10 @@
-   
-                                 
-   
-                     
-   
-                          
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Memory management
+  *
+  * (c) 1995 Bernd Schmidt
+  */
 
 #include "sysconfig.h"
 #include "sysdeps.h"
@@ -47,8 +47,8 @@ addrbank akiko_bank = {
 unsigned prefs_chipmem_size;
 unsigned prefs_bogomem_size;
 
-const char *kickstarts_rom_names[] = { "kick12.rom\0", "kick13.rom\0", "kick20.rom\0", "kick31.rom\0", "kickcustom.rom\0", "aros-amiga-m68k-rom.bin\0" };
-const char *extended_rom_names[] = { "\0", "\0", "\0", "\0", "\0", "aros-amiga-m68k-ext.bin\0" };
+const char *kickstarts_rom_names[] = { "kick12.rom\0", "kick13.rom\0", "kick20.rom\0", "kick31.rom\0", "kickcustom.rom\0", "aros-amiga-m68k-rom.bin\0", "kick40060.CD32\0" };
+const char *extended_rom_names[] = { "\0", "\0", "\0", "\0", "\0", "aros-amiga-m68k-ext.bin\0", "kick40060.CD32.ext\0" };
 #ifdef ANDROIDSDL
 const char *af_kickstarts_rom_names[] = { "amiga-os-120.rom\0", "amiga-os-130.rom\0", "amiga-os-204.rom\0", "amiga-os-310-a1200.rom\0" };
 #endif
@@ -79,7 +79,7 @@ uae_u32 chipmem_mask, kickmem_mask, bogomem_mask;
 
 uae_u32 extendedkickmem_mask, a3000mem_mask;
 
-                                           
+/* A dummy bank that only contains zeros */
 
 static uae_u32 dummy_lget (uaecptr) REGPARAM;
 static uae_u32 dummy_wget (uaecptr) REGPARAM;
@@ -91,17 +91,17 @@ static int dummy_check (uaecptr addr, uae_u32 size) REGPARAM;
 
 uae_u32 REGPARAM2 dummy_lget (uaecptr addr)
 {
-    return NONEXISTINGDATA;                
+    return NONEXISTINGDATA; /*0xFFFFFFFF;*/
 }
 
 uae_u32 REGPARAM2 dummy_wget (uaecptr addr)
 {
-    return NONEXISTINGDATA;           ;
+    return NONEXISTINGDATA; /*0xFFFF*/;
 }
 
 uae_u32 REGPARAM2 dummy_bget (uaecptr addr)
 {
-    return NONEXISTINGDATA;          
+    return NONEXISTINGDATA; /*0xFF;*/
 }
 
 void REGPARAM2 dummy_lput (uaecptr addr, uae_u32 l)
@@ -122,7 +122,7 @@ int REGPARAM2 dummy_check (uaecptr addr, uae_u32 size)
 }
 
 #if !( defined(PANDORA) || defined(ANDROIDSDL) )
-                                          
+/* A3000 "motherboard resources" bank.  */
 static uae_u32 mbres_lget (uaecptr) REGPARAM;
 static uae_u32 mbres_wget (uaecptr) REGPARAM;
 static uae_u32 mbres_bget (uaecptr) REGPARAM;
@@ -166,7 +166,7 @@ int REGPARAM2 mbres_check (uaecptr addr, uae_u32 size)
 }
 #endif
 
-                 
+/* Chip memory */
 
 uae_u8 *chipmemory;
 uae_u16 *chipmemory_word;
@@ -177,7 +177,7 @@ static uae_u8 *chipmem_xlate (uaecptr addr) REGPARAM;
 uae_u32 REGPARAM2 chipmem_lget (uaecptr addr)
 {
     uae_u32 *m;
-                                               
+//    addr -= chipmem_start /*& chipmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= chipmem_mask;
 #endif
@@ -189,7 +189,7 @@ uae_u32 REGPARAM2 chipmem_lget (uaecptr addr)
 uae_u32 REGPARAM2 chipmem_wget (uaecptr addr)
 {
    uae_u16 *m;
-                                                  
+   //    addr -= chipmem_start /*& chipmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
    addr &= chipmem_mask;
 #endif
@@ -201,7 +201,7 @@ uae_u32 REGPARAM2 chipmem_wget (uaecptr addr)
 uae_u32 REGPARAM2 chipmem_bget (uaecptr addr)
 {
 	uae_u8 *m;
-                                               
+//    addr -= chipmem_start /*& chipmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= chipmem_mask;
 #endif
@@ -212,7 +212,7 @@ uae_u32 REGPARAM2 chipmem_bget (uaecptr addr)
 void REGPARAM2 chipmem_lput (uaecptr addr, uae_u32 l)
 {
     uae_u32 *m;
-                                               
+//    addr -= chipmem_start /*& chipmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= chipmem_mask;
 #endif
@@ -223,7 +223,7 @@ void REGPARAM2 chipmem_lput (uaecptr addr, uae_u32 l)
 void REGPARAM2 chipmem_wput (uaecptr addr, uae_u32 w)
 {
    uae_u16 *m;
-                                                  
+   //    addr -= chipmem_start /*& chipmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
    addr &= chipmem_mask;
 #endif
@@ -234,7 +234,7 @@ void REGPARAM2 chipmem_wput (uaecptr addr, uae_u32 w)
 void REGPARAM2 chipmem_bput (uaecptr addr, uae_u32 b)
 {
 	uae_u8 *m;
-                                               
+//    addr -= chipmem_start /*& chipmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= chipmem_mask;
 #endif
@@ -244,7 +244,7 @@ void REGPARAM2 chipmem_bput (uaecptr addr, uae_u32 b)
 
 int REGPARAM2 chipmem_check (uaecptr addr, uae_u32 size)
 {
-                                               
+//    addr -= chipmem_start /*& chipmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= chipmem_mask;
 #endif
@@ -253,14 +253,14 @@ int REGPARAM2 chipmem_check (uaecptr addr, uae_u32 size)
 
 uae_u8 REGPARAM2 *chipmem_xlate (uaecptr addr)
 {
-                                               
+//    addr -= chipmem_start /*& chipmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
 	addr &= chipmem_mask;
 #endif
     return chipmemory + addr;
 }
 
-                 
+/* Slow memory */
 
 static uae_u8 *bogomemory;
 
@@ -275,7 +275,7 @@ static uae_u8 *bogomem_xlate (uaecptr addr) REGPARAM;
 uae_u32 REGPARAM2 bogomem_lget (uaecptr addr)
 {
     uae_u32 *m;
-    addr -= bogomem_start                   ;
+    addr -= bogomem_start /*& bogomem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= bogomem_mask;
 #endif
@@ -287,7 +287,7 @@ uae_u32 REGPARAM2 bogomem_lget (uaecptr addr)
 uae_u32 REGPARAM2 bogomem_wget (uaecptr addr)
 {
     uae_u16 *m;
-    addr -= bogomem_start                   ;
+    addr -= bogomem_start /*& bogomem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= bogomem_mask;
 #endif
@@ -299,7 +299,7 @@ uae_u32 REGPARAM2 bogomem_wget (uaecptr addr)
 uae_u32 REGPARAM2 bogomem_bget (uaecptr addr)
 {
     uae_u8 *m;
-    addr -= bogomem_start                   ;
+    addr -= bogomem_start /*& bogomem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= bogomem_mask;
 #endif
@@ -311,7 +311,7 @@ uae_u32 REGPARAM2 bogomem_bget (uaecptr addr)
 void REGPARAM2 bogomem_lput (uaecptr addr, uae_u32 l)
 {
     uae_u32 *m;
-    addr -= bogomem_start                   ;
+    addr -= bogomem_start /*& bogomem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= bogomem_mask;
 #endif
@@ -322,7 +322,7 @@ void REGPARAM2 bogomem_lput (uaecptr addr, uae_u32 l)
 void REGPARAM2 bogomem_wput (uaecptr addr, uae_u32 w)
 {
     uae_u16 *m;
-    addr -= bogomem_start                   ;
+    addr -= bogomem_start /*& bogomem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= bogomem_mask;
 #endif
@@ -333,7 +333,7 @@ void REGPARAM2 bogomem_wput (uaecptr addr, uae_u32 w)
 void REGPARAM2 bogomem_bput (uaecptr addr, uae_u32 b)
 {
     uae_u8 *m;
-    addr -= bogomem_start                   ;
+    addr -= bogomem_start /*& bogomem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= bogomem_mask;
 #endif
@@ -343,7 +343,7 @@ void REGPARAM2 bogomem_bput (uaecptr addr, uae_u32 b)
 
 int REGPARAM2 bogomem_check (uaecptr addr, uae_u32 size)
 {
-    addr -= bogomem_start                   ;
+    addr -= bogomem_start /*& bogomem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= bogomem_mask;
 #endif
@@ -352,7 +352,7 @@ int REGPARAM2 bogomem_check (uaecptr addr, uae_u32 size)
 
 uae_u8 REGPARAM2 *bogomem_xlate (uaecptr addr)
 {
-    addr -= bogomem_start                   ;
+    addr -= bogomem_start /*& bogomem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= bogomem_mask;
 #endif
@@ -360,7 +360,7 @@ uae_u8 REGPARAM2 *bogomem_xlate (uaecptr addr)
 }
 
 #if !( defined(PANDORA) || defined(ANDROIDSDL) )
-                                   
+/* A3000 motherboard fast memory */
 
 static uae_u8 *a3000memory;
 
@@ -438,7 +438,7 @@ uae_u8 REGPARAM2 *a3000mem_xlate (uaecptr addr)
 }
 #endif
 
-                 
+/* Kick memory */
 
 uae_u8 *kickmemory;
 
@@ -457,13 +457,13 @@ static unsigned get_kickmem_checksum(void)
 	return ret;
 }
 
-  
-                               
-  
-                                                                   
-                                                                       
-  
-   
+/*
+ * A1000 kickstart RAM handling
+ *
+ * RESET instruction unhides boot ROM and disables write protection
+ * write access to boot ROM hides boot ROM and enables write protection
+ *
+ */
 static int a1000_kickstart_mode;
 static uae_u8 *a1000_bootrom;
 static void a1000_handle_kickstart (int mode)
@@ -491,7 +491,7 @@ static uae_u8 *kickmem_xlate (uaecptr addr) REGPARAM;
 uae_u32 REGPARAM2 kickmem_lget (uaecptr addr)
 {
    uae_u16 *m;
-   addr -= kickmem_start                   ;
+   addr -= kickmem_start /*& kickmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
    addr &= kickmem_mask;
 #endif
@@ -504,7 +504,7 @@ uae_u32 REGPARAM2 kickmem_lget (uaecptr addr)
 uae_u32 REGPARAM2 kickmem_wget (uaecptr addr)
 {
    uae_u16 *m;
-   addr -= kickmem_start                   ;
+   addr -= kickmem_start /*& kickmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
    addr &= kickmem_mask;
 #endif
@@ -516,7 +516,7 @@ uae_u32 REGPARAM2 kickmem_wget (uaecptr addr)
 uae_u32 REGPARAM2 kickmem_bget (uaecptr addr)
 {
     uae_u8 *m;
-    addr -= kickmem_start                   ;
+    addr -= kickmem_start /*& kickmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= kickmem_mask;
 #endif
@@ -530,7 +530,7 @@ void REGPARAM2 kickmem_lput (uaecptr addr, uae_u32 l)
    uae_u16 *m;
    if (a1000_kickstart_mode) {
       if (addr >= 0xfc0000) {
-         addr -= kickmem_start                   ;
+         addr -= kickmem_start /*& kickmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
          addr &= kickmem_mask;
 #endif
@@ -548,7 +548,7 @@ void REGPARAM2 kickmem_wput (uaecptr addr, uae_u32 w)
    uae_u16 *m;
    if (a1000_kickstart_mode) {
       if (addr >= 0xfc0000) {
-         addr -= kickmem_start                   ;
+         addr -= kickmem_start /*& kickmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
          addr &= kickmem_mask;
 #endif
@@ -565,7 +565,7 @@ void REGPARAM2 kickmem_bput (uaecptr addr, uae_u32 b)
    uae_u8 *m;
    if (a1000_kickstart_mode) {
       if (addr >= 0xfc0000) {
-         addr -= kickmem_start                   ;
+         addr -= kickmem_start /*& kickmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
          addr &= kickmem_mask;
 #endif
@@ -579,7 +579,7 @@ void REGPARAM2 kickmem_bput (uaecptr addr, uae_u32 b)
 
 int REGPARAM2 kickmem_check (uaecptr addr, uae_u32 size)
 {
-    addr -= kickmem_start                   ;
+    addr -= kickmem_start /*& kickmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= kickmem_mask;
 #endif
@@ -588,14 +588,14 @@ int REGPARAM2 kickmem_check (uaecptr addr, uae_u32 size)
 
 uae_u8 REGPARAM2 *kickmem_xlate (uaecptr addr)
 {
-    addr -= kickmem_start                   ;
+    addr -= kickmem_start /*& kickmem_mask*/;
 #ifdef SAFE_MEMORY_ACCESS
     addr &= kickmem_mask;
 #endif
     return kickmemory + addr;
 }
 
-                                    
+/* CD32/CDTV extended kick memory */
 
 uae_u8 *extendedkickmemory;
 static int extendedkickmem_size;
@@ -676,7 +676,7 @@ uae_u8 REGPARAM2 *extendedkickmem_xlate (uaecptr addr)
 }
 
 
-                                     
+/* Default memory access functions */
 
 int REGPARAM2 default_check (uaecptr a, uae_u32 b)
 {
@@ -687,10 +687,10 @@ uae_u8 REGPARAM2 *default_xlate (uaecptr a)
 {
     write_log ("Your Amiga program just did something terribly stupid\n");
     uae_reset ();
-    return kickmem_xlate (get_long (0xF80000));	                        
+    return kickmem_xlate (get_long (0xF80000));	/* So we don't crash. */
 }
 
-                   
+/* Address banks */
 
 addrbank dummy_bank = {
     dummy_lget, dummy_wget, dummy_bget,
@@ -879,7 +879,7 @@ static int load_extendedkickstart (void)
 	    break;
   }
   
-                                                         
+  //read_kickstart (f, extendedkickmemory, 524288, 0, 0);
   int i;
   i = fread (extendedkickmemory, 1, 524288, f);
   if (i != 8192 && i != 65536 && i != 131072 && i != 262144 && i != 524288 && i != 524288 * 2 && i != 524288 * 4) 
@@ -974,7 +974,7 @@ static void allocate_memory (void)
 		else do_put_mem_long ((uae_u32 *)(chipmemory + 4), 0);
     }
 	
-	                    
+	/* PocketUAE code */
 	if (allocated_bogomem != prefs_bogomem_size) {
 		if (bogomemory)
 			mapped_free (bogomemory);
@@ -997,7 +997,7 @@ static void allocate_memory (void)
 		}
 	}
 
-	                    
+	/******************/
   if (savestate_state == STATE_RESTORE)
 	{
 	    fseek (savestate_file, chip_filepos, SEEK_SET);
@@ -1011,7 +1011,7 @@ static void allocate_memory (void)
 	    free(tmp);
 	    if(res != Z_OK)
 	    {
-	                                                     
+	        // decompression failed - treat data literaly
 		    allocated_chipmem=compressed_size;
 		    fseek (savestate_file, chip_filepos, SEEK_SET);
 		    fread (chipmemory, 1, allocated_chipmem, savestate_file);
@@ -1047,11 +1047,11 @@ void memory_reset (void)
 
     allocate_memory ();
 
-                                             
+//    memset(chipmemory,0,allocated_chipmem);
     clear_fame_mem_dummy();
 
-                                                                                            
-                       
+    /* Can't be done here, or we'll lose all the extension/filesys traps that were set up */
+//    rtarea_cleanup();
     
     if (kickmem_checksum!=get_kickmem_checksum() | bReloadKickstart)
     {
@@ -1069,26 +1069,26 @@ void memory_reset (void)
     map_banks (&custom_bank, custom_start, 0xE0 - custom_start, 0);
     map_banks (&cia_bank, 0xA0, 32, 0);
     if (!a1000_bootrom)
-                                                              
+       /* D80000 - DDFFFF not mapped (A1000 = custom chips) */
        map_banks (&dummy_bank, 0xD8, 6, 0);
 
-                                                                           
+     /* Map "nothing" to 0x200000 - 0x9FFFFF (0xBEFFFF if PCMCIA or AGA) */
     bnk = allocated_chipmem >> 16;
     if (bnk < 0x20 + (allocated_fastmem >> 16))
        bnk = 0x20 + (allocated_fastmem >> 16);
-    bnk_end = (((changed_prefs.chipset_mask & CSMASK_AGA)                           ) ? 0xBF : 0xA0);
+    bnk_end = (((changed_prefs.chipset_mask & CSMASK_AGA) /*|| currprefs.cs_pcmcia*/) ? 0xBF : 0xA0);
     map_banks (&dummy_bank, bnk, bnk_end - bnk, 0);
     if (changed_prefs.chipset_mask & CSMASK_AGA)
        map_banks (&dummy_bank, 0xc0, 0xd8 - 0xc0, 0);
 
-                     
+    /* Map chipmem */
     bnk = allocated_chipmem > 0x200000 ? (allocated_chipmem >> 16) : 0x20;
     map_banks (&chipmem_bank, 0x00, bnk, allocated_chipmem);
 
     if (bogomemory != 0) {
        int t = allocated_bogomem >> 16;
 
-                                                
+//       memset(bogomemory,0,allocated_bogomem);
        map_banks (&bogomem_bank, 0xC0, t, allocated_bogomem);
     }
     
@@ -1105,7 +1105,7 @@ void memory_reset (void)
     
     map_banks (&kickmem_bank, 0xF8, 8, 0);
 
-                                         
+    /* map beta Kickstarts at 0x200000 */
     if (kickmemory[2] == 0x4e && kickmemory[3] == 0xf9 && kickmemory[4] == 0x00) {
        uae_u32 addr = kickmemory[5];
        if (addr == 0x20 && allocated_chipmem <= 0x200000 && allocated_fastmem == 0)
@@ -1232,7 +1232,7 @@ void map_banks (addrbank *bank, int start, int size, int realsize)
 }
 
 
-                              
+/* memory save/restore code */
 
 uae_u8 *save_cram (int *len)
 {
@@ -1281,11 +1281,11 @@ uae_u8 *save_rom (int first, int *len)
     for (;;) {
 	mem_type = count;
 	switch (count) {
-	case 0:		                   
+	case 0:		/* Kickstart ROM */
 	    mem_start = 0xf80000;
 	    mem_real_start = kickmemory;
 	    mem_size = kickmem_size;
-	                             
+	    /* 256KB or 512KB ROM? */
 	    for (i = 0; i < mem_size / 2 - 4; i++) {
 		if (longget (i + mem_start) != longget (i + mem_start + mem_size / 2))
 		    break;
@@ -1310,11 +1310,11 @@ uae_u8 *save_rom (int first, int *len)
     save_u32 (mem_start);
     save_u32 (mem_size);
     save_u32 (mem_type);
-    save_u32 (longget (mem_start + 12));	                      
+    save_u32 (longget (mem_start + 12));	/* version+revision */
     save_u32 (0);
-                                                
-                                                                                                        
-                                      
+    // no memory allocated for "Kickstart %d.%d"
+    //snprintf ((char *)dst, 32, "Kickstart %d.%d", wordget (mem_start + 12), wordget (mem_start + 14));
+    //dst += strlen ((char *)dst) + 1;
     if (saverom) {
 	for (i = 0; i < mem_size; i++)
 	    *dst++ = byteget (mem_start + i);
