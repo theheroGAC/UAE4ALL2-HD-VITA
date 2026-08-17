@@ -66,6 +66,8 @@ extern char presetMode[20];
 extern int presetModeId;
 extern int mainMenu_cutLeft;
 extern int mainMenu_cutRight;
+extern int mainMenu_footerSize;
+extern int mainMenu_screenOffsetY;
 extern int mainMenu_ntsc;
 extern int mainMenu_frameskip;
 extern int mainMenu_vkbdLanguage;

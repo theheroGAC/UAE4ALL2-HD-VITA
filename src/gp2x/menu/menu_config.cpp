@@ -136,6 +136,8 @@ char presetMode[20] = "320x240 upscaled";
 int presetModeId = 2;
 int mainMenu_cutLeft = 0;
 int mainMenu_cutRight = 0;
+int mainMenu_footerSize = 0;
+int mainMenu_screenOffsetY = 0;
 int mainMenu_ntsc = DEFAULT_NTSC;
 int mainMenu_frameskip = 0;
 int mainMenu_vkbdLanguage = 0; //Default is US Keyboard
@@ -498,6 +500,8 @@ void SetDefaultMenuSettings(int general)
     moveY = 16;
     mainMenu_cutLeft = 0;
     mainMenu_cutRight = 0;
+    mainMenu_footerSize = 0;
+    mainMenu_screenOffsetY = 0;
     mainMenu_ntsc = DEFAULT_NTSC;
     mainMenu_frameskip = 0;
     mainMenu_vkbdLanguage = 0; //Default is US Keyboard
@@ -1493,6 +1497,10 @@ int saveconfig(int general)
     fputs(buffer,f);
     snprintf((char*)buffer, 255, "useSavesFolder=%d\n",mainMenu_useSavesFolder);
     fputs(buffer,f);
+    snprintf((char*)buffer, 255, "footerSize=%d\n",mainMenu_footerSize);
+    fputs(buffer,f);
+    snprintf((char*)buffer, 255, "screenOffsetY=%d\n",mainMenu_screenOffsetY);
+    fputs(buffer,f);
 #ifdef __SWITCH__
     snprintf((char*)buffer, 255, "swapAB=%d\n",mainMenu_swapAB);
     fputs(buffer,f);
@@ -1918,6 +1926,14 @@ void loadconfig(int general)
         // ignore this option. All saves are always made into saves folder now
         fscanf(f,"useSavesFolder=%d\n",&mainMenu_useSavesFolder);
         mainMenu_useSavesFolder = DEFAULT_USESAVESFOLDER;
+        if (fscanf(f,"footerSize=%d\n",&mainMenu_footerSize) != 1)
+            mainMenu_footerSize = 0;
+        if (mainMenu_footerSize < -64) mainMenu_footerSize = -64;
+        if (mainMenu_footerSize > 160) mainMenu_footerSize = 160;
+        if (fscanf(f,"screenOffsetY=%d\n",&mainMenu_screenOffsetY) != 1)
+            mainMenu_screenOffsetY = 0;
+        if (mainMenu_screenOffsetY < -128) mainMenu_screenOffsetY = -128;
+        if (mainMenu_screenOffsetY > 128) mainMenu_screenOffsetY = 128;
 #ifdef __SWITCH__ 
         fscanf(f,"swapAB=%d\n",&mainMenu_swapAB);
         fscanf(f,"singleJoycons=%d\n",&mainMenu_singleJoycons);
