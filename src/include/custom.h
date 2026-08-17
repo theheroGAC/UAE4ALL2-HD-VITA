@@ -1,13 +1,13 @@
-   
-                                 
-   
-                       
-   
-                          
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * custom chip support
+  *
+  * (c) 1995 Bernd Schmidt
+  */
 
-                                                                         
-                                                                           
+/* These are the masks that are ORed together in the chipset_mask option.
+ * If CSMASK_AJA is set, the ECS bits are guaranteed to be set as well.  */
 
 #ifndef UAE_CUSTOM_H
 #define UAE_CUSTOM_H
@@ -32,15 +32,15 @@ extern void custom_prepare_savestate (void);
 
 extern void togglemouse (void);
 
-                                                                             
-                                         
+/* Set to 1 to leave out the current frame in average frame time calculation.
+ * Useful if the debugger was active.  */
 extern int bogusframe;
 
 extern uae_u16 dmacon;
 extern uae_u16 intena,intreq;
 
-                                  
-                   
+// extern int current_hpos (void);
+// extern int vpos;
 
 extern int find_copper_record (uaecptr, int *, int *);
 
@@ -63,7 +63,7 @@ extern int n_frames;
 
 extern uae_u16 adkcon;
 
-                                             
+// number 2 and 3 are parallel port joysticks
 extern unsigned int joy0dir, joy1dir, joy2dir, joy3dir;
 extern int joy0button, joy1button, joy2button, joy3button;
 
@@ -71,17 +71,17 @@ extern void INTREQ (uae_u16);
 extern void INTREQ_0 (uae_u16);
 extern uae_u16 INTREQR (void);
 
-                                              
+/* maximums for statically allocated tables */
 
 #define MAXHPOS 227
 #define MAXVPOS 312
-                     
+//#define MAXVPOS 280
 
-                     
+/* PAL/NTSC values */
 
-                                                                                
-                                                                               
-                                   
+/* The HRM says: The vertical blanking area (PAL) ranges from line 0 to line 29,
+ * and no data can be displayed there. Nevertheless, we lose some overscan data
+ * if minfirstline is set to 29. */
 
 #define MAXHPOS_PAL MAXHPOS
 #define MAXHPOS_NTSC MAXHPOS
@@ -109,9 +109,9 @@ extern int maxhpos, maxvpos, minfirstline, vblank_endline, numscrlines;
 #define DMA_MASTER    0x0200
 #define DMA_BLITPRI   0x0400
 
-                                                                            
-                                                                         
-                                               
+/* 100 words give you 1600 horizontal pixels. Should be more than enough for
+ * superhires. Don't forget to update the definition in genp2c.c as well.
+ * needs to be larger for superhires support */
 #define MAX_WORDS_PER_LINE 100
 
 extern uae_u32 hirestab_h[256][2];
@@ -120,17 +120,17 @@ extern uae_u32 lorestab_h[256][4];
 extern uae_u32 hirestab_l[256][1];
 extern uae_u32 lorestab_l[256][2];
 
-                                  
+/* AGA mode color lookup tables */
 extern unsigned int xredcolors[256], xgreencolors[256], xbluecolors[256];
 
 extern int bpl_off[8];
 
-                                 
+/* get resolution from bplcon0 */
 #define GET_RES(CON0) (((CON0) & 0x8000) ? RES_HIRES : ((CON0) & 0x40) ? RES_SUPERHIRES : RES_LORES)
-                                                 
-                                 
+//#define GET_RES(CON0) (((CON0) & 0x8000) >> 15)
+/* get sprite width from FMODE */
 #define GET_SPRITEWIDTH(FMODE) ((((FMODE) >> 2) & 3) == 3 ? 64 : (((FMODE) >> 2) & 3) == 0 ? 16 : 32)
-                                                                      
+/* Compute the number of bitplanes from a value written to BPLCON0  */
 #define GET_PLANES(x) ((((x) >> 12) & 7) | (((x) & 0x10) >> 1))
 
 extern void fpscounter_reset (void);

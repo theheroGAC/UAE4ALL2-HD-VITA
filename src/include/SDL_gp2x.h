@@ -1,9 +1,9 @@
-  
-                           
-  
-                                                                        
-                                    
-   
+/*
+ * Non-standard SDL header.
+ *
+ * This header gives access to a few extra features of the GP2X hardware
+ * that I added to the video driver.
+ */
 
 #ifndef SDL_GP2X__H
 #define SDL_GP2X__H

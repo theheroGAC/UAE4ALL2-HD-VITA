@@ -1,10 +1,10 @@
-   
-                                 
-    
-                                         
-    
-                                
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  * 
+  * Generic thread support doesn't exist.
+  * 
+  * Copyright 1997 Bernd Schmidt
+  */
 
 #ifdef NO_THREADS
 
@@ -39,8 +39,8 @@ typedef int uae_thread_id;
 #include "sdl2_to_sdl1.h"
 #endif
 
-                                                                            
-                                                                
+/* Sempahores. We use POSIX semaphores; if you are porting this to a machine
+ * with different ones, make them look like POSIX semaphores. */
 typedef SDL_sem *uae_sem_t;
 
 #define uae_sem_init(PSEM, DUMMY, INIT) do { \
@@ -63,7 +63,7 @@ static __inline__ int uae_start_thread (void *(*f) (void *), void *arg, uae_thre
     return *foo == 0;
 }
 
-                                                           
+/* Do nothing; thread exits if thread function returns.  */
 #define UAE_THREAD_EXIT do {} while (0)
 
 #endif

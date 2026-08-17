@@ -1,10 +1,10 @@
-   
-                                 
-   
-                                         
-   
-                                
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Miscellaneous bits for exec emulation
+  *
+  * Copyright 1996 Bernd Schmidt
+  */
 
 #define CMD_INVALID 0
 #define CMD_RESET   1
@@ -27,7 +27,7 @@
 #define NT_LIBRARY  9
 #define NT_SIGNALSEM 15
 
-#ifndef MEMF_PUBLIC                              
+#ifndef MEMF_PUBLIC /* protection for AmigaDOS */
 #define MEMF_PUBLIC 1
 #define MEMF_CHIP 2
 #define MEMF_FAST 4

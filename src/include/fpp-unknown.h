@@ -1,12 +1,12 @@
-   
-                                 
-   
-                     
-   
-                                                                     
-   
-                                    
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * MC68881 emulation
+  *
+  * Conversion routines for hosts with unknown floating point format.
+  *
+  * Copyright 1996 Herman ten Brugge
+  */
 
 #ifndef HAVE_to_single
 static __inline__ double to_single (uae_u32 value)

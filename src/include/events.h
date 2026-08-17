@@ -1,13 +1,13 @@
-   
-                                 
-   
-          
-                                                                     
-                                                                         
-             
-   
-                                     
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Events
+  * These are best for low-frequency events. Having too many of them,
+  * or using them for events that occur too frequently, can cause massive
+  * slowdown.
+  *
+  * Copyright 1995-1998 Bernd Schmidt
+  */
 
 #include "rpt.h"
 
@@ -66,10 +66,10 @@ static __inline__ void do_cycles_slow (unsigned long cycles_to_add)
     currcycle += cycles_to_add;
 }
 
-                                                                           
-                                                                      
-                                                                         
-                                                      
+/* This is a special-case function.  Normally, all events should lie in the
+   future; they should only ever be active at the current cycle during
+   do_cycles.  However, a snapshot is saved during do_cycles, and so when
+   restoring it, we may have other events pending.  */
 static __inline__ void handle_active_events (void)
 {
     int i;

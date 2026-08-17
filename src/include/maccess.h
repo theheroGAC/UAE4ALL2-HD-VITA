@@ -1,10 +1,10 @@
-    
-                                 
-    
-                           
-   
-                                
-    
+ /* 
+  * UAE - The Un*x Amiga Emulator
+  * 
+  * Memory access functions
+  *
+  * Copyright 1996 Bernd Schmidt
+  */
 
 #ifndef MACCESS_UAE_H
 #define MACCESS_UAE_H
@@ -16,11 +16,11 @@ static __inline__ uae_u32 do_get_mem_long(uae_u32 *_GCCRES_ a)
 {
 #ifdef USE_FAME_CORE
    uae_u32 b;
-                                                                        
-              
-                                                                                   
-                                                                                      
-      
+   /* ! 68020+ CPUs can read/write words and longs at odd addresses ! */
+   /* Example:
+    *    - memory loc.    0x00000000 : 0xeeff0011 0x22334455... (word-swabbed data)
+    *    - read long from 0x00000001 : 0xee110033 (unswabbed data, eg. Amiga register)
+    */
    b  = do_get_mem_word((uae_u16 *)a) << 16;
    b |= do_get_mem_word((uae_u16 *)((hostptr)a + 2));
    return b;
@@ -34,12 +34,12 @@ static __inline__ uae_u32 do_get_mem_long(uae_u32 *_GCCRES_ a)
 static __inline__ uae_u16 do_get_mem_word(uae_u16 *_GCCRES_ a)
 {
 #ifdef USE_FAME_CORE
-                                                                        
+   /* ! 68020+ CPUs can read/write words and longs at odd addresses ! */
    if ((hostptr)a & 1) {
-                 
-                                                                        
-                                                                     
-         
+      /* Example:
+       *    - memory loc.    0x00000000 : 0xeeff0011 (word-swabbed data)
+       *    - read word from 0x00000001 : 0xee11     (unswabbed data)
+       */
       uae_u32 b;
       b = *((uae_u32 *)((hostptr)a ^ 1));
       b = (b << 8) | (b >> 24);
@@ -68,11 +68,11 @@ static __inline__ uae_u8 do_get_mem_byte(uae_u8 *_GCCRES_ a)
 static __inline__ void do_put_mem_long(uae_u32 *_GCCRES_ a, uae_u32 v)
 {
 #ifdef USE_FAME_CORE
-                                                                        
-              
-                                                                          
-                                                                
-      
+   /* ! 68020+ CPUs can read/write words and longs at odd addresses ! */
+   /* Example:
+    *    - memory loc.         0x00000000 : 0xeeff0011 (word-swabbed data)
+    *    - write 0x22334455 to 0x00000001 : 0x22ff4433 0xnn55...
+    */
    do_put_mem_word((uae_u16 *)a, v >> 16);
    do_put_mem_word((uae_u16 *)((hostptr)a + 2), v);
 #else
@@ -88,12 +88,12 @@ static __inline__ void do_put_mem_long(uae_u32 *_GCCRES_ a, uae_u32 v)
 static __inline__ void do_put_mem_word(uae_u16 *_GCCRES_ a, uae_u16 v)
 {
 #ifdef USE_FAME_CORE
-                                                                        
+   /* ! 68020+ CPUs can read/write words and longs at odd addresses ! */
    if ((hostptr)a & 1) {
-                 
-                                                                         
-                                                     
-         
+      /* Example:
+       *    - memory loc.     0x00000000 : 0xeeff0011 (word-swabbed data)
+       *    - write 0x2233 to 0x00000001 : 0x22ff0033
+       */
       *((uae_u8 *)a - 1) = v >> 8;
       *((uae_u8 *)a + 2) = v;
    }

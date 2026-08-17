@@ -1,10 +1,10 @@
-   
-                                 
-   
-                                                    
-   
-                            
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * routines to handle compressed file automatically
+  *
+  * (c) 1996 Samuel Devulder
+  */
 struct zfile;
 
 extern struct zfile *zfile_open (const char *, const char *);

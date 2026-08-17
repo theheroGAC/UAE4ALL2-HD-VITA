@@ -1,10 +1,10 @@
-   
-                                 
-   
-                             
-   
-                      
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Autoconfig device support
+  *
+  * (c) 1996 Ed Hanway
+  */
 
 
 typedef uae_u32 (*TrapFunction) (void);

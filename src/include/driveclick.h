@@ -1,10 +1,10 @@
-   
-                                 
-   
-                               
-   
-                                         
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Drive Click emulation stuff
+  *
+  * Copyright 2004 James Bagg, Toni Wilen
+  */
 
 
 struct drvsample {

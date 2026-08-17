@@ -1,10 +1,10 @@
-   
-                                 
-   
-                                         
-   
-                                
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Unix file system handler for AmigaDOS
+  *
+  * Copyright 1997 Bernd Schmidt
+  */
 
 #define FILESYS_VIRTUAL 0
 #define FILESYS_HARDFILE 1

@@ -1,10 +1,10 @@
-   
-                                 
-   
-                
-   
-                          
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * disk support
+  *
+  * (c) 1995 Bernd Schmidt
+  */
 
 extern void DISK_init (void);
 extern void DISK_select (uae_u8 data);

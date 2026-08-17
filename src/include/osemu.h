@@ -1,10 +1,10 @@
-   
-                                 
-   
-                           
-   
-                                
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * OS emulation prototypes
+  *
+  * Copyright 1996 Bernd Schmidt
+  */
 
 static __inline__ char *raddr(uaecptr p)
 {
@@ -13,7 +13,7 @@ static __inline__ char *raddr(uaecptr p)
 
 extern void gfxlib_install(void);
 
-                      
+/* graphics.library */
 
 extern int GFX_WritePixel(uaecptr rp, int x, int y);
 

@@ -1,11 +1,11 @@
-   
-                                 
-   
-         
-   
-                                  
-                                     
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Stuff
+  *
+  * Copyright 1995, 1996 Ed Hanway
+  * Copyright 1995-2001 Bernd Schmidt
+  */
 
 #define UAEMAJOR 0
 #define UAEMINOR 8
@@ -13,9 +13,9 @@
 
 extern long int version;
 
-                                                               
-                 
-                                                                
+/**************************************************************
+ * UAE4ALL header
+ **************************************************************/
 extern int produce_sound;
 extern int changed_produce_sound;
 extern char prefs_df[4][256];
@@ -29,8 +29,8 @@ extern unsigned prefs_chipmem_size;
 extern unsigned prefs_bogomem_size;
 extern unsigned prefs_fastmem_size;
 extern int prefs_gfx_framerate, changed_gfx_framerate;
-extern const char *kickstarts_rom_names[6];
-extern const char *extended_rom_names[6];
+extern const char *kickstarts_rom_names[7];
+extern const char *extended_rom_names[7];
 #ifdef ANDROIDSDL
 extern const char *af_kickstarts_rom_names[4]; 
 #endif
@@ -44,7 +44,7 @@ extern const char *af_kickstarts_rom_names[4];
 
 typedef enum { DRV_NONE = -1, DRV_35_DD = 0, DRV_35_HD, DRV_525_SD, DRV_35_DD_ESCOM } drive_type;
 
-                                                                 
+/**************************************************************/ 
 
 struct uaedev_mount_info;
 
@@ -75,7 +75,7 @@ extern struct uae_prefs currprefs, changed_prefs;
 
 #define MAX_COLOR_MODES 5
 
-                                 
+/* #define NEED_TO_DEBUG_BADLY */
 
 #if !defined(USER_PROGRAMS_BEHAVE)
 #define USER_PROGRAMS_BEHAVE 0

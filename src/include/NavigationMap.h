@@ -17,7 +17,7 @@ NavigationMap navMap[] =
   { "A500", "Save Config", "Reset", "tabbedArea", "A1200" },
   { "A1200", "Quit", "Reset", "A500", "tabbedArea" },
 
-             
+  // Tab Main
   { "68000", "ChipMem", "1.2", "tabbedArea", "68020" },
   { "68020", "ChipMem", "1.3", "68000", "OCS" },
   { "OCS", "FastMem", "3.1", "68020", "ECS" },
@@ -67,7 +67,7 @@ NavigationMap navMap[] =
 #endif
   { "BrowseROM", "AGA", "BM_normal", "CustomRom", "Reset" },
   
-                     
+  // Tab Floppy Drive
   { "DF0", "Drives1", "ejectDF0", "tabbedArea", "DF1" },
   { "DF1", "Drives2", "ejectDF1", "DF0", "DF2" },
   { "DF2", "Drives3", "ejectDF2", "DF1", "DF3" },
@@ -91,7 +91,7 @@ NavigationMap navMap[] =
   { "Eject", "Speed2x", "SaveCfgGame", "DF3", "Reset" },
   { "SaveCfgGame", "Eject", "Speed1x", "DF3", "Reset" },
 
-           
+  // Tab HD
   { "HDOff", "HDDir", "HDDir", "tabbedArea", "Dir" },
   { "Dir", "HDFile", "HDFile", "HDOff", "File" },
   { "File", "HDFile", "HDFile", "Dir", "SaveHD" },
@@ -100,7 +100,7 @@ NavigationMap navMap[] =
   { "HDFile", "Dir", "Dir", "HDDir", "SaveHD" },
   { "SaveHD", "File", "File", "HDFile", "ConfManager" },
 
-                      
+  // Tab Display/Sound
   { "320", "8K", "200", "tabbedArea", "640" },
   { "640", "11K", "216", "320", "352" },
   { "352", "22K", "240", "640", "704" },
@@ -138,7 +138,7 @@ NavigationMap navMap[] =
   { "32K", "mono", "704", "22K", "44K" },
   { "44K", "mono", "384", "32K", "A500" },
 
-                   
+  // Tab Savestates
   { "Savestate0", "---", "---", "tabbedArea", "Savestate1" },
   { "Savestate1", "---", "---", "Savestate0", "Savestate2" },
   { "Savestate2", "---", "---", "Savestate1", "Savestate3" },
@@ -147,7 +147,7 @@ NavigationMap navMap[] =
   { "LoadState", "---", "---", "Savestate3", "SaveState" },
   { "SaveState", "---", "---", "LoadState", "Reset" },
   
-                
+  // Tab Control
   { "ControlCfg1", "TapNormal", "ControlCfg2", "tabbedArea", "ControlCfg3" },
   { "ControlCfg2", "ControlCfg1", "Port0", "tabbedArea", "ControlCfg4" },
   { "ControlCfg3", "TapShort", "ControlCfg4", "ControlCfg1", "Reset" },
@@ -192,7 +192,7 @@ NavigationMap navMap[] =
   { "StylusOffset", "StatusOff", "StatusOff", "---", "---" },
 #endif
 
-                       
+  // Tab Custom Control
   { "CustomCtrlOff", "CtrlUp", "CustomCtrlOn", "tabbedArea", "DPadCustom" },
   { "CustomCtrlOn", "CustomCtrlOff", "CtrlB", "tabbedArea", "DPadCustom" },
   
@@ -213,7 +213,7 @@ NavigationMap navMap[] =
   { "CtrlRight", "CtrlY", "DPadCustom", "---", "---" },
   
 #ifdef ANDROIDSDL
-                            
+    // Tab On-Screen Control
   { "OnScrCtrl", "QckSwtch2", "OnScrButton3", "tabbedArea", "OnScrTextInput" },
   { "OnScrButton3", "OnScrCtrl", "QckSwtchOff", "tabbedArea", "OnScrButton4" },
   { "OnScrTextInput", "QckSwtch2", "OnScrButton4", "OnScrCtrl", "OnScrDpad" },
@@ -230,7 +230,7 @@ NavigationMap navMap[] =
   { "FloatJoy", "CustomPos", "CustomPos", "OnScrButton2", "Reset" },
 #endif 
   
-                
+  // File dialog
   { "dirList1", "cmdCancel1", "cmdOk", "---", "---" },
   { "cmdCancel1", "cmdOk", "cmdOk", "dirList1", "dirList1" },
   { "cmdOk", "cmdCancel1", "cmdCancel1", "dirList1", "dirList1" },
@@ -240,7 +240,7 @@ NavigationMap navMap[] =
   { "cmdSelect", "cmdCancel2", "cmdOpen", "dirList2", "dirList2" },
   { "cmdOpen", "cmdSelect", "cmdCancel2", "dirList2", "dirList2" },
 
-                   
+  // Config Manager
   { "cfgText", "cfgLoad", "cfgLoad", "configList", "configList" },
   { "configList", "cfgLoad", "cfgLoad", "---", "---" },
   { "cfgSave", "cfgText", "configList", "cfgLoad", "cfgDelete" },

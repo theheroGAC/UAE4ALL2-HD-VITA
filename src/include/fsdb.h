@@ -1,11 +1,11 @@
-   
-                                 
-   
-                                                                      
-                                                   
-   
-                                
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Library of functions to make emulated filesystem as independent as
+  * possible of the host filesystem's capabilities.
+  *
+  * Copyright 1999 Bernd Schmidt
+  */
 
 #ifndef FSDB_FILE
 #define FSDB_FILE "_UAEFSDB.___"
@@ -15,7 +15,7 @@
 #define FSDB_DIR_SEPARATOR '/'
 #endif
 
-                    
+/* AmigaOS errors */
 #define ERROR_NO_FREE_STORE		103
 #define ERROR_OBJECT_IN_USE		202
 #define ERROR_OBJECT_EXISTS		203
@@ -43,41 +43,41 @@
 #define A_FIBF_EXECUTE (1<<1)
 #define A_FIBF_DELETE  (1<<0)
 
-                    
+/* AmigaOS "keys" */
 typedef struct a_inode_struct {
-                                                 
+    /* Circular list of recycleable a_inodes.  */
     struct a_inode_struct *next, *prev;
-                                                               
+    /* This a_inode's relatives in the directory structure.  */
     struct a_inode_struct *parent;
     struct a_inode_struct *child, *sibling;
-                                                                            
-                                                  
+    /* AmigaOS name, and host OS name.  The host OS name is a full path, the
+     * AmigaOS name is relative to the parent.  */
     char *aname;
     char *nname;
-                                                          
+    /* AmigaOS file comment, or NULL if file has none.  */
     char *comment;
-                                   
+    /* AmigaOS protection bits.  */
     int amigaos_mode;
-                                            
+    /* Unique number for identification.  */
     uae_u32 uniq;
-                                                                          
-                                             
+    /* For a directory that is being ExNext()ed, the number of child ainos
+       which must be kept locked in core.  */
     unsigned long locked_children;
-                                                             
+    /* How many ExNext()s are going on in this directory?  */
     unsigned long exnext_count;
-                                
+    /* AmigaOS locking bits.  */
     int shlock;
     long db_offset;
     unsigned int dir:1;
     unsigned int elock:1;
-                                                              
+    /* Nonzero if this came from an entry in our database.  */
     unsigned int has_dbentry:1;
-                                                              
+    /* Nonzero if this will need an entry in our database.  */
     unsigned int needs_dbentry:1;
-                                                                    
+    /* This a_inode possibly needs writing back to the database.  */
     unsigned int dirty:1;
-                                                                    
-                                                 
+    /* If nonzero, this represents a deleted file; the corresponding
+     * entry in the database must be cleared.  */
     unsigned int deleted:1;
 } a_inode;
 
@@ -86,7 +86,7 @@ extern char *nname_begin (char *);
 extern char *build_nname (const char *d, const char *n);
 extern char *build_aname (const char *d, const char *n);
 
-                                        
+/* Filesystem-independent functions.  */
 extern void fsdb_clean_dir (a_inode *);
 extern char *fsdb_search_dir (const char *dirname, char *rel);
 extern void fsdb_dir_writeback (a_inode *);
@@ -99,7 +99,7 @@ static inline int same_aname (const char *an1, const char *an2)
     return strcasecmp (an1, an2) == 0;
 }
 
-                                      
+/* Filesystem-dependent functions.  */
 extern int fsdb_name_invalid (const char *n);
 extern void fsdb_fill_file_attrs (a_inode *);
 extern int fsdb_set_file_attrs (a_inode *, int);

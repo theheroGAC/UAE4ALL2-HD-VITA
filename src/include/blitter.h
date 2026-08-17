@@ -1,10 +1,10 @@
-   
-                                 
-   
-                     
-   
-                          
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Blitter emulation
+  *
+  * (c) 1995 Bernd Schmidt
+  */
 
 struct bltinfo {
     int blitzero;
@@ -42,7 +42,7 @@ extern blitter_func *blitfunc_dofast[256];
 extern blitter_func *blitfunc_dofast_desc[256];
 extern uae_u32 blit_masktable[BLITTER_MAX_WORDS];
 
-                                      
+// New vars for blitter mode "partial"
 extern int blitter_in_partial_mode;
 extern void blitter_do_partial(int do_all);
 extern void blitter_dma_disabled(void);

@@ -1,15 +1,15 @@
-   
-                                 
-   
-                
-   
-                          
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Mac keycodes
+  *
+  * (c) 1996 Ernesto Corvi
+  */
 
-#define kUpArrowKeyMap				0x7E	                                 
-#define kDownArrowKeyMap			0x7D	                                   
-#define kRightArrowKeyMap			0x7C	                                    
-#define kLeftArrowKeyMap			0x7B	                                   
+#define kUpArrowKeyMap				0x7E	/* key map offset for up arrow */
+#define kDownArrowKeyMap			0x7D	/* key map offset for down arrow */
+#define kRightArrowKeyMap			0x7C	/* key map offset for right arrow */
+#define kLeftArrowKeyMap			0x7B	/* key map offset for left arrow */
 
 #define kBackSpaceKeyMap			0x33
 #define kReturnKeyMap				0x24

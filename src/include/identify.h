@@ -1,9 +1,9 @@
-   
-                                 
-   
-                                          
-   
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Tables for labelling amiga internals. 
+  *
+  */
 		
 struct mem_labels
 {
