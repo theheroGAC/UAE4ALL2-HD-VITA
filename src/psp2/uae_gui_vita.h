@@ -14,7 +14,6 @@
 extern "C" {
 #endif
 
-/* Screen Dimensions */
 #define VITA_SCREEN_W 960
 #define VITA_SCREEN_H 544
 
@@ -22,7 +21,6 @@ extern "C" {
 #define RGBA8(r,g,b,a) ((((a)&0xFF)<<24) | (((b)&0xFF)<<16) | (((g)&0xFF)<<8) | (((r)&0xFF)<<0))
 #endif
 
-/* Modern Amiga Color Palette (RGBA8) */
 #define VITA_COLOR_BG            RGBA8(15, 18, 26, 255)       /* Deep slate/charcoal */
 #define VITA_COLOR_HEADER        RGBA8(22, 27, 39, 255)       /* Top bar background */
 #define VITA_COLOR_FOOTER        RGBA8(20, 24, 34, 255)       /* Bottom bar background */
@@ -43,7 +41,6 @@ extern "C" {
 #define VITA_COLOR_DANGER        RGBA8(239, 68, 68, 255)      /* Danger/Eject */
 #define VITA_COLOR_OVERLAY_BG    RGBA8(8, 10, 16, 210)        /* Modal/Dark backdrop */
 
-/* GUI Tabs */
 typedef enum {
     VITA_TAB_FLOPPY = 0,
     VITA_TAB_HARD_DISK,
@@ -56,7 +53,6 @@ typedef enum {
     VITA_TAB_COUNT
 } VitaGuiTab;
 
-/* Input Button Mask state */
 typedef struct {
     SceCtrlData pad;
     SceCtrlData prev_pad;
@@ -70,7 +66,6 @@ typedef struct {
     int touch_hold_frames;
 } VitaInputState;
 
-/* System Status */
 typedef struct {
     int battery_percent;
     bool is_charging;
@@ -78,7 +73,6 @@ typedef struct {
     char date_str[32];
 } VitaSystemInfo;
 
-/* GUI Management Functions */
 int  vita_gui_init(void);
 void vita_gui_shutdown(void);
 void vita_gui_shutdown_final(void);
@@ -86,7 +80,6 @@ void vita_gui_prepare_exit(void);
 void vita_gui_update_input(VitaInputState *input);
 void vita_gui_update_system_info(VitaSystemInfo *sysinfo);
 
-/* Drawing Primitives */
 void vita_draw_rounded_rect(float x, float y, float w, float h, float r, unsigned int color);
 void vita_draw_rounded_rect_outline(float x, float y, float w, float h, float r, float thickness, unsigned int color);
 void vita_draw_card(float x, float y, float w, float h, bool focused, bool active);
@@ -95,7 +88,6 @@ void vita_draw_header(const char *title, VitaGuiTab current_tab, const VitaSyste
 void vita_draw_footer(const char *left_hint, const char *right_hint);
 void vita_draw_tab_bar(VitaGuiTab current_tab, float y);
 
-/* PlayStation Button Glyphs */
 typedef enum {
     VITA_BTN_CROSS = 0,
     VITA_BTN_CIRCLE,
@@ -109,7 +101,6 @@ typedef enum {
     VITA_BTN_ANALOG
 } VitaButtonGlyph;
 
-/* Text Rendering & Layout Helpers */
 void vita_draw_text(float x, float y, unsigned int color, float scale, const char *text);
 void vita_draw_textf(float x, float y, unsigned int color, float scale, const char *fmt, ...);
 void vita_draw_text_centered(float cx, float y, unsigned int color, float scale, const char *text);
@@ -119,7 +110,6 @@ void vita_truncate_text(const char *in_text, float max_w, float scale, char *out
 int  vita_get_text_width(float scale, const char *text);
 int  vita_get_text_height(float scale);
 
-/* PlayStation Button & Footer Components */
 void vita_draw_button_glyph(float x, float y, VitaButtonGlyph glyph);
 void vita_draw_hint_item(float x, float y, VitaButtonGlyph glyph, const char *label);
 void vita_draw_badge(float x, float y, const char *label, unsigned int bg_col, unsigned int text_col);
@@ -130,11 +120,10 @@ void vita_draw_selector_item(float x, float y, float w, float h, const char *tit
 void vita_draw_switch_item(float x, float y, float w, float h, const char *title, bool enabled, bool focused);
 void vita_draw_slider_item(float x, float y, float w, float h, const char *title, int val, int min, int max, const char *suffix, bool focused);
 
-/* Modal & Dialogs */
 void vita_show_message_box(const char *title, const char *message, const char *btn_label);
+void vita_show_about_box(void);
 bool vita_show_confirm_box(const char *title, const char *message, const char *yes_label, const char *no_label);
 
-/* Views */
 void vita_view_floppy(VitaInputState *input, int *selected_item);
 void vita_view_hard_disk(VitaInputState *input, int *selected_item);
 void vita_view_presets(VitaInputState *input, int *selected_item);
@@ -144,10 +133,8 @@ void vita_view_controls(VitaInputState *input, int *selected_item);
 void vita_view_savestates(VitaInputState *input, int *selected_item);
 void vita_view_system(VitaInputState *input, int *selected_item);
 
-/* File Browser with Cover Art Preview */
 int  vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_idx);
 
-/* Main GUI Entry Points */
 int  run_mainMenu_vita(void);
 int  run_overlay_vita(void);
 
@@ -155,5 +142,5 @@ int  run_overlay_vita(void);
 }
 #endif
 
-#endif /* __PSP2__ */
-#endif /* UAE_GUI_VITA_H */
+#endif
+#endif

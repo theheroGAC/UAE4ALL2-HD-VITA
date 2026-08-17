@@ -47,10 +47,6 @@ extern int kickstart_warning;
 
 extern SDL_Surface *prSDLScreen;
 
-/* SDL-Vita stores the GPU texture inside prSDLScreen->hwdata. Like init_text()
-   does for the classic menu, we must free that texture manually before the
-   surface is replaced, otherwise the old framebuffer texture is leaked and the
-   GPU can end up rendering a stale/invalid surface. */
 #ifndef PRIVATE_HW_DATA
 #define PRIVATE_HW_DATA
 typedef struct private_hwdata {
@@ -88,7 +84,6 @@ static float s_boing_angle = 0.0f;
 static VitaGuiTab s_active_tab = VITA_TAB_FLOPPY;
 static int s_tab_selected_item[VITA_TAB_COUNT] = {0};
 
-/* Embedded 8x8 font table (ASCII 32 to 127) */
 static const unsigned char s_font_8x8[96][8] = {
     {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}, // 32 ' '
     {0x18,0x3C,0x3C,0x18,0x18,0x00,0x18,0x00}, // 33 '!'
@@ -188,7 +183,6 @@ static const unsigned char s_font_8x8[96][8] = {
     {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}  // 127
 };
 
-/* Proportional character width table (in pixels) */
 static const unsigned char s_char_widths[96] = {
     4, 3, 5, 7, 7, 7, 7, 3, 4, 4, 6, 7, 3, 6, 3, 6, // 32-47
     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 3, 3, 5, 7, 5, 7, // 48-63
@@ -198,7 +192,6 @@ static const unsigned char s_char_widths[96] = {
     6, 5, 6, 5, 6, 6, 8, 6, 6, 6, 4, 3, 4, 7, 0      // 112-127
 };
 
-/* Tab names */
 static const char *s_tab_names[VITA_TAB_COUNT] = {
     "Floppy",
     "Hard Disk",
@@ -323,7 +316,6 @@ void vita_gui_update_system_info(VitaSystemInfo *sysinfo)
     sysinfo->is_charging = (scePowerIsBatteryCharging() == 1);
 }
 
-/* Fast color conversion helper */
 static inline Uint32 to_sdl_color(unsigned int col)
 {
     Uint8 r = (col >> 0) & 0xFF;
@@ -332,9 +324,6 @@ static inline Uint32 to_sdl_color(unsigned int col)
     return SDL_MapRGB(prSDLScreen->format, r, g, b);
 }
 
-/* ========================================================================= */
-/* Drawing Primitives                                                        */
-/* ========================================================================= */
 
 void vita_draw_rounded_rect(float x, float y, float w, float h, float r, unsigned int color)
 {
@@ -424,9 +413,6 @@ void vita_draw_card_custom(float x, float y, float w, float h, unsigned int bg_c
     vita_draw_rounded_rect_outline(x, y, w, h, 6.0f, 1.0f, border_col);
 }
 
-/* ========================================================================= */
-/* Big, High-Definition & Legible Text Rendering                             */
-/* ========================================================================= */
 
 int vita_get_text_width(float scale, const char *text)
 {
@@ -600,9 +586,6 @@ void vita_draw_text_wrapped(float x, float y, float max_w, unsigned int color, f
     }
 }
 
-/* ========================================================================= */
-/* PlayStation Button Glyphs & Badges                                        */
-/* ========================================================================= */
 
 void vita_draw_button_glyph(float x, float y, VitaButtonGlyph glyph)
 {
@@ -873,6 +856,89 @@ void vita_draw_slider_item(float x, float y, float w, float h, const char *title
     vita_draw_rounded_rect(bar_x, bar_y, bar_w * progress, bar_h, 4.0f, fill_col);
 }
 
+void vita_show_about_box(void)
+{
+    static const char *credits[] = {
+        "UAE4ALL2 HD Vita",
+        "Version 1.02",
+        "by theheroGAC",
+        "https://github.com/theheroGAC/UAE4ALL2-HD-VITA",
+        "",
+        "This project is a derivative work and would not exist without the",
+        "original UAE4ALL and Vita ports.",
+        "Full credit and thanks go to the original authors and contributors:",
+        "Chui",
+        "john4p",
+        "TomB",
+        "notaz",
+        "Bernd Schneider",
+        "Toni Wilen",
+        "Pickle",
+        "smoku",
+        "AnotherGuest",
+        "Anonymous engineer",
+        "finkel",
+        "Lubomyr",
+        "pelya",
+        "Cpasjuste for the original Vita port, SDL-Vita work,",
+        "shader support and performance improvements",
+        "rsn8887 for the Vita/Switch work and UAE4ALL2 improvements",
+        "https://github.com/rsn8887/uae4all2",
+        "ScHlAuChi for testing, ideas and virtual-keyboard contributions",
+        "wronghands for the menu font, keyboard styles and design ideas",
+        "CrashMidnick for the French virtual keyboard",
+        "Xerpi and frangarCJ for Vita2D and shader-library work",
+        "The VitaSDK Team"
+    };
+    const int total_lines = (int)(sizeof(credits) / sizeof(credits[0]));
+    const int visible_lines = 17;
+    const int max_scroll = total_lines - visible_lines;
+    int scroll = 0;
+    int frame_count = 0;
+    VitaInputState input;
+    memset(&input, 0, sizeof(input));
+    vita_gui_init();
+
+    while (1) {
+        vita_gui_update_input(&input);
+        frame_count++;
+        if (frame_count > 6 && (input.pressed & (SCE_CTRL_CIRCLE | SCE_CTRL_CROSS | SCE_CTRL_START)))
+            break;
+        if (input.pressed & SCE_CTRL_UP) {
+            scroll--;
+            if (scroll < 0) scroll = 0;
+        }
+        if (input.pressed & SCE_CTRL_DOWN) {
+            scroll++;
+            if (scroll > max_scroll) scroll = max_scroll;
+        }
+
+        SDL_FillRect(prSDLScreen, NULL, to_sdl_color(VITA_COLOR_OVERLAY_BG));
+        float dx = 24.0f;
+        float dy = 14.0f;
+        float dw = VITA_SCREEN_W - 48.0f;
+        float dh = VITA_SCREEN_H - 28.0f;
+        vita_draw_card_custom(dx, dy, dw, dh, VITA_COLOR_HEADER, VITA_COLOR_FOCUS_BORDER);
+        vita_draw_text_centered(VITA_SCREEN_W * 0.5f, dy + 18.0f,
+            VITA_COLOR_AMIGA_RED, 1.05f, "UAE4ALL2 HD Vita - About");
+
+        for (int i = 0; i < visible_lines; i++) {
+            int line = scroll + i;
+            if (line >= total_lines) break;
+            unsigned int color = (line == 4) ? VITA_COLOR_AMIGA_ORANGE : VITA_COLOR_TEXT_WHITE;
+            vita_draw_text(50.0f, dy + 58.0f + (float)i * 23.0f,
+                color, 0.72f, credits[line]);
+        }
+
+        char footer[64];
+        snprintf(footer, sizeof(footer), "UP/DOWN Scroll   %d/%d   CIRCLE Close", scroll + 1, max_scroll + 1);
+        vita_draw_text_centered(VITA_SCREEN_W * 0.5f, VITA_SCREEN_H - 32.0f,
+            VITA_COLOR_TEXT_MUTED, 0.72f, footer);
+        SDL_Flip(prSDLScreen);
+        SDL_Delay(20);
+    }
+}
+
 void vita_show_message_box(const char *title, const char *message, const char *btn_label)
 {
     vita_gui_init();
@@ -928,6 +994,10 @@ bool vita_show_confirm_box(const char *title, const char *message, const char *y
     /* Exit is already an explicit command in the System tab. Do not make
        Cross depend on a second modal input loop, which could lose the button
        edge while the menu surface is being reused. */
+    if (title && strcmp(title, "About") == 0) {
+        vita_show_about_box();
+        return false;
+    }
     if (title && strcmp(title, "Exit") == 0)
         return true;
 
@@ -1151,4 +1221,4 @@ int run_mainMenu_vita(void)
     return (mainMenu_case == MAIN_MENU_CASE_RESET) ? 2 : (mainMenu_case == MAIN_MENU_CASE_QUIT ? 0 : 1);
 }
 
-#endif /* __PSP2__ */
+#endif
