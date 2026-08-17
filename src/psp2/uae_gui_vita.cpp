@@ -201,6 +201,7 @@ static const unsigned char s_char_widths[96] = {
 /* Tab names */
 static const char *s_tab_names[VITA_TAB_COUNT] = {
     "Floppy",
+    "Hard Disk",
     "Presets",
     "Hardware",
     "Display",
@@ -774,6 +775,8 @@ void vita_draw_footer(const char *left_hint, const char *right_hint)
     if (s_active_tab == VITA_TAB_FLOPPY) {
         vita_draw_hint_item(145.0f, btn_y, VITA_BTN_TRIANGLE, "EJECT");
         vita_draw_hint_item(275.0f, btn_y, VITA_BTN_SQUARE, "REBOOT");
+    } else if (s_active_tab == VITA_TAB_HARD_DISK) {
+        vita_draw_hint_item(145.0f, btn_y, VITA_BTN_TRIANGLE, "EJECT");
     } else if (s_active_tab == VITA_TAB_SAVESTATES) {
         vita_draw_hint_item(145.0f, btn_y, VITA_BTN_SQUARE, "LOAD");
     }
@@ -1106,6 +1109,9 @@ int run_mainMenu_vita(void)
         switch (s_active_tab) {
             case VITA_TAB_FLOPPY:
                 vita_view_floppy(&input, cur_sel);
+                break;
+            case VITA_TAB_HARD_DISK:
+                vita_view_hard_disk(&input, cur_sel);
                 break;
             case VITA_TAB_PRESETS:
                 vita_view_presets(&input, cur_sel);

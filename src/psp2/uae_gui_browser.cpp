@@ -43,6 +43,7 @@ typedef struct {
 static FileEntry s_entries[MAX_ENTRIES];
 static int s_num_entries = 0;
 static char s_current_dir[MAX_PATH_LEN] = "ux0:/data/uae4all/roms";
+static bool s_hdf_mode = false;
 static SDL_Surface *s_cover_surf = NULL;
 static char s_cover_loaded_path[MAX_PATH_LEN] = "";
 
@@ -105,7 +106,11 @@ static void scan_directory(const char *path)
             }
 
             bool is_dir = SCE_S_ISDIR(dir.d_stat.st_mode);
-            if (is_dir || is_supported_ext(dir.d_name)) {
+            const char *ext = strrchr(dir.d_name, '.');
+            bool supported = s_hdf_mode
+                ? (ext != NULL && strcasecmp(ext, ".hdf") == 0)
+                : is_supported_ext(dir.d_name);
+            if (is_dir || supported) {
                 strncpy(s_entries[s_num_entries].name, dir.d_name, sizeof(s_entries[s_num_entries].name) - 1);
                 s_entries[s_num_entries].name[sizeof(s_entries[s_num_entries].name) - 1] = '\0';
                 s_entries[s_num_entries].is_dir = is_dir;
@@ -201,6 +206,7 @@ static int find_next_letter_index(int current_idx, int direction)
 
 int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_idx)
 {
+    s_hdf_mode = (disk_drive_idx >= 4);
     if (start_dir && strlen(start_dir) > 0) {
         strncpy(s_current_dir, start_dir, sizeof(s_current_dir) - 1);
     }
@@ -371,8 +377,11 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
         SDL_FillRect(prSDLScreen, NULL, to_sdl_color(VITA_COLOR_BG));
 
         char browser_title[128];
-        snprintf(browser_title, sizeof(browser_title), "INSERT DISK INTO DF%d", disk_drive_idx);
-        vita_draw_header(browser_title, VITA_TAB_FLOPPY, &sysinfo);
+        if (s_hdf_mode)
+            snprintf(browser_title, sizeof(browser_title), "SELECT HDF FOR SLOT %d", disk_drive_idx - 3);
+        else
+            snprintf(browser_title, sizeof(browser_title), "INSERT DISK INTO DF%d", disk_drive_idx);
+        vita_draw_header(browser_title, s_hdf_mode ? VITA_TAB_HARD_DISK : VITA_TAB_FLOPPY, &sysinfo);
 
         /* Path breadcrumb bar */
         vita_draw_card_custom(20.0f, 52.0f, VITA_SCREEN_W - 40.0f, 34.0f, RGBA8(22, 28, 40, 255), VITA_COLOR_CARD_BORDER);

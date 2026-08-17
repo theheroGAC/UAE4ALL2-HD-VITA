@@ -19,6 +19,7 @@
 #include "menu_config.h"
 #include "savestate.h"
 #include "gui.h"
+#include "cfgfile.h"
 
 #include "uae_gui_vita.h"
 
@@ -26,6 +27,11 @@ extern char uae4all_image_file0[256];
 extern char uae4all_image_file1[256];
 extern char uae4all_image_file2[256];
 extern char uae4all_image_file3[256];
+extern char uae4all_hard_file0[256];
+extern char uae4all_hard_file1[256];
+extern char uae4all_hard_file2[256];
+extern char uae4all_hard_file3[256];
+extern int mainMenu_bootHD;
 extern char currentDir[300];
 extern char launchDir[300];
 extern int mainMenu_drives;
@@ -39,7 +45,9 @@ extern int kickstart;
 extern int bReloadKickstart;
 extern int uae4all_init_rom(const char *romfile);
 extern const char *kickstarts_rom_names[];
+extern const char *extended_rom_names[];
 extern char romfile[256];
+extern char extfile[256];
 extern int mainMenu_shader;
 extern int mainMenu_ntsc;
 extern int mainMenu_showStatus;
@@ -197,9 +205,93 @@ void vita_view_floppy(VitaInputState *input, int *selected_item)
     vita_draw_button_item(card_x + (card_w * 0.5f) + 6.0f, spd_y, (card_w * 0.5f) - 6.0f, 44.0f, "Eject All Disks", NULL, "EJECT", *selected_item == 5, false);
 }
 
-/* ========================================================================= */
-/* TAB 2: QUICK PRESETS                                                      */
-/* ========================================================================= */
+void vita_view_hard_disk(VitaInputState *input, int *selected_item)
+{
+    const int total_items = 6;
+    if (*selected_item < 0) *selected_item = 0;
+    if (*selected_item >= total_items) *selected_item = total_items - 1;
+
+    if (input->pressed & SCE_CTRL_UP) {
+        (*selected_item)--;
+        if (*selected_item < 0) *selected_item = total_items - 1;
+    }
+    if (input->pressed & SCE_CTRL_DOWN) {
+        (*selected_item)++;
+        if (*selected_item >= total_items) *selected_item = 0;
+    }
+
+    char *hdf_files[4] = {
+        uae4all_hard_file0, uae4all_hard_file1,
+        uae4all_hard_file2, uae4all_hard_file3
+    };
+
+    if (input->pressed & SCE_CTRL_CROSS) {
+        if (*selected_item >= 0 && *selected_item < 4) {
+            char new_file[512];
+            new_file[0] = 0;
+            int res = vita_gui_run_browser(new_file, currentDir, 4 + *selected_item);
+            if (res == 1) {
+                copy_drive_path(hdf_files[*selected_item], new_file);
+                make_hard_file_cfg_line(hdf_files[*selected_item]);
+                mainMenu_bootHD = 2;
+                reset_hdConf();
+                gui_update();
+            } else if (res == 2) {
+                hdf_files[*selected_item][0] = 0;
+                reset_hdConf();
+                gui_update();
+            }
+        } else if (*selected_item == 4) {
+            mainMenu_bootHD = (mainMenu_bootHD + 1) % 3;
+            reset_hdConf();
+        } else if (*selected_item == 5) {
+            for (int i = 0; i < 4; i++)
+                hdf_files[i][0] = 0;
+            mainMenu_bootHD = 0;
+            reset_hdConf();
+            gui_update();
+        }
+    }
+
+    if ((input->pressed & SCE_CTRL_TRIANGLE) && *selected_item < 4) {
+        hdf_files[*selected_item][0] = 0;
+        reset_hdConf();
+        gui_update();
+    }
+
+    float card_x = 20.0f;
+    float card_w = VITA_SCREEN_W - 40.0f;
+    float start_y = 90.0f;
+    float item_h = 56.0f;
+
+    for (int i = 0; i < 4; i++) {
+        float y = start_y + (float)i * (item_h + 8.0f);
+        bool focused = (*selected_item == i);
+        bool loaded = hdf_files[i][0] != 0;
+        char slot_title[64];
+        char file_name[128];
+        snprintf(slot_title, sizeof(slot_title), "HDF%d: Hard Disk Slot %d", i + 1, i + 1);
+        vita_truncate_text(get_filename_only(hdf_files[i]), card_w - 230.0f, 0.95f, file_name, sizeof(file_name));
+        vita_draw_card(card_x, y, card_w, item_h, focused, loaded);
+        char slot_tag[16];
+        snprintf(slot_tag, sizeof(slot_tag), "HDF%d", i + 1);
+        vita_draw_badge(card_x + 14.0f, y + 17.0f, slot_tag,
+            loaded ? VITA_COLOR_AMIGA_RED : RGBA8(40, 50, 70, 255), VITA_COLOR_TEXT_WHITE);
+        vita_draw_text(card_x + 78.0f, y + 10.0f, focused ? VITA_COLOR_TEXT_WHITE : VITA_COLOR_TEXT_MUTED,
+            0.85f, slot_title);
+        vita_draw_text(card_x + 78.0f, y + 29.0f,
+            loaded ? VITA_COLOR_TEXT_WHITE : VITA_COLOR_TEXT_DIM, 0.95f, file_name);
+        vita_draw_led(card_x + card_w - 110.0f, y + 18.0f, loaded ? "LOADED" : "EMPTY",
+            loaded, VITA_COLOR_AMIGA_ORANGE);
+    }
+
+    const char *boot_names[3] = { "Off", "HD Directory", "HDF Files" };
+    vita_draw_selector_item(card_x, start_y + 4.0f * (item_h + 8.0f), card_w,
+        item_h, "Boot HD", boot_names[mainMenu_bootHD % 3], *selected_item == 4);
+    vita_draw_button_item(card_x, start_y + 5.0f * (item_h + 8.0f), card_w, 44.0f,
+        "Eject All HDF Files", "Remove all mounted hard-disk images", "EJECT",
+        *selected_item == 5, false);
+}
 
 void vita_view_presets(VitaInputState *input, int *selected_item)
 {
@@ -264,7 +356,7 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
             saveconfig(1);
             vita_show_message_box("Preset Applied", "Amiga 1200 (AGA 3.1, 68020 2MB+4MB RAM) configured!", "OK (X)");
         } else if (*selected_item == 3) {
-            kickstart = 3;
+            kickstart = 6;
             mainMenu_CPU_model = 1;
             mainMenu_chipset = 2;
             mainMenu_chipMemory = 2; /* 2MB */
@@ -274,10 +366,11 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
             UpdateMemorySettings();
             UpdateChipsetSettings();
             snprintf(romfile, 256, "%s/kickstarts/%s", launchDir, kickstarts_rom_names[kickstart]);
+            snprintf(extfile, 256, "%s/kickstarts/%s", launchDir, extended_rom_names[kickstart]);
             bReloadKickstart = 1;
             uae4all_init_rom(romfile);
             saveconfig(1);
-            vita_show_message_box("Preset Applied", "Amiga CD32 (Akiko 3.1, 2MB Chip RAM) configured!", "OK (X)");
+            vita_show_message_box("Preset Applied", "Amiga CD32 (Akiko, CD32 Kickstart + Extended ROM) configured!", "OK (X)");
         }
     }
 
@@ -334,7 +427,7 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
 
 void vita_view_hardware(VitaInputState *input, int *selected_item)
 {
-    const int total_items = 6;
+    const int total_items = 7;
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
 
@@ -354,8 +447,12 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
     if (dir != 0) {
         switch (*selected_item) {
             case 0:
-                kickstart = (kickstart + dir + 6) % 6;
+                kickstart = (kickstart + dir + 7) % 7;
                 snprintf(romfile, 256, "%s/kickstarts/%s", launchDir, kickstarts_rom_names[kickstart]);
+                if (extended_rom_names[kickstart][0] != '\0')
+                    snprintf(extfile, 256, "%s/kickstarts/%s", launchDir, extended_rom_names[kickstart]);
+                else
+                    extfile[0] = '\0';
                 bReloadKickstart = 1;
                 uae4all_init_rom(romfile);
                 break;
@@ -387,14 +484,14 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
     float start_y = 90.0f;
     float item_h = 50.0f;
 
-    const char *ks_names[6] = { "Kickstart 1.2", "Kickstart 1.3 (A500)", "Kickstart 2.04 (A500+)", "Kickstart 3.1 (A1200)", "Kickstart 3.1 (CD32)", "Custom ROM" };
+    const char *ks_names[7] = { "Kickstart 1.2", "Kickstart 1.3 (A500)", "Kickstart 2.04 (A500+)", "Kickstart 3.1 (A1200)", "Custom ROM", "AROS ROM", "Kickstart CD32" };
     const char *cpu_names[2] = { "Motorola 68000 (7 MHz)", "Motorola 68020 (14 MHz AGA)" };
     const char *chipset_names[3] = { "OCS (Original Chip Set)", "ECS (Enhanced Chip Set)", "AGA (Advanced Graphics)" };
     const char *chip_ram_names[4] = { "512 KB (Standard)", "1 MB", "2 MB (Expanded)", "None" };
     const char *fast_ram_names[5] = { "None", "1 MB", "2 MB", "4 MB (AGA recommended)", "8 MB" };
     const char *slow_ram_names[4] = { "None", "512 KB (Trapdoor)", "1 MB", "1.5 MB" };
 
-    vita_draw_selector_item(card_x, start_y + 0.0f * (item_h + 8.0f), card_w, item_h, "Kickstart ROM", ks_names[kickstart % 6], *selected_item == 0);
+    vita_draw_selector_item(card_x, start_y + 0.0f * (item_h + 8.0f), card_w, item_h, "Kickstart ROM", ks_names[kickstart % 7], *selected_item == 0);
     vita_draw_selector_item(card_x, start_y + 1.0f * (item_h + 8.0f), card_w, item_h, "CPU Architecture", cpu_names[mainMenu_CPU_model % 2], *selected_item == 1);
     vita_draw_selector_item(card_x, start_y + 2.0f * (item_h + 8.0f), card_w, item_h, "Amiga Chipset", chipset_names[mainMenu_chipset % 3], *selected_item == 2);
     vita_draw_selector_item(card_x, start_y + 3.0f * (item_h + 8.0f), card_w, item_h, "Chip RAM", chip_ram_names[mainMenu_chipMemory % 4], *selected_item == 3);
