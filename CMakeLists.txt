@@ -3,6 +3,7 @@ set(CMAKE_VERBOSE_MAKEFILE OFF)
 
 set(VERSION_MAJOR 2)
 set(VERSION_MINOR 12)
+option(BUILD_CDROM_TESTS "Build CD-ROM backend tests" OFF)
 
 if(vita OR DEFINED ENV{VITASDK})
     set(BUILD_PSP2 ON)
@@ -103,6 +104,9 @@ set(SRC_FILES
         src/gp2x/menu/menu_display.cpp
         src/gp2x/menu/menu_memory_disk.cpp
         src/sound_sdl_new.cpp
+        src/disk_sound.cpp
+        src/cdrom.cpp
+        src/osd.cpp
         src/akiko.cpp
         src/capsimg/CAPSImg/CapsAPI.cpp
         src/capsimg/CAPSImg/CapsFDCEmulator.cpp
@@ -152,6 +156,8 @@ if(BUILD_PSP2)
     src/psp2/ipf_disk.cpp
     src/psp2/uae_gui_views.cpp
     src/psp2/uae_gui_browser.cpp
+    src/psp2/hdf_manager.cpp
+    src/psp2/whdload_manager.cpp
     src/psp2/psp2_shader.cpp
     src/psp2/psp2-dirent.c
     src/psp2/psp2_touch.c
@@ -188,7 +194,7 @@ if(BUILD_PSP2)
 
   set(LDFLAGS
           -fno-lto
-          SDL SDL_image
+          SDL SDL_image vorbisfile vorbis ogg
           ${CMAKE_SOURCE_DIR}/src/psp2/vita2d_fbo/lib/libvita2d.a
           ${CMAKE_SOURCE_DIR}/src/psp2/vita-shader-collection/lib/libvitashaders.a
           SceSysmodule_stub SceDisplay_stub SceGxm_stub
@@ -349,4 +355,10 @@ if(BUILD_NX)
   )
 endif(BUILD_NX)
 
+if(BUILD_CDROM_TESTS AND NOT BUILD_PSP2 AND NOT BUILD_NX)
+  enable_testing()
+  add_executable(cdrom_tests tests/cdrom_tests.cpp src/cdrom.cpp)
+  target_include_directories(cdrom_tests PRIVATE src src/include)
+  add_test(NAME cdrom_backend COMMAND cdrom_tests)
+endif()
 
