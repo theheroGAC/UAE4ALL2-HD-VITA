@@ -16,7 +16,12 @@ uae4all2hd.vpk
 - IPF floppy images through the bundled CAPS decoder
 - ZIP, LHA and LZH archives containing Amiga disk images
 - HDF hard-disk images and HD directories (4 HDF slots, boot order selection)
-- WHDLoad tab with safe LHA extraction, game list and startup-script generation
+- Integrated HDF Manager (create, format, and prepare FFS hard-disk images from 50 MB to 4000 MB)
+- Dedicated WHDLoad tab with one-click game launch and automatic A1200 AGA preset configuration
+- High-performance, bit-perfect native LHA decompressor (-lh5-, -lh4-, -lh0-) with real-time UI progress bar
+- Pre-bundled official WHDLoad binaries (C:WHDLoad, CD32, DIC, Patcher, RawDIC, WArc, VFS, S:WHDLoad.prefs)
+- Automatic Amiga directory navigation (CD) into game folders for full resource locking
+- Hidden system directories (S, C, Libs, Devs, L, etc.) from the WHDLoad game browser
 - Savestates and thumbnails, savestate slots 1-4 with per-game naming
 - Virtual keyboard, touch controls and analog mouse
 - Vita shaders and aspect-ratio scaling
@@ -26,7 +31,7 @@ uae4all2hd.vpk
 - CD32 data tracks, CD audio playback, subcode data, DMA and controller state
 - CD32-aware savestates including the mounted image and playback position
 - Automatic per-game configuration files with CD32 profile application when a CD image is mounted
-- PNG screenshots saved to `ux0:/data/uae4all/screenshots/` at 960x544 with preserved aspect ratio and black bars when required
+- PNG screenshots saved to `ux0:/data/uae4all/screenshots/` at 960x544 with preserved aspect ratio
 - Automatic CUE handling for multiple FILE entries, INDEX 00/01, PREGAP and POSTGAP
 - Live DF0-DF3 and HDF activity lights with synthesized disk-access sounds
 - Quick Menu (L trigger in-game) with resume, save/load state, eject DF0, eject CD32 and screenshot
@@ -118,29 +123,23 @@ The classic installation path is also supported on the Vita itself: mount an emp
 
 HDF activity is shown by the hard-disk LED and mixed with the emulator audio as a synthesized drive sound.
 
-## WHDLoad and LHA
+## WHDLoad Integration
 
-The WHDLoad tab automates game installation and launching:
+The dedicated **WHDLoad** tab automates game installation, configuration, and one-click execution:
 
-1. Copy a WHDLoad game archive (`.lha` / `.lzh`) to the Vita.
-2. Open the **WHDLoad** tab and choose **Install Game from LHA**.
-3. Select the archive. It is extracted safely (path-traversal guarded) into:
+1. Obtain WHDLoad game archives (`.lha` / `.lzh`) from [Aminet](https://aminet.net) or [whdload.de](http://www.whdload.de).
+2. Copy the `.lha` files to any accessible folder on your Vita (`ux0:` or `uma0:`).
+3. Open the **WHDLoad** tab and select **Install Game from LHA**.
+4. Choose the archive: a live progress bar displays real-time extraction percentage, file count, and the active file name.
+5. The game is extracted into `ux0:/data/uae4all/whdload/<GameName>/`.
+6. Selecting the extracted game from the list:
+   - automatically configures the Amiga 1200 hardware profile (68020 CPU, Kickstart 3.1, 2 MB Chip RAM, 4 MB Fast RAM);
+   - mounts `ux0:/data/uae4all/whdload/` as hard drive volume `DH0:`;
+   - deploys bundled official WHDLoad binaries (`C:WHDLoad`, `C:WHDLoadCD32`, `S:WHDLoad.prefs`, etc.) on first launch;
+   - prepares an optimized `Startup-Sequence` that changes directory (`CD`) into the game folder and runs `C:WHDLoad "<Game.slave>" PRELOAD`;
+   - launches the game immediately in 1 click!
 
-```text
-ux0:/data/uae4all/whdload/<GameName>/
-```
-
-4. The installed folders appear in the game list. Selecting a game:
-
-   - finds the `.slave` file recursively;
-   - backs up the existing `S:Startup-Sequence` to `S:Startup-Sequence.uae4all` (once);
-   - writes `S:UAE4ALL-WHDLoad` containing `C:WHDLoad "DH0:<GameName>/<slave>"`;
-   - injects `Execute S:UAE4ALL-WHDLoad` into `S:Startup-Sequence`;
-   - mounts the library as the HD directory and reboots the emulation.
-
-5. **Use WHDLoad Directory** selects the library as the HD directory without launching a game.
-
-A Workbench environment, the user-supplied `WHDLoad` executable and legally obtained game files are still required. LHA extraction requires `ux0:/data/uae4all/whdload/` to be writable and uses libarchive.
+7. **Use WHDLoad Directory** mounts the library as `DH0:` for manual exploration or custom Workbench use.
 
 ## Supported disk images
 
@@ -222,26 +221,18 @@ UAEGFX/Picasso96 is not enabled in this build. The source contains partial Zorro
 
 This project is a derivative work and would not exist without the original UAE4ALL and Vita ports. Full credit and thanks go to the original authors and contributors:
 
-- Chui
-- john4p
-- TomB
-- notaz
-- Bernd Schneider
-- Toni Wilen
-- Pickle
-- smoku
-- AnotherGuest
-- Anonymous engineer
-- finkel
-- Lubomyr
-- pelya
-- Cpasjuste for the original Vita port, SDL-Vita work, shader support and performance improvements
-- rsn8887 for the Vita/Switch work and the UAE4ALL2 improvements
-- ScHlAuChi for testing, ideas and virtual-keyboard contributions
-- wronghands for the menu font, keyboard styles and design ideas
-- CrashMidnick for the French virtual keyboard
-- Xerpi and frangarCJ for Vita2D and shader-library work
-- The VitaSDK Team
+- **Chui**, **john4p**, **TomB**, **notaz**, **Bernd Schneider**, **Toni Wilen**, **Pickle**, **smoku**, **AnotherGuest**, **Anonymous engineer**, **finkel**, **Lubomyr**, **pelya** (Original UAE4ALL / UAE4ALL2 authors)
+- **Cpasjuste** for the original Vita port, SDL-Vita work, shader support and performance improvements
+- **rsn8887** for the Vita/Switch work and the UAE4ALL2 improvements (https://github.com/rsn8887/uae4all2)
+- **theheroGAC** for the UAE4ALL2 HD Vita project, HD menu design, WHDLoad integration, CD32 & HDF enhancements (https://github.com/theheroGAC/UAE4ALL2-HD-VITA)
+- **ScHlAuChi** for testing, ideas and virtual-keyboard contributions
+- **wronghands** for the menu font, keyboard styles and design ideas
+- **CrashMidnick** for the French virtual keyboard
+- **Xerpi** and **frangarCJ** for Vita2D and shader-library work
+- **The VitaSDK Team** for VitaSDK toolchain and libraries
+- **Bert Jahn (Wepl)** for WHDLoad (http://www.whdload.de)
+- **Aminet** for the Amiga software and WHDLoad game archive (https://aminet.net)
+- **SPS (Software Preservation Society)** for CAPS / IPF image decoding support
 
 Please preserve the original project credits and license notices when redistributing or modifying this project.
 
