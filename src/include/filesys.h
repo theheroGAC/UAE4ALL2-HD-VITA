@@ -18,6 +18,7 @@ struct hardfiledata {
     int surfaces;
     int reservedblocks;
     int blocksize;
+    uae_u32 dostype;
     FILE *fd;
 };
 #ifdef WIN32

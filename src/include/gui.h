@@ -52,6 +52,9 @@ extern char uae4all_hard_file1[256];
 extern char uae4all_hard_file2[256];
 extern char uae4all_hard_file3[256];
 
+/* Per-slot read-only flag for HDF files (1 = mounted without write access). */
+extern int uae4all_hard_file_ro[4];
+
 #endif
 
 /* Functions to be called when prefs are changed by non-gui code.  */
