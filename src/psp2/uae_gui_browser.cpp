@@ -44,6 +44,7 @@ static FileEntry s_entries[MAX_ENTRIES];
 static int s_num_entries = 0;
 static char s_current_dir[MAX_PATH_LEN] = "ux0:/data/uae4all/roms";
 static bool s_hdf_mode = false;
+static bool s_cd_mode = false;
 static SDL_Surface *s_cover_surf = NULL;
 static char s_cover_loaded_path[MAX_PATH_LEN] = "";
 
@@ -200,7 +201,8 @@ static int find_next_letter_index(int current_idx, int direction)
 
 int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_idx)
 {
-    s_hdf_mode = (disk_drive_idx >= 4);
+    s_hdf_mode = (disk_drive_idx >= 4 && disk_drive_idx < 8);
+    s_cd_mode = (disk_drive_idx == 8);
     if (start_dir && strlen(start_dir) > 0) {
         strncpy(s_current_dir, start_dir, sizeof(s_current_dir) - 1);
     }
@@ -358,8 +360,12 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
         SDL_FillRect(prSDLScreen, NULL, to_sdl_color(VITA_COLOR_BG));
 
         char browser_title[128];
-        if (s_hdf_mode)
+        if (disk_drive_idx == 9)
+            snprintf(browser_title, sizeof(browser_title), "SELECT WHDLOAD LHA");
+        else if (s_hdf_mode)
             snprintf(browser_title, sizeof(browser_title), "SELECT HDF FOR SLOT %d", disk_drive_idx - 3);
+        else if (s_cd_mode)
+            snprintf(browser_title, sizeof(browser_title), "SELECT CD32 IMAGE");
         else
             snprintf(browser_title, sizeof(browser_title), "INSERT DISK INTO DF%d", disk_drive_idx);
         vita_draw_header(browser_title, s_hdf_mode ? VITA_TAB_HARD_DISK : VITA_TAB_FLOPPY, &sysinfo);
@@ -391,7 +397,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
                 vita_draw_card(list_x, item_y, list_w, item_h, is_sel, false);
 
                 char name_buf[128];
-                float max_name_w = list_w - 180.0f;
+                float max_name_w = list_w - 260.0f;
                 vita_truncate_text(entry->name, max_name_w, 0.95f, name_buf, sizeof(name_buf));
 
                 if (entry->is_dir) {
@@ -424,7 +430,9 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
         if (selected_idx >= 0 && selected_idx < s_num_entries) {
             FileEntry *sel_entry = &s_entries[selected_idx];
 
-            vita_draw_badge(preview_x + 16.0f, preview_y + 12.0f, sel_entry->is_dir ? "DIRECTORY INFO" : "AMIGA DISK INFO", VITA_COLOR_AMIGA_RED, VITA_COLOR_TEXT_WHITE);
+            vita_draw_badge(preview_x + 16.0f, preview_y + 12.0f,
+                sel_entry->is_dir ? "DIRECTORY INFO" : (s_cd_mode ? "CD IMAGE INFO" : "AMIGA DISK INFO"),
+                VITA_COLOR_AMIGA_RED, VITA_COLOR_TEXT_WHITE);
 
             if (s_cover_surf) {
                 float img_max_w = preview_w - 32.0f;
@@ -456,15 +464,35 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
                 vita_draw_text_centered(ph_x + (ph_w * 0.5f), ph_y + 160.0f, VITA_COLOR_TEXT_DIM, 0.85f, "Cover: <name>.png");
             }
 
-            char name_buf[128];
-            vita_truncate_text(sel_entry->name, preview_w - 70.0f, 0.90f, name_buf, sizeof(name_buf));
-            vita_draw_text(preview_x + 16.0f, preview_y + 298.0f, VITA_COLOR_TEXT_WHITE, 0.95f, "File:");
-            vita_draw_text(preview_x + 60.0f, preview_y + 298.0f, VITA_COLOR_TEXT_MUTED, 0.90f, name_buf);
+            /* Info header label */
+            vita_draw_text(preview_x + 16.0f, preview_y + 278.0f, VITA_COLOR_TEXT_DIM, 0.80f, sel_entry->is_dir ? "DIRECTORY:" : "FILE NAME:");
 
+            /* Name */
+            char name_buf[128];
+            vita_truncate_text(sel_entry->name, preview_w - 32.0f, 0.90f, name_buf, sizeof(name_buf));
+            vita_draw_text(preview_x + 16.0f, preview_y + 298.0f, VITA_COLOR_TEXT_WHITE, 0.90f, name_buf);
+
+            /* File size / format details */
             if (!sel_entry->is_dir) {
                 char size_txt[64];
-                snprintf(size_txt, sizeof(size_txt), "Size: %u KB (Standard ADF)", (unsigned int)(sel_entry->size / 1024));
-                vita_draw_text(preview_x + 16.0f, preview_y + 326.0f, VITA_COLOR_TEXT_MUTED, 0.85f, size_txt);
+                char size_buf[64];
+                const char *ext = strrchr(sel_entry->name, '.');
+                const char *type_desc = "Disk Image";
+                if (ext) {
+                    if (!strcasecmp(ext, ".adf")) type_desc = "Standard ADF";
+                    else if (!strcasecmp(ext, ".ipf")) type_desc = "CAPS / IPF Image";
+                    else if (!strcasecmp(ext, ".adz")) type_desc = "Compressed ADF";
+                    else if (!strcasecmp(ext, ".dms")) type_desc = "DMS Disk";
+                    else if (!strcasecmp(ext, ".iso") || !strcasecmp(ext, ".cue")) type_desc = "CD Image";
+                    else if (!strcasecmp(ext, ".lha") || !strcasecmp(ext, ".lzh")) type_desc = "LHA Archive";
+                    else if (!strcasecmp(ext, ".zip")) type_desc = "ZIP Archive";
+                    else if (!strcasecmp(ext, ".hdf")) type_desc = "Hard Disk Image";
+                }
+                snprintf(size_txt, sizeof(size_txt), "Size: %u KB (%s)", (unsigned int)(sel_entry->size / 1024), type_desc);
+                vita_truncate_text(size_txt, preview_w - 32.0f, 0.85f, size_buf, sizeof(size_buf));
+                vita_draw_text(preview_x + 16.0f, preview_y + 326.0f, VITA_COLOR_TEXT_MUTED, 0.85f, size_buf);
+            } else {
+                vita_draw_text(preview_x + 16.0f, preview_y + 326.0f, VITA_COLOR_TEXT_MUTED, 0.85f, "Folder / Subdirectory");
             }
         }
 

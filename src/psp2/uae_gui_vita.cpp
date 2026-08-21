@@ -24,6 +24,7 @@
 #include "menu_config.h"
 #include "savestate.h"
 #include "gui.h"
+#include "cdrom.h"
 
 #include "uae_gui_vita.h"
 
@@ -195,6 +196,7 @@ static const unsigned char s_char_widths[96] = {
 static const char *s_tab_names[VITA_TAB_COUNT] = {
     "Floppy",
     "Hard Disk",
+    "WHDLoad",
     "Presets",
     "Hardware",
     "Display",
@@ -734,11 +736,15 @@ void vita_draw_tab_bar(VitaGuiTab current_tab, float y)
         float tx = (float)i * tab_w;
         bool active = (i == (int)current_tab);
 
+        float tab_scale = active ? 0.90f : 0.85f;
+        while (tab_scale > 0.60f && vita_get_text_width(tab_scale, s_tab_names[i]) > (int)(tab_w - 10.0f))
+            tab_scale -= 0.02f;
+
         if (active) {
             vita_draw_rounded_rect(tx + 4.0f, y + 4.0f, tab_w - 8.0f, 28.0f, 5.0f, VITA_COLOR_AMIGA_RED);
-            vita_draw_text_centered(tx + (tab_w * 0.5f), y + 7.0f, VITA_COLOR_TEXT_WHITE, 0.90f, s_tab_names[i]);
+            vita_draw_text_centered(tx + (tab_w * 0.5f), y + 7.0f, VITA_COLOR_TEXT_WHITE, tab_scale, s_tab_names[i]);
         } else {
-            vita_draw_text_centered(tx + (tab_w * 0.5f), y + 7.0f, VITA_COLOR_TEXT_MUTED, 0.85f, s_tab_names[i]);
+            vita_draw_text_centered(tx + (tab_w * 0.5f), y + 7.0f, VITA_COLOR_TEXT_MUTED, tab_scale, s_tab_names[i]);
         }
     }
 }
@@ -760,6 +766,7 @@ void vita_draw_footer(const char *left_hint, const char *right_hint)
         vita_draw_hint_item(275.0f, btn_y, VITA_BTN_SQUARE, "REBOOT");
     } else if (s_active_tab == VITA_TAB_HARD_DISK) {
         vita_draw_hint_item(145.0f, btn_y, VITA_BTN_TRIANGLE, "EJECT");
+        vita_draw_hint_item(275.0f, btn_y, VITA_BTN_SQUARE, "MANAGER");
     } else if (s_active_tab == VITA_TAB_SAVESTATES) {
         vita_draw_hint_item(145.0f, btn_y, VITA_BTN_SQUARE, "LOAD");
     }
@@ -860,7 +867,7 @@ void vita_show_about_box(void)
 {
     static const char *credits[] = {
         "UAE4ALL2 HD Vita",
-        "Version 1.02",
+        "Version 1.03",
         "by theheroGAC",
         "https://github.com/theheroGAC/UAE4ALL2-HD-VITA",
         "",
@@ -895,6 +902,7 @@ void vita_show_about_box(void)
     const int max_scroll = total_lines - visible_lines;
     int scroll = 0;
     int frame_count = 0;
+    int auto_scroll_frames = 0;
     VitaInputState input;
     memset(&input, 0, sizeof(input));
     vita_gui_init();
@@ -907,10 +915,20 @@ void vita_show_about_box(void)
         if (input.pressed & SCE_CTRL_UP) {
             scroll--;
             if (scroll < 0) scroll = 0;
+            auto_scroll_frames = 0;
         }
         if (input.pressed & SCE_CTRL_DOWN) {
             scroll++;
             if (scroll > max_scroll) scroll = max_scroll;
+            auto_scroll_frames = 0;
+        }
+        if (frame_count > 20) {
+            auto_scroll_frames++;
+            if (auto_scroll_frames >= 28) {
+                scroll++;
+                if (scroll > max_scroll) scroll = 0;
+                auto_scroll_frames = 0;
+            }
         }
 
         SDL_FillRect(prSDLScreen, NULL, to_sdl_color(VITA_COLOR_OVERLAY_BG));
@@ -925,13 +943,13 @@ void vita_show_about_box(void)
         for (int i = 0; i < visible_lines; i++) {
             int line = scroll + i;
             if (line >= total_lines) break;
-            unsigned int color = (line == 4) ? VITA_COLOR_AMIGA_ORANGE : VITA_COLOR_TEXT_WHITE;
-            vita_draw_text(50.0f, dy + 58.0f + (float)i * 23.0f,
-                color, 0.72f, credits[line]);
+            unsigned int color = (line < 3) ? VITA_COLOR_AMIGA_ORANGE : ((line == 3 || line == 23) ? VITA_COLOR_TEXT_DIM : VITA_COLOR_TEXT_WHITE);
+            vita_draw_text_centered(VITA_SCREEN_W * 0.5f, dy + 58.0f + (float)i * 23.0f,
+                color, 0.75f, credits[line]);
         }
 
         char footer[64];
-        snprintf(footer, sizeof(footer), "UP/DOWN Scroll   %d/%d   CIRCLE Close", scroll + 1, max_scroll + 1);
+        snprintf(footer, sizeof(footer), "UP/DOWN Scroll   AUTO   %d/%d   CIRCLE Close", scroll + 1, max_scroll + 1);
         vita_draw_text_centered(VITA_SCREEN_W * 0.5f, VITA_SCREEN_H - 32.0f,
             VITA_COLOR_TEXT_MUTED, 0.72f, footer);
         SDL_Flip(prSDLScreen);
@@ -1105,9 +1123,89 @@ void vita_draw_boing_ball_icon(float cx, float cy, float radius, float rot_angle
     }
 }
 
-/* ========================================================================= */
-/* Main Menu Loop                                                            */
-/* ========================================================================= */
+int run_overlay_vita(void)
+{
+    if (vita_gui_init() != 0)
+        return 1;
+
+    VitaInputState input;
+    VitaSystemInfo sysinfo;
+    const char *items[6] = { "Resume", "Save State", "Load State", "Eject DF0", "Eject CD32", "Screenshot" };
+    int selected = 0;
+    int frame_count = 0;
+    memset(&input, 0, sizeof(input));
+    memset(&sysinfo, 0, sizeof(sysinfo));
+    inside_menu = 1;
+
+    while (1) {
+        vita_gui_update_input(&input);
+        vita_gui_update_system_info(&sysinfo);
+        frame_count++;
+
+        if (input.pressed & (SCE_CTRL_CIRCLE | SCE_CTRL_START)) {
+            mainMenu_case = MAIN_MENU_CASE_RUN;
+            break;
+        }
+        if (input.pressed & SCE_CTRL_UP) {
+            selected--;
+            if (selected < 0) selected = 5;
+        }
+        if (input.pressed & SCE_CTRL_DOWN) {
+            selected++;
+            if (selected > 5) selected = 0;
+        }
+        if (input.pressed & SCE_CTRL_CROSS) {
+            extern char *savestate_filename;
+            extern char *screenshot_filename;
+            if (selected == 0) {
+                mainMenu_case = MAIN_MENU_CASE_RUN;
+                break;
+            } else if (selected == 1) {
+                saveMenu_n_savestate = 1;
+                make_savestate_filenames(savestate_filename, screenshot_filename);
+                savestate_state = STATE_DOSAVE;
+                mainMenu_case = MAIN_MENU_CASE_RUN;
+                break;
+            } else if (selected == 2) {
+                saveMenu_n_savestate = 1;
+                make_savestate_filenames(savestate_filename, screenshot_filename);
+                FILE *state_file = fopen(savestate_filename, "rb");
+                if (state_file) {
+                    fclose(state_file);
+                    savestate_state = STATE_DORESTORE;
+                }
+                mainMenu_case = MAIN_MENU_CASE_RUN;
+                break;
+            } else if (selected == 3) {
+                uae4all_image_file0[0] = '\0';
+                gui_update();
+                mainMenu_case = MAIN_MENU_CASE_RUN;
+                break;
+            } else if (selected == 4) {
+                cdrom_close_image();
+                mainMenu_case = MAIN_MENU_CASE_RUN;
+                break;
+            } else {
+                vita_screenshot_request = 1;
+                mainMenu_case = MAIN_MENU_CASE_RUN;
+                break;
+            }
+        }
+
+        SDL_FillRect(prSDLScreen, NULL, to_sdl_color(VITA_COLOR_OVERLAY_BG));
+        vita_draw_header("Quick Menu", VITA_TAB_FLOPPY, &sysinfo);
+        for (int i = 0; i < 6; i++) {
+            float y = 82.0f + (float)i * 58.0f;
+            vita_draw_button_item(80.0f, y, VITA_SCREEN_W - 160.0f, 48.0f, items[i], NULL, NULL, selected == i, false);
+        }
+        vita_draw_footer("CROSS SELECT", "CIRCLE/START RESUME");
+        SDL_Flip(prSDLScreen);
+        SDL_Delay(16);
+    }
+
+    inside_menu = 0;
+    return 1;
+}
 
 int run_mainMenu_vita(void)
 {
@@ -1159,7 +1257,7 @@ int run_mainMenu_vita(void)
             write_log("[VITA] menu: Start pressed (kickstart_warning=%d)\n", kickstart_warning);
             if (kickstart_warning) {
                 write_log("[VITA] run_mainMenu_vita: Start blocked, Kickstart missing\n");
-                vita_show_message_box("Kickstart Missing", "Cannot start emulation without a Kickstart ROM. Copy kick13.rom and kick31.rom to ux0:/data/uae4all/kickstarts/.", "OK (X)");
+                vita_show_message_box("Kickstart Missing", "Copy kick13.rom and kick31.rom for normal Amiga use, or kick40060.CD32 and kick40060.CD32.ext for CD32, to ux0:/data/uae4all/kickstarts/.", "OK (X)");
             } else {
                 mainMenu_case = MAIN_MENU_CASE_RUN;
                 break;
@@ -1182,6 +1280,9 @@ int run_mainMenu_vita(void)
                 break;
             case VITA_TAB_HARD_DISK:
                 vita_view_hard_disk(&input, cur_sel);
+                break;
+            case VITA_TAB_WHDLOAD:
+                vita_view_whdload(&input, cur_sel);
                 break;
             case VITA_TAB_PRESETS:
                 vita_view_presets(&input, cur_sel);
