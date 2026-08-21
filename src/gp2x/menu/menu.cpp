@@ -50,6 +50,7 @@ extern int mainMenu_displayedLines;
 #endif
 
 SDL_Surface *current_screenshot = NULL;
+volatile int vita_screenshot_request = 0;
 
 #define VIDEO_FLAGS_INIT SDL_SWSURFACE|SDL_FULLSCREEN
 #ifdef ANDROIDSDL
@@ -214,17 +215,44 @@ void CreateScreenshot(int code)
 
   if (code == SCREENSHOT)
   {
+#ifdef __PSP2__
+    if (vita_screenshot_request) {
+      w = VITA_SCREEN_W;
+      h = VITA_SCREEN_H;
+    } else {
+      w = prSDLScreen->w;
+      h = prSDLScreen->h;
+    }
+#else
 		w=prSDLScreen->w;
 		h=prSDLScreen->h;
-	}
-	else
-	{
+#endif
+  }
+  else
+  {
 		w=32;
 		h=32;
-	}
+  }
 	
-	current_screenshot = SDL_CreateRGBSurface(prSDLScreen->flags,w,h,prSDLScreen->format->BitsPerPixel,prSDLScreen->format->Rmask,prSDLScreen->format->Gmask,prSDLScreen->format->Bmask,prSDLScreen->format->Amask);
+	current_screenshot = SDL_CreateRGBSurface(SDL_SWSURFACE,w,h,prSDLScreen->format->BitsPerPixel,prSDLScreen->format->Rmask,prSDLScreen->format->Gmask,prSDLScreen->format->Bmask,prSDLScreen->format->Amask);
+#ifdef __PSP2__
+  if (code == SCREENSHOT && vita_screenshot_request) {
+    SDL_FillRect(current_screenshot, NULL, SDL_MapRGB(current_screenshot->format, 0, 0, 0));
+    float scale_x = (float)VITA_SCREEN_W / (float)prSDLScreen->w;
+    float scale_y = (float)VITA_SCREEN_H / (float)prSDLScreen->h;
+    float scale = scale_x < scale_y ? scale_x : scale_y;
+    SDL_Rect dst;
+    dst.w = (Uint16)(prSDLScreen->w * scale + 0.5f);
+    dst.h = (Uint16)(prSDLScreen->h * scale + 0.5f);
+    dst.x = (Sint16)((VITA_SCREEN_W - dst.w) / 2);
+    dst.y = (Sint16)((VITA_SCREEN_H - dst.h) / 2);
+    SDL_SoftStretch(prSDLScreen, NULL, current_screenshot, &dst);
+  } else {
+    SDL_BlitSurface(prSDLScreen, NULL, current_screenshot, NULL);
+  }
+#else
 	SDL_BlitSurface(prSDLScreen, NULL, current_screenshot, NULL);
+#endif
 }
 
 

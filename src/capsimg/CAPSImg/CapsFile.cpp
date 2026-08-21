@@ -12,7 +12,7 @@ CCapsFile::~CCapsFile()
 	Close();
 }
 
-            
+// open file
 int CCapsFile::Open(PCAPSFILE pcf)
 {
 	int res=true;
@@ -39,7 +39,7 @@ int CCapsFile::Open(PCAPSFILE pcf)
 	return res;
 }
 
-             
+// close file
 int CCapsFile::Close()
 {
 	int res=0;
@@ -53,19 +53,19 @@ int CCapsFile::Close()
 	return res;
 }
 
-                              
+// read file chunk into memory
 int CCapsFile::Read(PUBYTE buf, int size)
 {
 	return (int)file->Read(buf, size);
 }
 
-             
+// write file
 int CCapsFile::Write(PUBYTE buf, int size)
 {
 	return (int)file->Write(buf, size);
 }
 
-               
+// seek in file
 int CCapsFile::Seek(int pos, int mode)
 {
 	if (!mode)
@@ -76,19 +76,19 @@ int CCapsFile::Seek(int pos, int mode)
 	return file->Seek(pos, mode);
 }
 
-                                   
+// check whether file is accessible
 int CCapsFile::IsOpen()
 {
 	return file->IsOpen();
 }
 
-                
+// get file size
 int CCapsFile::GetSize()
 {
 	return file->GetSize();
 }
 
-                            
+// get current file position
 int CCapsFile::GetPosition()
 {
 	return file->GetPosition();

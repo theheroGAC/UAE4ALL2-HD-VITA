@@ -9,12 +9,12 @@ CDiskEncoding dskenc;
 CDiskImageFactory imgfactory;
 vector <PCDISKIMAGE> img;
 
-                    
+// version info size
 int sizeversioninfo[]= {
 	sizeof(CapsVersionInfo)
 };
 
-                  
+// track info size
 int sizetrackinfo[]= {
 	sizeof(CapsTrackInfo),
 	sizeof(CapsTrackInfoT1),
@@ -23,13 +23,13 @@ int sizetrackinfo[]= {
 
 
 
-                           
+// start caps image support
 SDWORD __cdecl CAPSInit()
 {
 	return imgeOk;
 }
 
-                          
+// stop caps image support
 SDWORD __cdecl CAPSExit()
 {
 	for (PCDISKIMAGE &actimg : img) {
@@ -40,10 +40,10 @@ SDWORD __cdecl CAPSExit()
 	return imgeOk;
 }
 
-                      
+// add image container
 SDWORD __cdecl CAPSAddImage()
 {
-	                                                                               
+	// use the base image type as a placeholder, returning errors for the functions
 	PCDISKIMAGE pi = new CDiskImage;
 	unsigned pos;
 
@@ -60,7 +60,7 @@ SDWORD __cdecl CAPSAddImage()
 	return pos;
 }
 
-                         
+// delete image container
 SDWORD __cdecl CAPSRemImage(SDWORD id)
 {
 	if (id<0 || (unsigned)id>=img.size())
@@ -71,7 +71,7 @@ SDWORD __cdecl CAPSRemImage(SDWORD id)
 	return id;
 }
 
-                             
+// lock image using file name
 SDWORD __cdecl CAPSLockImage(SDWORD id, PCHAR name)
 {
 	if (id<0 || (unsigned)id >= img.size() || !img[id])
@@ -84,7 +84,7 @@ SDWORD __cdecl CAPSLockImage(SDWORD id, PCHAR name)
 	return CAPSLockImage(id, &cf);
 }
 
-                                               
+// lock image using the specified memory buffer
 SDWORD __cdecl CAPSLockImageMemory(SDWORD id, PUBYTE buffer, UDWORD length, UDWORD flag)
 {
 	if (id<0 || (unsigned)id >= img.size() || !img[id])
@@ -101,39 +101,39 @@ SDWORD __cdecl CAPSLockImageMemory(SDWORD id, PUBYTE buffer, UDWORD length, UDWO
 	return CAPSLockImage(id, &cf);
 }
 
-                                                          
+// lock image using the specified file - internal function
 int CAPSLockImage(int id, PCAPSFILE pcf)
 {
 	int res = imgeOk;
 
-	                                               
+	// get the possible image type used by the file
 	int type = imgfactory.GetImageType(pcf);
 
-	                        
+	// check for file errors
 	switch (type) {
-		                        
+		// problem with the file
 		case citError:
 			res = imgeOpen;
 			break;
 
-		                       
+		// unknown file content
 		case citUnknown:
 			res = imgeType;
 			break;
 	}
 
-	                                   
+	// file type is known and supported
 	if (res == imgeOk) {
 		PCDISKIMAGE newimg = imgfactory.CreateImage(type);
 
 		if (newimg) {
-			                                                                                    
+			// delete the existing image class regardless of type since it can no longer be used
 			CAPSRemImage(id);
 
-			                          
+			// add the new image class
 			img[id] = newimg;
 
-			                                                                                         
+			// try to lock the file; this can still give an error as the checks will be more thorough
 			res = img[id]->Lock(pcf);
 		} else
 			res = imgeGeneric;
@@ -142,7 +142,7 @@ int CAPSLockImage(int id, PCAPSFILE pcf)
 	return res;
 }
 
-               
+// unlock image
 SDWORD __cdecl CAPSUnlockImage(SDWORD id)
 {
 	if (id<0 || (unsigned)id >= img.size() || !img[id])
@@ -153,7 +153,7 @@ SDWORD __cdecl CAPSUnlockImage(SDWORD id)
 	return res;
 }
 
-                                 
+// load and decode complete image
 SDWORD __cdecl CAPSLoadImage(SDWORD id, UDWORD flag)
 {
 	if (id<0 || (unsigned)id >= img.size() || !img[id])
@@ -164,7 +164,7 @@ SDWORD __cdecl CAPSLoadImage(SDWORD id, UDWORD flag)
 	return res;
 }
 
-                        
+// get image information
 SDWORD __cdecl CAPSGetImageInfo(PCAPSIMAGEINFO pi, SDWORD id)
 {
 	if (!pi)
@@ -179,9 +179,9 @@ SDWORD __cdecl CAPSGetImageInfo(PCAPSIMAGEINFO pi, SDWORD id)
 	if (!pd)
 		return imgeGeneric;
 
-	                     
+	// convert image info
 	if (pd->civalid) {
-		                              
+		// use image info if available
 		switch (pd->ci.type) {
 			case cpimtFDD:
 				pi->type = ciitFDD;
@@ -203,9 +203,9 @@ SDWORD __cdecl CAPSGetImageInfo(PCAPSIMAGEINFO pi, SDWORD id)
 		for (int plt = 0; plt < CAPS_MAXPLATFORM; plt++)
 			pi->platform[plt] = pd->ci.platform[plt];
 	} else {
-		                           
+		// image info not available
 		if (pd->dmpcount) {
-			                                                             
+			// if there is at least one track dumped use dump information
 			pi->type = ciitFDD;
 			pi->release = 0;
 			pi->revision = 0;
@@ -214,7 +214,7 @@ SDWORD __cdecl CAPSGetImageInfo(PCAPSIMAGEINFO pi, SDWORD id)
 			pi->minhead = pd->uminhead;
 			pi->maxhead = pd->umaxhead;
 		}	else {
-			                                                                                 
+			// invalid image type if not a dumped image and there is no information available
 			pi->type = ciitNA;
 		}
 	}
@@ -222,32 +222,32 @@ SDWORD __cdecl CAPSGetImageInfo(PCAPSIMAGEINFO pi, SDWORD id)
 	return imgeOk;
 }
 
-                        
+// load and decode track
 SDWORD __cdecl CAPSLockTrack(PVOID ptrackinfo, SDWORD id, UDWORD cylinder, UDWORD head, UDWORD flag)
 {
 	if (!ptrackinfo)
 		return imgeGeneric;
 
-	                                                         
+	// structure revision is zero, unless newer one requested
 	unsigned rev=0;
 	if (flag & DI_LOCK_TYPE)
 		rev=*(PUDWORD)ptrackinfo;
 
-	                                                        
+	// if unsupported type set the highest supported version
 	if (rev > 2) {
 		*(PUDWORD)ptrackinfo=2;
 		return imgeUnsupportedType;
 	}
 
-	           
+	// check id
 	if (id < 0 || (unsigned)id >= img.size() || !img[id]) {
-		                  
+		// clear structure
 		memset(ptrackinfo, 0, sizetrackinfo[rev]);
 
 		return imgeOutOfRange;
 	}
 
-	                         
+	// set weak bit generator
 	if (flag & DI_LOCK_SETWSEED) {
 		PDISKTRACKINFO pt=img[id]->GetTrack(cylinder, head);
 		if (pt) {
@@ -259,10 +259,10 @@ SDWORD __cdecl CAPSLockTrack(PVOID ptrackinfo, SDWORD id, UDWORD cylinder, UDWOR
 		}
 	}
 
-	                  
+	// clear structure
 	memset(ptrackinfo, 0, sizetrackinfo[rev]);
 
-	             
+	// lock track
 	PDISKTRACKINFO pt=img[id]->LockTrack(cylinder, head, flag);
 	if (!pt) {
 		PDISKIMAGEINFO pd=img[id]->GetInfo();
@@ -270,7 +270,7 @@ SDWORD __cdecl CAPSLockTrack(PVOID ptrackinfo, SDWORD id, UDWORD cylinder, UDWOR
 		return pd ? pd->error : imgeGeneric;
 	}
 
-	                        
+	// track type conversion
 	UDWORD ttype;
 	switch (pt->ci.dentype) {
 		case cpdenNA:
@@ -290,19 +290,19 @@ SDWORD __cdecl CAPSLockTrack(PVOID ptrackinfo, SDWORD id, UDWORD cylinder, UDWOR
 			break;
 	}
 
-	                      
+	// signal track update
 	if (pt->fdpsize)
 		ttype|=CTIT_FLAG_FLAKEY;
 
-	                                               
+	// track type is variable density for raw dumps
 	if (pt->rawdump)
 		ttype = ctitVar;
 
-	                                                                 
+	// if multiple revolutions used by a raw dump signal track update
 	if (pt->rawupdate)
 		ttype |= CTIT_FLAG_FLAKEY;
 
-	                            
+	// get the correct structure
 	switch (rev) {
 		case 0:
 			CAPSLockTrackT0((PCAPSTRACKINFO)ptrackinfo, pt, ttype, flag);
@@ -320,7 +320,7 @@ SDWORD __cdecl CAPSLockTrack(PVOID ptrackinfo, SDWORD id, UDWORD cylinder, UDWOR
 	return imgeOk;
 }
 
-                        
+// get track info type 0
 void CAPSLockTrackT0(PCAPSTRACKINFO pi, PDISKTRACKINFO pt, UDWORD ttype, UDWORD flag)
 {
 	pi->type=ttype;
@@ -340,7 +340,7 @@ void CAPSLockTrackT0(PCAPSTRACKINFO pi, PDISKTRACKINFO pt, UDWORD ttype, UDWORD 
 	}
 }
 
-                        
+// get track info type 1
 void CAPSLockTrackT1(PCAPSTRACKINFOT1 pi, PDISKTRACKINFO pt, UDWORD ttype, UDWORD flag)
 {
 	pi->type=ttype;
@@ -355,7 +355,7 @@ void CAPSLockTrackT1(PCAPSTRACKINFOT1 pi, PDISKTRACKINFO pt, UDWORD ttype, UDWOR
 	pi->overlap=pt->overlap;
 }
 
-                        
+// get track info type 1
 void CAPSLockTrackT2(PCAPSTRACKINFOT2 pi, PDISKTRACKINFO pt, UDWORD ttype, UDWORD flag)
 {
 	pi->type=ttype;
@@ -373,7 +373,7 @@ void CAPSLockTrackT2(PCAPSTRACKINFOT2 pi, PDISKTRACKINFO pt, UDWORD ttype, UDWOR
 	pi->weakcnt=pt->fdpsize;
 }
 
-                          
+// remove track from cache
 SDWORD __cdecl CAPSUnlockTrack(SDWORD id, UDWORD cylinder, UDWORD head)
 {
 	if (id<0 || (unsigned)id >= img.size() || !img[id])
@@ -384,7 +384,7 @@ SDWORD __cdecl CAPSUnlockTrack(SDWORD id, UDWORD cylinder, UDWORD head)
 	return pt ? imgeOk : imgeOutOfRange;
 }
 
-                               
+// remove all tracks from cache
 SDWORD __cdecl CAPSUnlockAllTracks(SDWORD id)
 {
 	if (id<0 || (unsigned)id >= img.size() || !img[id])
@@ -395,33 +395,33 @@ SDWORD __cdecl CAPSUnlockAllTracks(SDWORD id)
 	return imgeOk;
 }
 
-                    
+// get platform name
 PCHAR  __cdecl CAPSGetPlatformName(UDWORD pid)
 {
 	return (PCHAR)CDiskImage::GetPlatformName(pid);
 }
 
-                      
+// get library version
 SDWORD __cdecl CAPSGetVersionInfo(PVOID pversioninfo, UDWORD flag)
 {
 	if (!pversioninfo)
 		return imgeGeneric;
 
-	                                                         
+	// structure revision is zero, unless newer one requested
 	unsigned rev=0;
 	if (flag & DI_LOCK_TYPE)
 		rev=*(PUDWORD)pversioninfo;
 
-	                                                        
+	// if unsupported type set the highest supported version
 	if (rev > 0) {
 		*(PUDWORD)pversioninfo=0;
 		return imgeUnsupportedType;
 	}
 
-	                  
+	// clear structure
 	memset(pversioninfo, 0, sizeversioninfo[rev]);
 
-	                            
+	// get the correct structure
 	switch (rev) {
 		case 0:
 			CAPSGetVersionInfoT0((PCAPSVERSIONINFO)pversioninfo);
@@ -431,7 +431,7 @@ SDWORD __cdecl CAPSGetVersionInfo(PVOID pversioninfo, UDWORD flag)
 	return imgeOk;
 }
 
-                             
+// get library version type 0
 void CAPSGetVersionInfoT0(PCAPSVERSIONINFO pi)
 {
 	pi->release=CAPS_LIB_RELEASE;
@@ -453,7 +453,7 @@ void CAPSGetVersionInfoT0(PCAPSVERSIONINFO pi)
 		DI_LOCK_SETWSEED;
 }
 
-                                         
+// get various information after decoding
 SDWORD __cdecl CAPSGetInfo(PVOID pinfo, SDWORD id, UDWORD cylinder, UDWORD head, UDWORD inftype, UDWORD infid)
 {
 	if (!pinfo)
@@ -484,7 +484,7 @@ SDWORD __cdecl CAPSGetInfo(PVOID pinfo, SDWORD id, UDWORD cylinder, UDWORD head,
 	return res;
 }
 
-                         
+// get sector information
 int CAPSGetSectorInfo(PCAPSSECTORINFO pi, PDISKIMAGEINFO pd, PDISKTRACKINFO pt, UDWORD infid)
 {
 	memset(pi, 0, sizeof(CapsSectorInfo));
@@ -516,7 +516,7 @@ int CAPSGetSectorInfo(PCAPSSECTORINFO pi, PDISKIMAGEINFO pd, PDISKTRACKINFO pt, 
 	return imgeOk;
 }
 
-                            
+// get weak data information
 int CAPSGetWeakInfo(PCAPSDATAINFO pi, PDISKIMAGEINFO pd, PDISKTRACKINFO pt, UDWORD infid)
 {
 	memset(pi, 0, sizeof(CapsDataInfo));
@@ -539,29 +539,29 @@ int CAPSGetWeakInfo(PCAPSDATAINFO pi, PDISKIMAGEINFO pd, PDISKTRACKINFO pt, UDWO
 	return imgeOk;
 }
 
-                             
+// get revolution information
 int CAPSGetRevolutionInfo(PCAPSREVOLUTIONINFO pi, PDISKIMAGEINFO pd, PDISKTRACKINFO pt, UDWORD infid)
 {
 	memset(pi, 0, sizeof(CapsRevolutionInfo));
 
-	                                   
+	// set image data if image is valid
 	if (pd) {
-		                                                    
+		// next, last and real revolution used by lock track
 		pi->next = pd->nextrev;
 		pi->last = pd->lastrev;
 		pi->real = pd->realrev;
 	}
 
-	                                   
+	// set track data if track is valid
 	if (pt) {
-		                                                                                 
+		// use the revolutions sampled for raw dumps, -1 (unlimited/randomized) otherwise
 		pi->max = (pt->rawdump) ? pt->rawtrackcnt : -1;
 	}
 
 	return imgeOk;
 }
 
-                                                   
+// set the next revolution to be used by track lock
 SDWORD __cdecl CAPSSetRevolution(SDWORD id, UDWORD value)
 {
 	if (id<0 || (unsigned)id >= img.size() || !img[id])
@@ -571,24 +571,24 @@ SDWORD __cdecl CAPSSetRevolution(SDWORD id, UDWORD value)
 	if (!pd)
 		return imgeGeneric;
 
-	                 
+	// set revolution
 	pd->nextrev = value;
 
 	return imgeOk;
 }
 
-                                 
+// get image type using file name
 SDWORD __cdecl CAPSGetImageType(PCHAR name)
 {
 	CapsFile cf;
 	memset(&cf, 0, sizeof(CapsFile));
 	cf.name = name;
 
-	                                               
+	// get the possible image type used by the file
 	return imgfactory.GetImageType(&cf);
 }
 
-                                                   
+// get image type using the specified memory buffer
 SDWORD __cdecl CAPSGetImageTypeMemory(PUBYTE buffer, UDWORD length)
 {
 	CapsFile cf;
@@ -597,11 +597,11 @@ SDWORD __cdecl CAPSGetImageTypeMemory(PUBYTE buffer, UDWORD length)
 	cf.size = length;
 	cf.flag |= CFF_MEMMAP | CFF_MEMREF;
 
-	                                               
+	// get the possible image type used by the file
 	return imgfactory.GetImageType(&cf);
 }
 
-                                                                                     
+// return the state of host debug request coming from the library and reset the state
 SDWORD __cdecl CAPSGetDebugRequest()
 {
 	SDWORD res = api_debug_request;

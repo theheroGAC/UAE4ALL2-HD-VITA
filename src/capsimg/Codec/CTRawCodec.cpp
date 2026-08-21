@@ -12,13 +12,13 @@ CCTRawCodec::~CCTRawCodec()
 	Free();
 }
 
-                  
+// clear variables
 void CCTRawCodec::Clear()
 {
 	memset(&wh, 0, sizeof(wh));
 }
 
-                             
+// free all allocated buffers
 void CCTRawCodec::Free()
 {
 	FreeCompressedDensity();
@@ -28,7 +28,7 @@ void CCTRawCodec::Free()
 	Clear();
 }
 
-                                             
+// free compressed CT Raw density information
 void CCTRawCodec::FreeCompressedDensity()
 {
 	delete [] wh.cdbuf;
@@ -36,7 +36,7 @@ void CCTRawCodec::FreeCompressedDensity()
 	wh.cdlen = 0;
 }
 
-                                               
+// free uncompressed CT Raw density information
 void CCTRawCodec::FreeUncompressedDensity()
 {
 	delete [] wh.timbuf;
@@ -44,7 +44,7 @@ void CCTRawCodec::FreeUncompressedDensity()
 	wh.timlen = 0;
 }
 
-                                           
+// free compressed CT Raw track information
 void CCTRawCodec::FreeCompressedTrack()
 {
 	delete [] wh.ctbuf;
@@ -52,13 +52,13 @@ void CCTRawCodec::FreeCompressedTrack()
 	wh.ctlen = 0;
 }
 
-                                             
+// free uncompressed CT Raw track information
 void CCTRawCodec::FreeUncompressedTrack()
 {
 	FreeUncompressedTrack(&wh);
 }
 
-                                             
+// free uncompressed CT Raw track information
 void CCTRawCodec::FreeUncompressedTrack(PCAPSWH w)
 {
 	delete[] w->rawbuf;
@@ -75,7 +75,7 @@ void CCTRawCodec::FreeUncompressedTrack(PCAPSWH w)
 
 
 
-                                 
+// set data to network byte order
 void CCTRawCodec::Swap(PUDWORD buf, int cnt)
 {
 #ifdef INTEL

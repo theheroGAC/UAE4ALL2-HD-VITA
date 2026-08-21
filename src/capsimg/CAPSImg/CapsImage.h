@@ -7,7 +7,7 @@
 
 
 
-                                                 
+// CAPS image handler with extended functionality
 class CCapsImage : public CCapsImageStd
 {
 public:
@@ -32,7 +32,7 @@ typedef CCapsImage *PCCAPSIMAGE;
 
 
 
-                   
+// get loader class
 inline PCCAPSLOADER CCapsImage::GetLoader()
 {
 	return &loader;

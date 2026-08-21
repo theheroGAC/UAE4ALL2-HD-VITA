@@ -1,7 +1,7 @@
 #ifndef DISKFILE_H
 #define DISKFILE_H
 
-                         
+// disk based file access
 class CDiskFile : public CBaseFile
 {
 public:
@@ -24,7 +24,7 @@ public:
 protected:
 	FILE *dfile;
 	int lastop;
-	char tempname[MAX_FILENAMELEN];                       
+	char tempname[MAX_FILENAMELEN]; // temporary file name
 };
 
 typedef CDiskFile *PCDISKFILE;

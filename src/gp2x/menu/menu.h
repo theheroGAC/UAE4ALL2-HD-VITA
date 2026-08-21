@@ -2,6 +2,7 @@
 #include<SDL.h>
 
 extern SDL_Surface *prSDLScreen;
+extern volatile int vita_screenshot_request;
 
 #define MENU_FILE_SPLASH DATA_PREFIX "gp2xsplash.bmp"
 #define MENU_FILE_BACKGROUND_0 DATA_PREFIX "background_static.bmp"

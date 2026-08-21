@@ -3,7 +3,7 @@
 
 
 
-                            
+// CAPS image generic loader
 class CCapsLoader  
 {
 public:
@@ -64,13 +64,13 @@ typedef CCapsLoader *PCCAPSLOADER;
 
 
 
-                    
+// access chunk data
 inline PCAPSCHUNK CCapsLoader::GetChunk()
 {
 	return &chunk;
 }
 
-                       
+// access file directly
 inline PCCAPSFILE CCapsLoader::GetFile()
 {
 	return &file;

@@ -11,7 +11,7 @@ UBYTE crcpoly_ccitt[]={0, 5, 12};
 UBYTE crcpoly_ansi[]={0, 2, 15};
 
 
-                       
+// initialize CRC table
 void MakeCRCTable()
 {
 	UDWORD poly=0;
@@ -20,7 +20,7 @@ void MakeCRCTable()
 	if (crcinit)
 		return;
 
-	        
+	// crc32
 	for (i=0; i < sizeof(crcpoly)/sizeof(UBYTE); i++)
 		poly|=1UL<<(31-crcpoly[i]);
 
@@ -34,7 +34,7 @@ void MakeCRCTable()
 		crctab[i]=crc;
 	}
 
-	            
+	// crc-ccitt
 	for (i=0, poly=0; i < sizeof(crcpoly_ccitt)/sizeof(UBYTE); i++)
 		poly|=1UL<<crcpoly_ccitt[i];
 
@@ -48,7 +48,7 @@ void MakeCRCTable()
 		crctab_ccitt[i]=crc;
 	}
 
-	           
+	// crc-ansi
 	for (i=0, poly=0; i < sizeof(crcpoly_ansi)/sizeof(UBYTE); i++)
 		poly|=1UL<<crcpoly_ansi[i];
 
@@ -65,7 +65,7 @@ void MakeCRCTable()
 	crcinit=1;
 }
 
-                               
+// create CRC value from buffer
 UDWORD CalcCRC(PUBYTE buf, int len)
 {
 	UDWORD crc=~0;
@@ -76,7 +76,7 @@ UDWORD CalcCRC(PUBYTE buf, int len)
 	return crc^~0;
 }
 
-                               
+// create CRC32 from seed value
 UDWORD CalcCRC32(PUBYTE buf, int len, UDWORD seed)
 {
 	UDWORD crc=~seed;
@@ -87,7 +87,7 @@ UDWORD CalcCRC32(PUBYTE buf, int len, UDWORD seed)
 	return crc^~0;
 }
 
-                                     
+// create CRC-CCITT value from buffer
 UWORD CalcCRC_CCITT(PUBYTE buf, int len)
 {
 	UWORD crc=~0;
@@ -98,7 +98,7 @@ UWORD CalcCRC_CCITT(PUBYTE buf, int len)
 	return crc;
 }
 
-                        
+// CRC16 from seed value
 UDWORD CalcCRC16(PUBYTE buf, int len, UDWORD seed)
 {
 	UWORD crc=(UWORD)seed;
@@ -109,7 +109,7 @@ UDWORD CalcCRC16(PUBYTE buf, int len, UDWORD seed)
 	return crc;
 }
 
-                                    
+// create CRC-ANSI value from buffer
 UWORD CalcCRC_ANSI(PUBYTE buf, int len)
 {
 	UWORD crc=0;

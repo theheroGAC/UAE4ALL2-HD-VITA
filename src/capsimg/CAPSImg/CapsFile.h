@@ -3,7 +3,7 @@
 
 
 
-                          
+// generic file descriptor
 struct CapsFile {
 	LPCSTR name;
 	PUBYTE memmap;
@@ -13,7 +13,7 @@ struct CapsFile {
 
 typedef CapsFile *PCAPSFILE;
 
-                  
+// file mode flags
 #define CFF_WRITE  DF_0
 #define CFF_MEMMAP DF_1
 #define CFF_MEMREF DF_2
@@ -21,7 +21,7 @@ typedef CapsFile *PCAPSFILE;
 
 
 
-                                                           
+// legacy CAPS file handler, bridge for CBaseFile functions
 class CCapsFile
 {
 public:

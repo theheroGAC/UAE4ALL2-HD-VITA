@@ -1,7 +1,7 @@
 #ifndef STREAMIMAGE_H
 #define STREAMIMAGE_H
 
-                                
+// KryoFlux stream image handler
 class CStreamImage : public CDiskImage
 {
 public:

@@ -11,7 +11,7 @@ CBaseFile::~CBaseFile()
 {
 }
 
-                      
+// clear file settings
 void CBaseFile::Clear()
 {
 	fileopen=0;

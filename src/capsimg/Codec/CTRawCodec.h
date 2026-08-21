@@ -1,7 +1,7 @@
 #ifndef CTRAWCODEC_H
 #define CTRAWCODEC_H
 
-                   
+// CAPS work helper
 struct CapsWH {
 	CapsRaw cr;
 	PUDWORD timbuf;
@@ -28,7 +28,7 @@ typedef CapsWH *PCAPSWH;
 
 
 
-                                                     
+// CT Raw codec wrapper - originally it's pure C code
 class CCTRawCodec
 {
 public:
@@ -70,7 +70,7 @@ typedef CCTRawCodec *PCCTRAWCODEC;
 
 
 
-                      
+// get codec work info
 inline PCAPSWH CCTRawCodec::GetInfo()
 {
 	return &wh;

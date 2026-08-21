@@ -3,7 +3,7 @@
 
 
 
-                                                                     
+// disk image factory identifying and creating the correct image type
 class CDiskImageFactory
 {
 public:

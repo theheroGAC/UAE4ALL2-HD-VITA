@@ -1,11 +1,11 @@
 #ifndef BASEFILE_H
 #define BASEFILE_H
 
-             
+// file modes
 #define BFFLAG_WRITE  1
 #define BFFLAG_CREATE 2
 
-                      
+// generic file access
 class CBaseFile
 {
 public:
@@ -37,7 +37,7 @@ typedef CBaseFile *PCBASEFILE;
 
 
 
-                              
+// return true if file is open
 inline int CBaseFile::IsOpen()
 {
 	return fileopen;

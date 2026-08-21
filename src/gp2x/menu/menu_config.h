@@ -1,4 +1,5 @@
 extern void SetDefaultMenuSettings(int general);
+extern void ApplyCd32Profile(void);
 extern void UpdateMemorySettings();
 extern void UpdateCPUModelSettings();
 extern void UpdateChipsetSettings();
@@ -24,6 +25,7 @@ extern int mainMenu_spriteCollisions;
 extern int mainMenu_sound;
 extern int mainMenu_soundStereo;
 extern int mainMenu_soundStereoSep;
+extern int mainMenu_diskSoundVolume;
 extern int mainMenu_CPU_speed;
 extern int mainMenu_cpuSpeed;
 extern int mainMenu_joyConf;

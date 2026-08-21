@@ -1,14 +1,14 @@
 #ifndef CAPSFDCEMULATOR_H
 #define CAPSFDCEMULATOR_H
 
-             
+// init state
 struct CapsFdcInit {
-	int runmode;                     
-	UDWORD stmask;                                                   
-	UDWORD st0clr;                           
-	UDWORD st0set;                         
-	UDWORD st1clr;                           
-	UDWORD st1set;                         
+	int runmode;   // run mode to set
+	UDWORD stmask; // status mask register to set (1 bits select st1)
+	UDWORD st0clr; // clear these bits in ST0
+	UDWORD st0set; // set these bits in ST0
+	UDWORD st1clr; // clear these bits in ST1
+	UDWORD st1set; // set these bits in ST1
 };
 
 typedef struct CapsFdcInit *PCAPSFDCINIT;

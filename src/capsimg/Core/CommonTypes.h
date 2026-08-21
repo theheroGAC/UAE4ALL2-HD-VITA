@@ -1,11 +1,11 @@
 #ifndef COMMONTYPES_H
 #define COMMONTYPES_H
 
-                  
+//-- Linux changes
 typedef int8_t BYTE;
 typedef int16_t WORD;
 typedef int32_t DWORD;
-                  
+//-- Linux changes
 
 typedef void *PVOID;
 typedef char *PCHAR;

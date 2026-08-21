@@ -5,7 +5,7 @@
 
 
 
-                                  
+// memory based file access/buffer
 class CMemoryFile : public CBaseFile
 {
 public:
@@ -22,7 +22,7 @@ public:
 	uint8_t *GetBuffer();
 
 protected:
-	              
+	// memory type
 	enum {
 		mtAlloc,
 		mtUser,
@@ -34,11 +34,11 @@ protected:
 	void FreeBuffer();
 
 protected:
-	int filemt;                    
-	uint8_t *filebuf[mtLast];               
-	size_t filesize[mtLast];               
-	size_t filecount;                              
-	size_t filepos;                           
+	int filemt; // file memory type
+	uint8_t *filebuf[mtLast]; // file buffer
+	size_t filesize[mtLast]; // buffer size
+	size_t filecount; // valid data count in buffer
+	size_t filepos; // file position in buffer
 };
 
 typedef CMemoryFile *PCMEMORYFILE;

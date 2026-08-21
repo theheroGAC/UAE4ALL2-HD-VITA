@@ -9,11 +9,16 @@
 #include "options.h"
 #include "gui.h"
 #include "sound.h"
+#include "disk_sound.h"
 #include "custom.h"
 #include "gp2x.h"
 #include "cfgfile.h"
+#ifdef __PSP2__
+#include "cdrom.h"
+#endif
 
 extern int kickstart;
+extern int bReloadKickstart;
 extern int blitter_in_partial_mode;
 extern int sound_rate;
 extern int skipintro;
@@ -67,6 +72,7 @@ int mainMenu_spriteCollisions = DEFAULT_SPRITECOLLISIONS;
 int mainMenu_sound = DEFAULT_SOUND;
 int mainMenu_soundStereo = 1; // Default is stereo
 int mainMenu_soundStereoSep = 3; // Default is 100% stereo separation
+int mainMenu_diskSoundVolume = 35;
 int mainMenu_CPU_speed = 0;
 
 int mainMenu_cpuSpeed = 600;
@@ -235,10 +241,41 @@ void SetDefaultMenuSettings(int general)
 
         mainMenu_drives = DEFAULT_DRIVES;
     }
+
+    if (general == 1) {
+        nr_drives = DEFAULT_DRIVES;
+        uae4all_hard_dir[0] = '\0';
+        uae4all_hard_file0[0] = '\0';
+        uae4all_hard_file1[0] = '\0';
+        uae4all_hard_file2[0] = '\0';
+        uae4all_hard_file3[0] = '\0';
+        uae4all_hard_file_ro[0] = 0;
+        uae4all_hard_file_ro[1] = 0;
+        uae4all_hard_file_ro[2] = 0;
+        uae4all_hard_file_ro[3] = 0;
+        strcpy(custom_kickrom, "./kick.rom");
+        kickstart = DEFAULT_KICKSTART;
+        snprintf(romfile, sizeof(romfile), "%s/kickstarts/%s", launchDir, kickstarts_rom_names[kickstart]);
+        FILE *kick_file = fopen(romfile, "rb");
+        if (!kick_file) {
+            strcpy(romfile, "kick.rom");
+        } else {
+            fclose(kick_file);
+        }
+        if (extended_rom_names[kickstart][0] != '\0')
+            snprintf(extfile, sizeof(extfile), "%s/kickstarts/%s", launchDir, extended_rom_names[kickstart]);
+        else
+            extfile[0] = '\0';
+#ifdef __PSP2__
+        cdrom_close_image();
+#endif
+        bReloadKickstart = 1;
+    }
     mainMenu_floppyspeed = 100;
 
     mainMenu_CPU_model = DEFAULT_CPU_MODEL;
     mainMenu_chipset = DEFAULT_CHIPSET_SELECT;
+    UpdateCPUModelSettings();
     UpdateChipsetSettings();
     mainMenu_spriteCollisions = DEFAULT_SPRITECOLLISIONS;
     kickstart = DEFAULT_KICKSTART;
@@ -246,6 +283,9 @@ void SetDefaultMenuSettings(int general)
     sound_rate = DEFAULT_SOUND_FREQ;
     mainMenu_soundStereo = 1; // Default is stereo
     mainMenu_soundStereoSep = 3; // Default is 100% stereo separation
+    mainMenu_diskSoundVolume = 35;
+    disk_sound_set_volume(mainMenu_diskSoundVolume);
+    disk_sound_reset();
     mainMenu_CPU_speed = 0;
 
     mainMenu_cpuSpeed = 600;
@@ -586,6 +626,21 @@ void UpdateMemorySettings()
 
 }
 
+
+void ApplyCd32Profile(void)
+{
+    kickstart = 6;
+    mainMenu_CPU_model = 1;
+    mainMenu_chipset = 2;
+    mainMenu_chipMemory = 2;
+    mainMenu_fastMemory = 0;
+    mainMenu_slowMemory = 0;
+    mainMenu_bootHD = 0;
+    mainMenu_drives = 1;
+    UpdateCPUModelSettings();
+    UpdateMemorySettings();
+    UpdateChipsetSettings();
+}
 
 void UpdateChipsetSettings()
 {
@@ -1040,37 +1095,37 @@ void reset_hdConf()
             mainMenu_filesysUnits++;
         }
         if (uae4all_hard_file0[0] != '\0') {
-            parse_hardfile_spec(uae4all_hard_file0);
+            parse_hardfile_spec(uae4all_hard_file_ro[0], uae4all_hard_file0);
             mainMenu_filesysUnits++;
         }
         if (uae4all_hard_file1[0] != '\0') {
-            parse_hardfile_spec(uae4all_hard_file1);
+            parse_hardfile_spec(uae4all_hard_file_ro[1], uae4all_hard_file1);
             mainMenu_filesysUnits++;
         }
         if (uae4all_hard_file2[0] != '\0') {
-            parse_hardfile_spec(uae4all_hard_file2);
+            parse_hardfile_spec(uae4all_hard_file_ro[2], uae4all_hard_file2);
             mainMenu_filesysUnits++;
         }
         if (uae4all_hard_file3[0] != '\0') {
-            parse_hardfile_spec(uae4all_hard_file3);
+            parse_hardfile_spec(uae4all_hard_file_ro[3], uae4all_hard_file3);
             mainMenu_filesysUnits++;
         }
         break;
     case 2:
         if (uae4all_hard_file0[0] != '\0') {
-            parse_hardfile_spec(uae4all_hard_file0);
+            parse_hardfile_spec(uae4all_hard_file_ro[0], uae4all_hard_file0);
             mainMenu_filesysUnits++;
         }
         if (uae4all_hard_file1[0] != '\0') {
-            parse_hardfile_spec(uae4all_hard_file1);
+            parse_hardfile_spec(uae4all_hard_file_ro[1], uae4all_hard_file1);
             mainMenu_filesysUnits++;
         }
         if (uae4all_hard_file2[0] != '\0') {
-            parse_hardfile_spec(uae4all_hard_file2);
+            parse_hardfile_spec(uae4all_hard_file_ro[2], uae4all_hard_file2);
             mainMenu_filesysUnits++;
         }
         if (uae4all_hard_file3[0] != '\0') {
-            parse_hardfile_spec(uae4all_hard_file3);
+            parse_hardfile_spec(uae4all_hard_file_ro[3], uae4all_hard_file3);
             mainMenu_filesysUnits++;
         }
         if (uae4all_hard_dir[0] != '\0') {
@@ -1420,6 +1475,11 @@ int saveconfig(int general)
     else
         snprintf((char*)buffer, 255, "hard_disk_file3=%s\n",uae4all_hard_file3);
     fputs(buffer,f);
+    // Per-slot HDF read-only flags
+    snprintf((char*)buffer, 255, "hard_disk_file_ro=%d,%d,%d,%d\n",
+             uae4all_hard_file_ro[0], uae4all_hard_file_ro[1],
+             uae4all_hard_file_ro[2], uae4all_hard_file_ro[3]);
+    fputs(buffer,f);
     snprintf((char*)buffer, 255, "chipmemory=%d\n",mainMenu_chipMemory);
     fputs(buffer,f);
     snprintf((char*)buffer, 255, "slowmemory=%d\n",mainMenu_slowMemory);
@@ -1505,6 +1565,14 @@ int saveconfig(int general)
     snprintf((char*)buffer, 255, "swapAB=%d\n",mainMenu_swapAB);
     fputs(buffer,f);
     snprintf((char*)buffer, 255, "singleJoycons=%d\n",mainMenu_singleJoycons);
+    fputs(buffer,f);
+#endif
+#ifdef __PSP2__
+    snprintf((char*)buffer, 255, "cdimage=%s\n", current_cd_image);
+    fputs(buffer,f);
+    snprintf((char*)buffer, 255, "diskSoundVolume=%d\n", mainMenu_diskSoundVolume);
+    fputs(buffer,f);
+    snprintf((char*)buffer, 255, "diskSoundVolumeConfigured=1\n");
     fputs(buffer,f);
 #endif
     fclose(f);
@@ -1880,6 +1948,10 @@ void loadconfig(int general)
             if (uae4all_hard_file3[0] == '*')
                 uae4all_hard_file3[0] = '\0';
         }
+        // Per-slot HDF read-only flags (absent in old configs -> stays off)
+        fscanf(f,"hard_disk_file_ro=%d,%d,%d,%d\n",
+               &uae4all_hard_file_ro[0], &uae4all_hard_file_ro[1],
+               &uae4all_hard_file_ro[2], &uae4all_hard_file_ro[3]);
         fscanf(f,"chipmemory=%d\n",&mainMenu_chipMemory);
         fscanf(f,"slowmemory=%d\n",&mainMenu_slowMemory);
         fscanf(f,"fastmemory=%d\n",&mainMenu_fastMemory);
@@ -1937,6 +2009,23 @@ void loadconfig(int general)
 #ifdef __SWITCH__ 
         fscanf(f,"swapAB=%d\n",&mainMenu_swapAB);
         fscanf(f,"singleJoycons=%d\n",&mainMenu_singleJoycons);
+#endif
+#ifdef __PSP2__
+        memset(filebuffer, 0, 256);
+        if (fscanf(f,"cdimage=%255[^\n]\n",filebuffer) == 1 && filebuffer[0] != '\0') {
+            if (cdrom_open_image(filebuffer))
+                ApplyCd32Profile();
+        } else
+            cdrom_close_image();
+        int disk_sound_volume_configured = 0;
+        if (fscanf(f,"diskSoundVolume=%d\n", &mainMenu_diskSoundVolume) != 1)
+            mainMenu_diskSoundVolume = 35;
+        fscanf(f,"diskSoundVolumeConfigured=%d\n", &disk_sound_volume_configured);
+        if (!disk_sound_volume_configured && mainMenu_diskSoundVolume == 100)
+            mainMenu_diskSoundVolume = 35;
+        if (mainMenu_diskSoundVolume < 0) mainMenu_diskSoundVolume = 0;
+        if (mainMenu_diskSoundVolume > 100) mainMenu_diskSoundVolume = 100;
+        disk_sound_set_volume(mainMenu_diskSoundVolume);
 #endif
         fclose(f);
     }
