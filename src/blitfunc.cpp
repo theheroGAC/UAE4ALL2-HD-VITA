@@ -9,10 +9,10 @@
 #include "blitfunc.h"
 #include "debug_uae4all.h"
 
-  
-                 
-              
-  
+/*
+	gno: optimized..
+	notaz: too :)
+*/
 
 void blitdofast_0 (uaecptr pta, uaecptr ptb, uaecptr ptc, uaecptr ptd, struct bltinfo *_GCCRES_ b)
 {

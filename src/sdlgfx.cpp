@@ -1,18 +1,18 @@
-   
-                                 
-   
-                 
-   
-                                                            
-   
-                                                  
-   
-                                      
-                                                                      
-                                  
-                                 
-                                                           
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * SDL interface
+  *
+  * Copyright 2001 Bernd Lachner (EMail: dev@lachner-net.de)
+  *
+  * Partialy based on the UAE X interface (xwin.c)
+  *
+  * Copyright 1995, 1996 Bernd Schmidt
+  * Copyright 1996 Ed Hanway, Andre Beck, Samuel Devulder, Bruno Coste
+  * Copyright 1998 Marcus Sundberg
+  * DGA support by Kai Kollmorgen
+  * X11/DGA merge, hotkeys and grabmouse by Marcus Sundberg
+  */
 
 #include "sysconfig.h"
 #include "sysdeps.h"
@@ -44,6 +44,7 @@
 #include "menu_config.h"
 #include "menu.h"
 #include "savestate.h"
+#include "osd.h"
 #include "rpt.h"
 #include "events.h"
 
@@ -51,7 +52,7 @@
 #define SDL_PollEvent PSP2_PollEvent
 #endif
 
-#ifdef __PSP2__                  
+#ifdef __PSP2__ // NOT __SWITCH__
 #include "psp2/psp2_touch.h"
 #endif
 
@@ -103,10 +104,10 @@ Uint32 uae4all_numframes=0;
 #define VIDEO_FLAGS VIDEO_FLAGS_INIT | SDL_DOUBLEBUF
 #endif
 
-                                    
-                   
+/* Uncomment for debugging output */
+/* #define DEBUG */
 
-                                     
+/* SDL variable for output surface */
 SDL_Surface *prSDLScreen = NULL;
 
 static int red_bits, green_bits, blue_bits;
@@ -114,7 +115,7 @@ static int red_shift, green_shift, blue_shift;
 static SDL_Color arSDLColors[256];
 static int ncolors = 0;
 
-                        
+/* Keyboard and mouse */
 int uae4all_keystate[256];
 static int shiftWasPressed = 0;
 #ifdef PANDORA
@@ -127,11 +128,11 @@ static unsigned long next_synctime = 0;
 
 void flush_block ()
 {
-#if !defined(__PSP2__)                                                     
+#if !defined(__PSP2__) //no need to unlock screen on Vita unless we have to
 	SDL_UnlockSurface(prSDLScreen);
 #endif
-#ifdef USE_UAE4ALL_VKBD	                                  
-#if defined(__PSP2__)                                                   
+#ifdef USE_UAE4ALL_VKBD	//draw vkbd and process user input
+#if defined(__PSP2__) //even on Vita, vkbd blitting requires unlock/lock
 	if (vkbd_mode)
 	{
 		SDL_UnlockSurface(prSDLScreen); 
@@ -158,6 +159,21 @@ void flush_block ()
 			CreateScreenshot(SCREENSHOT);
 #endif
 		}
+#if defined(__PSP2__)
+		if (vita_screenshot_request) {
+			char screenshot_path[256];
+			static unsigned int screenshot_number;
+			mkdir("ux0:/data/uae4all", 0777);
+			mkdir("ux0:/data/uae4all/screenshots", 0777);
+			SDL_UnlockSurface(prSDLScreen);
+			CreateScreenshot(SCREENSHOT);
+			SDL_LockSurface(prSDLScreen);
+			screenshot_number++;
+			snprintf(screenshot_path, sizeof(screenshot_path), "ux0:/data/uae4all/screenshots/shot_%u.png", screenshot_number);
+			save_thumb(SCREENSHOT, screenshot_path);
+			vita_screenshot_request = 0;
+		}
+#endif
 		unsigned long start = read_processor_time();
 		if(start < next_synctime && next_synctime - start > time_per_frame - 1000)
 #if defined(__PSP2__)
@@ -165,6 +181,7 @@ void flush_block ()
 #else
 			usleep((next_synctime - start) - 1000);
 #endif
+		OSD_Render(prSDLScreen);
 		SDL_Flip(prSDLScreen);
 		last_synctime = read_processor_time();
 
@@ -216,7 +233,7 @@ void flush_block ()
 			fcounter++;
 		}
 	}
-#endif            
+#endif // __PSP2__
 	init_row_map();
 }
 
@@ -228,7 +245,7 @@ void black_screen_now(void)
 
 static __inline__ int bitsInMask (unsigned long mask)
 {
-	                        
+	/* count bits in mask */
 	int n = 0;
 	while (mask)
 	{
@@ -240,7 +257,7 @@ static __inline__ int bitsInMask (unsigned long mask)
 
 static __inline__ int maskShift (unsigned long mask)
 {
-	                                       
+	/* determine how far mask is shifted */
 	int n = 0;
 	while (!(mask & 1))
 	{
@@ -265,7 +282,7 @@ static int init_colors (void)
 {
 	int i;
 
-	                
+	/* Truecolor: */
 	red_bits = bitsInMask(prSDLScreen->format->Rmask);
 	green_bits = bitsInMask(prSDLScreen->format->Gmask);
 	blue_bits = bitsInMask(prSDLScreen->format->Bmask);
@@ -281,7 +298,7 @@ static int init_colors (void)
 
 int graphics_setup (void)
 {
-                                    
+    /* Initialize the SDL library */
     if ( SDL_Init(SDL_INIT_VIDEO) < 0 )
     {
         fprintf(stderr, "Unable to init SDL: %s\n", SDL_GetError());
@@ -304,7 +321,7 @@ static void graphics_subinit (void)
 		SDL_UnlockSurface(prSDLScreen);
 		SDL_Flip(prSDLScreen);
 		SDL_ShowCursor(SDL_DISABLE);
-		                                                
+		/* Initialize structure for Amiga video modes */
 		gfx_mem = (char *)prSDLScreen->pixels;
 		gfx_rowbytes = prSDLScreen->pitch;
 	}
@@ -316,9 +333,9 @@ int graphics_init (void)
 {
 	int i,j;
 
-	                                                                            
-	                                                                          
-	                                                  
+	// this will hold the state of the mouse emulation toggle.  The start button
+	// will enable mouse emulation, which will allow the joystick to move the 
+	// mouse point (probably badly, but there you go).
 	gp2xButtonRemappingOn = 0;
 	show_volumecontrol = 0;
 
@@ -351,13 +368,13 @@ void graphics_leave (void)
     dumpcustom ();
 }
 
-                                                                     
-                                           
+/* Decode KeySyms. This function knows about all keys that are common
+ * between different keyboard languages. */
 static int kc_decode (SDL_keysym *prKeySym)
 {
 #ifdef PANDORA
-                                          
-                                                               
+  // Special handling of Pandora keyboard:
+  // Some keys requires shift on Amiga, so we simulate shift...
   switch (prKeySym->sym)
   {
     case SDLK_COLON:
@@ -402,7 +419,7 @@ static int kc_decode (SDL_keysym *prKeySym)
       if(prKeySym->mod == KMOD_LSHIFT)
         return SIMULATE_RELEASED_SHIFT | AK_RBRACKET;
       break;
-    case 124:                
+    case 124: // code for '|'
       return SIMULATE_SHIFT | AK_BACKSLASH;
   }
 #endif
@@ -493,8 +510,8 @@ static int kc_decode (SDL_keysym *prKeySym)
     case SDLK_LEFT: return AK_LF;
     case SDLK_RIGHT: return AK_RT;
 
-    case SDLK_PAGEDOWN: return AK_LAMI;                                       
-    case SDLK_PAGEUP: return AK_RAMI;                                          
+    case SDLK_PAGEDOWN: return AK_LAMI;        /* PgDn mapped to left amiga */
+    case SDLK_PAGEUP: return AK_RAMI;          /* PgUp mapped to right amiga */
 
     default: return -1;
     }
@@ -504,7 +521,7 @@ static int decode_us (SDL_keysym *prKeySym)
 {
     switch(prKeySym->sym)
     {
-	                 
+	/* US specific */
     case SDLK_a: return AK_A;
     case SDLK_m: return AK_M;
     case SDLK_q: return AK_Q;
@@ -519,7 +536,7 @@ static int decode_us (SDL_keysym *prKeySym)
     case SDLK_SEMICOLON: return AK_SEMICOLON;
     case SDLK_MINUS: return AK_MINUS;
     case SDLK_EQUALS: return AK_EQUAL;
-	                        
+	/* this doesn't work: */
     case SDLK_BACKQUOTE: return AK_QUOTE;
     case SDLK_QUOTE: return AK_BACKQUOTE;
     case SDLK_BACKSLASH: return AK_BACKSLASH;
@@ -544,18 +561,18 @@ void handle_events (void)
 	int i, j;
 	int iIsHotKey = 0;
 
-	                       
+	/* Handle GUI events */
 	gui_handle_events ();
 
 #if defined(__PSP2__) || defined(__SWITCH__)
-                                                                                            
-#ifdef __PSP2__	                   
+/* SDL events on PSP2 with all keyboard/mouse inputs for BT keyboard and mouse, and touch */
+#ifdef __PSP2__	 // NOT __SWITCH__	
 	if (mainMenu_touchControls) {
 		psp2PollTouch();
 	}
 #endif
 #ifdef __SWITCH__
-	                                   
+	// need to call this once per frame
 	if (mainMenu_touchControls)
 		SWITCH_FinishSimulatedMouseClicks();
 #endif
@@ -620,7 +637,7 @@ void handle_events (void)
 		}
 	}
 #else
-                                                                                    
+/* Event handling on non-PSP2 systems involves special hooks for certain keys */    
     while (SDL_PollEvent(&rEvent))
     {
 		switch (rEvent.type)
@@ -659,33 +676,33 @@ void handle_events (void)
 				if (!vkbd_mode)
 #endif
 				{
-					                                                     
-					                    
-					                                                
-					                                             
-					                
-					                                                 
-					                         
+					// only do this if the virtual keyboard isn't visible
+					// state moves thus:
+					// joystick mode (with virt keyboard on L and R)
+					// mouse mode (with mouse buttons on L and R)
+					// if specified:
+					// remapping mode (with whatever's been supplied)
+					// back to start of state
 					
 #ifndef PANDORA
 					if (!hasGp2xButtonRemapping)
 					{
-						                           
+						// skip the remapping state
 						gp2xMouseEmuOn = !gp2xMouseEmuOn;
 					}
 					else
 					{
 #endif
-						                                                                   
+						// start condition is gp2xMouseEmuOn = 0, gp2xButtonRemappingOn = 0
 						if (!gp2xButtonRemappingOn && !gp2xMouseEmuOn)
 						{
-							                         
+							// move to mouse emu mode
 							gp2xMouseEmuOn = 1;
 							gp2xButtonRemappingOn = 0;
 						}
 						else if (gp2xMouseEmuOn && !gp2xButtonRemappingOn)
 						{
-						                                
+						// move to button remapping mode
 						gp2xMouseEmuOn = 0;
 						gp2xButtonRemappingOn = 1;
 						}
@@ -705,12 +722,12 @@ void handle_events (void)
 #ifdef USE_UAE4ALL_VKBD
 			else if ((!gp2xMouseEmuOn) && (!gp2xButtonRemappingOn) && (!vkbd_mode) && (vkbd_button2!=(SDLKey)0))
 			{
-				if (vkbd_button2)                                                               
+				if (vkbd_button2) // button2 keyboard was a planned feature, not yet implemented
 					rEvent.key.keysym.sym=vkbd_button2;
 				else
 					break;
 			}
-#endif                   
+#endif //UAE_UAE4ALL_VKBD
 
 #ifndef PANDORA
 			if (gp2xButtonRemappingOn)
@@ -735,7 +752,7 @@ void handle_events (void)
 #ifdef PANDORA
 				  if(iAmigaKeyCode & SIMULATE_SHIFT)
 			    {
-                                        
+            // We need to simulate shift
             iAmigaKeyCode = iAmigaKeyCode & 0x1ff;
             shiftWasPressed = uae4all_keystate[AK_LSH];
             if(!shiftWasPressed)
@@ -746,7 +763,7 @@ void handle_events (void)
 			    }
 				  if(iAmigaKeyCode & SIMULATE_RELEASED_SHIFT)
 			    {
-                                                 
+            // We need to simulate released shift
             iAmigaKeyCode = iAmigaKeyCode & 0x1ff;
             shiftWasPressed = uae4all_keystate[AK_LSH];
             if(shiftWasPressed)
@@ -822,7 +839,7 @@ void handle_events (void)
 #ifdef PANDORA
 				  if(iAmigaKeyCode & SIMULATE_SHIFT)
 			    {
-                                          
+            // We needed to simulate shift
             iAmigaKeyCode = iAmigaKeyCode & 0x1ff;
             if(!shiftWasPressed)
             {
@@ -833,7 +850,7 @@ void handle_events (void)
 			    }
 				  if(iAmigaKeyCode & SIMULATE_RELEASED_SHIFT)
 			    {
-                                                   
+            // We needed to simulate released shift
             iAmigaKeyCode = iAmigaKeyCode & 0x1ff;
             if(shiftWasPressed)
             {
@@ -862,7 +879,7 @@ void handle_events (void)
 			{
 				lastmx = 16 * (rEvent.motion.x*2 - mainMenu_stylusOffset + moved_x + stylusAdjustX >> 1);
 				lastmy = 16 * (rEvent.motion.y*2 - mainMenu_stylusOffset + moved_y + stylusAdjustY >> 1);
-				                  
+				//mouseMoving = 1;
 			}
 			else if(slow_mouse)
 			{
@@ -898,7 +915,7 @@ void handle_events (void)
 		}
 	}
 
-#endif            
+#endif // __PSP2__
 
 	if (mouse_state==false)
 	{

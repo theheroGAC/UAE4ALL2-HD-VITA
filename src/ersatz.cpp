@@ -1,11 +1,11 @@
-   
-                                 
-   
-                                           
-                
-   
-                          
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * A "replacement" for a missing Kickstart
+  * Warning! Q&D
+  *
+  * (c) 1995 Bernd Schmidt
+  */
 
 #include "sysconfig.h"
 #include "sysdeps.h"
@@ -33,9 +33,9 @@
 void init_ersatz_rom (uae_u8 *data)
 {
     write_log ("Trying to use Kickstart replacement.\n");
-    *data++ = 0x00; *data++ = 0x08;                 
+    *data++ = 0x00; *data++ = 0x08; /* initial SP */
     *data++ = 0x00; *data++ = 0x00;
-    *data++ = 0x00; *data++ = 0xF8;                 
+    *data++ = 0x00; *data++ = 0xF8; /* initial PC */
     *data++ = 0x00; *data++ = 0x08;
 
     *data++ = 0xFF; *data++ = 0x0D;
@@ -70,8 +70,8 @@ static void ersatz_doio (void)
 {
     uaecptr request = _68k_areg(1);
     switch (get_word (request + 0x1C)) {
-     case 9:                           
-     case 2: case 0x8002:                    
+     case 9: /* TD_MOTOR is harmless */
+     case 2: case 0x8002: /* READ commands */
 	break;
 
      default:
@@ -107,7 +107,7 @@ static void ersatz_init (void)
     }
 
     _68k_sreg = 0;
-                                    
+    /* Set some interrupt vectors */
     for (a = 8; a < 0xC0; a += 4) {
 	put_long (a, 0xF8001A);
     }
@@ -116,24 +116,24 @@ static void ersatz_init (void)
 #ifndef USE_FAME_CORE
     _68k_intmask = 0;
 #else
-	m68k_set_register(M68K_REG_SR, _68k_sreg & 0xf8ff);                
+	m68k_set_register(M68K_REG_SR, _68k_sreg & 0xf8ff); // intmask to 0
 #endif
 
-                                
+    /* Build a dummy execbase */
     put_long (4, _68k_areg(6) = 0x676);
     put_byte (0x676 + 0x129, 0);
     for (f = 1; f < 105; f++) {
 	put_word (0x676 - 6*f, 0x4EF9);
 	put_long (0x676 - 6*f + 2, 0xF8000C);
     }
-                                    
+    /* Some "supported" functions */
     put_long (0x676 - 456 + 2, 0xF80014);
     put_long (0x676 - 216 + 2, 0xF80020);
     put_long (0x676 - 198 + 2, 0xF80026);
     put_long (0x676 - 204 + 2, 0xF8002c);
     put_long (0x676 - 210 + 2, 0xF8002a);
 
-                            
+    /* Build an IORequest */
     request = 0x800;
     put_word (request + 0x1C, 2);
     put_long (request + 0x28, 0x4000);
@@ -141,14 +141,14 @@ static void ersatz_init (void)
     put_long (request + 0x24, 0x200 * 4);
     _68k_areg(1) = request;
     ersatz_doio ();
-                               
+    /* kickstart disk loader */
     if (get_long(0x4000) == 0x4b49434b) {
-	                                            
+	/* a kickstart disk was found in drive 0! */
 	write_log ("Loading Kickstart rom image from Kickstart disk\n");
-	                         
+	/* print some notes... */
 	write_log ("NOTE: if UAE crashes set CPU to 68000 and/or chipmem size to 512KB!\n");
 
-	                                        
+	/* read rom image from kickstart disk */
 	put_word (request + 0x1C, 2);
 	put_long (request + 0x28, 0xF80000);
 	put_long (request + 0x2C, 0x200);
@@ -156,8 +156,8 @@ static void ersatz_init (void)
 	_68k_areg(1) = request;
 	ersatz_doio ();
 
-	                                                     
-                                   
+	/* read rom image once again to mirror address space.
+	   not elegant, but it works... */
 	put_word (request + 0x1C, 2);
 	put_long (request + 0x28, 0xFC0000);
 	put_long (request + 0x2C, 0x200);
@@ -175,7 +175,7 @@ static void ersatz_init (void)
 
     _68k_setpc (0x400C);
 
-                           
+    /* Init the hardware */
     put_long (0x3000, 0xFFFFFFFEul);
     put_long (0xDFF080, 0x3000);
     put_word (0xDFF088, 0);
@@ -205,7 +205,7 @@ void ersatz_perform (uae_u16 what)
 	break;
 
      case EOP_SERVEINT:
-	                                               
+	/* Just reset all the interrupt request bits */
 	put_word (0xDFF09C, get_word (0xDFF01E) & 0x3FFF);
 	break;
 
@@ -229,7 +229,7 @@ void ersatz_perform (uae_u16 what)
 	write_log ("Unimplemented Kickstart function called\n");
 	uae_quit ();
 	
-	                  
+	/* fall through */
      case EOP_LOOP:
 	_68k_setpc (0xF80010);
 	break;

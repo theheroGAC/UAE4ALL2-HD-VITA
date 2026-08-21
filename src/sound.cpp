@@ -1,10 +1,10 @@
-    
-                                 
-    
-                               
-    
-                                
-    
+ /* 
+  * UAE - The Un*x Amiga Emulator
+  * 
+  * Support for Linux/USS sound
+  * 
+  * Copyright 1997 Bernd Schmidt
+  */
 
 #include "sysconfig.h"
 #include "sysdeps.h"
@@ -66,14 +66,14 @@ uae_u16 *callback_sndbuff, *render_sndbuff, *sndbufpt;
 
 int tablas_ajuste[8][9]=
 {
-	{ 9 , 9 , 9 , 9 , 9 , 9 , 9 , 9 , 9 },	    
-	{ 3 , 4 , 3 , 4 , 3 , 4 , 3 , 4 , 3 },	     
-	{ 1 , 2 , 1 , 2 , 1 , 2 , 1 , 2 , 1 },	     
-	{ 1 , 0 , 1 , 0 , 1 , 0 , 1 , 0 , 1 },	     
-	{ 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 },	     
-	{ 0 ,-1 , 0 ,-1 , 0 ,-1 , 0 ,-1 , 0 },	     
-	{-2 ,-1 ,-2 ,-1 ,-2 ,-1 ,-2 ,-1 ,-2 },	     
-	{-4 ,-3 ,-4 ,-3 ,-4 ,-3 ,-4 ,-3 ,-4 },	    
+	{ 9 , 9 , 9 , 9 , 9 , 9 , 9 , 9 , 9 },	// 0
+	{ 3 , 4 , 3 , 4 , 3 , 4 , 3 , 4 , 3 },	// 1 
+	{ 1 , 2 , 1 , 2 , 1 , 2 , 1 , 2 , 1 },	// 2 
+	{ 1 , 0 , 1 , 0 , 1 , 0 , 1 , 0 , 1 },	// 3 
+	{ 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 },	// 4 
+	{ 0 ,-1 , 0 ,-1 , 0 ,-1 , 0 ,-1 , 0 },	// 5 
+	{-2 ,-1 ,-2 ,-1 ,-2 ,-1 ,-2 ,-1 ,-2 },	// 6 
+	{-4 ,-3 ,-4 ,-3 ,-4 ,-3 ,-4 ,-3 ,-4 },	// 7
 };
 
 #else
@@ -161,15 +161,15 @@ void sound_default_evtime(void)
 			break;
 
 		case 5:
-		case 4:            
+		case 4: // ~4/3 234
 			if (pal)
-				scaled_sample_evtime=(MAXHPOS_PAL*244*VBLANK_HZ_PAL*CYCLE_UNIT)/sound_rate;       
+				scaled_sample_evtime=(MAXHPOS_PAL*244*VBLANK_HZ_PAL*CYCLE_UNIT)/sound_rate; // ???
 			else
 				scaled_sample_evtime=(MAXHPOS_NTSC*255*VBLANK_HZ_NTSC*CYCLE_UNIT)/sound_rate;
 			break;
 
 		case 3:
-		case 2:            
+		case 2: // ~8/7 273
 			if (pal)
 				scaled_sample_evtime=(MAXHPOS_PAL*270*VBLANK_HZ_PAL*CYCLE_UNIT)/sound_rate;
 			else
@@ -177,7 +177,7 @@ void sound_default_evtime(void)
 			break;
 
 		case 1:
-		default:                
+		default: // MAXVPOS_PAL?
 			if (pal)
 				scaled_sample_evtime=(MAXHPOS_PAL*313*VBLANK_HZ_PAL*CYCLE_UNIT)/sound_rate;
 			else
@@ -322,7 +322,7 @@ static int get_soundbuf_size(void)
 	return (size * DEFAULT_SOUND_BITS / 8 * channels);
 }
 
-                                                                                   
+/* Try to determine whether sound is available.  This is only for GUI purposes.  */
 int setup_sound (void)
 {
 #ifdef DEBUG_SOUND
@@ -334,7 +334,7 @@ int setup_sound (void)
     spec.samples = SNDBUFFER_LEN>>1;
     spec.callback = sound_callback;
     spec.userdata = NULL;
-                    
+// #ifndef DREAMCAST
 #if 0
     if (SDL_OpenAudio (&spec, NULL) < 0) {
 	write_log ("Couldn't open audio: %s\n", SDL_GetError());
@@ -369,14 +369,14 @@ static int open_sound (void)
 #ifndef MENU_MUSIC
     if (!passed)
 {
-                                                                          
+//printf("SDL_OpenAudio %i %i %i\n",spec.freq,spec.channels,spec.samples);
 	if (SDL_OpenAudio (&spec, NULL) < 0)
 	{
-                                
+//puts(SDL_GetError()); exit(0);
 		write_log (stderr, "Couldn't open audio: %s\n", SDL_GetError());
 		return 0;
     	}
-                  
+//puts("DESPUES");
 }
 #else
     SDL_PauseAudio (1);
@@ -384,7 +384,7 @@ static int open_sound (void)
 #endif
     have_sound = 1;
 
-                              
+//    sound_default_evtime(0);
     scaled_sample_evtime_ok = 1;
 
     sound_available = 1;
@@ -419,7 +419,7 @@ void close_sound (void)
 #endif
     }
     SDL_Delay(333);
-                        
+//    SDL_CloseAudio ();
     have_sound = 0;
 #ifdef DEBUG_SOUND
     dbg(" sound.c : ! close_sound");
@@ -478,7 +478,7 @@ void resume_sound (void)
     Mix_HookMusic(&sound_callback,NULL);
 #endif
     SDL_PauseAudio (0);
-                      
+//    closing_sound=0;
 #ifdef DEBUG_SOUND
     dbg(" sound.c : ! resume_sound");
 #endif
@@ -519,7 +519,7 @@ void uae4all_pause_music(void)
     dbg("sound.c : pause_music");
 #endif
 #ifdef MENU_MUSIC
-                       
+//    closing_sound=-1;
     SDL_PauseAudio (1);
 #endif
 #ifdef DEBUG_SOUND

@@ -8,21 +8,12 @@
 extern "C" {
 #endif
 
-   
-                                                 
-                                               
-                                                             
-   
 void OSD_TriggerDiskSwap(int disk_number, bool is_error);
 
-   
-                                                                              
-                                                                                   
-   
 void OSD_Render(SDL_Surface *surface);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif         
+#endif

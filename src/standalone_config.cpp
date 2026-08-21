@@ -38,10 +38,10 @@ bool FileExists(const char *path)
 
 void ShowErrorAndExit(const char *line1, const char *line2, const char *line3, const char *line4)
 {
-                                            
+    // Inizializza visualizzazione testo SDL
     init_text(0);
 
-                                                 
+    // Disegna lo sfondo e la finestra di dialogo
     text_draw_background();
     text_draw_window(2, 4, 42, 14, "--- AMIGA LAUNCHER ERROR ---");
 
@@ -52,7 +52,7 @@ void ShowErrorAndExit(const char *line1, const char *line2, const char *line3, c
 
     text_flip();
 
-                                                                                     
+    // Attesa non bloccante di 5 secondi (5000 ms), gestendo eventuali eventi di quit
     Uint32 start_ticks = SDL_GetTicks();
     SDL_Event ev;
     while (SDL_GetTicks() - start_ticks < 5000) {
@@ -73,7 +73,7 @@ void ShowErrorAndExit(const char *line1, const char *line2, const char *line3, c
 
 bool Standalone_CheckBootFiles(void)
 {
-                                 
+    // 1. Controllo Kickstart 3.x
     if (!FileExists(PATH_KICK3)) {
         ShowErrorAndExit(
             "Missing kick3.rom",
@@ -84,7 +84,7 @@ bool Standalone_CheckBootFiles(void)
         return false;
     }
 
-                           
+    // 2. Controllo Disco 1
     if (!FileExists(PATH_DISK1)) {
         ShowErrorAndExit(
             "Missing disk1.adf",
@@ -95,7 +95,7 @@ bool Standalone_CheckBootFiles(void)
         return false;
     }
 
-                           
+    // 3. Controllo Disco 2
     if (!FileExists(PATH_DISK2)) {
         ShowErrorAndExit(
             "Missing disk2.adf",
@@ -111,17 +111,17 @@ bool Standalone_CheckBootFiles(void)
 
 void Standalone_ConfigureEmulator(void)
 {
-                            
-    kickstart = 3;                                        
+    // Imposta Kickstart 3.1
+    kickstart = 3; // Indice 3 in UAE4All2 = Kickstart 3.1
     snprintf(romfile, sizeof(romfile), "%s", PATH_KICK3);
     uae4all_init_rom(romfile);
 
-                                                                    
-    mainMenu_drives = 1;                               
-    mainMenu_chipMemory = 2;                
-    mainMenu_CPU_model = 1;          
+    // Configurazione hardware Amiga standard compatibile con KS 3.x
+    mainMenu_drives = 1; // 1 Floppy drive fisico (DF0)
+    mainMenu_chipMemory = 2; // 2MB Chip RAM
+    mainMenu_CPU_model = 1;  // 68020
     
-                                
+    // Inserimento Disk 1 in DF0
     strncpy(uae4all_image_file0, PATH_DISK1, 255);
     uae4all_image_file0[255] = '\0';
 

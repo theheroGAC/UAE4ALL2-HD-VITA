@@ -1,7 +1,7 @@
-    
-                                                
-                   
-    
+ /* 
+  * Minimalistic sound.c implementation for gp2x
+  * (c) notaz, 2007
+  */
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -52,15 +52,15 @@ void sound_default_evtime(void)
 			break;
 
 		case 5:
-		case 4:            
+		case 4: // ~4/3 234
 			if (pal)
-				scaled_sample_evtime=(MAXHPOS_PAL*244*VBLANK_HZ_PAL*CYCLE_UNIT)/sound_rate;       
+				scaled_sample_evtime=(MAXHPOS_PAL*244*VBLANK_HZ_PAL*CYCLE_UNIT)/sound_rate; // ???
 			else
 				scaled_sample_evtime=(MAXHPOS_NTSC*255*VBLANK_HZ_NTSC*CYCLE_UNIT)/sound_rate;
 			break;
 
 		case 3:
-		case 2:            
+		case 2: // ~8/7 273
 			if (pal)
 				scaled_sample_evtime=(MAXHPOS_PAL*270*VBLANK_HZ_PAL*CYCLE_UNIT)/sound_rate;
 			else
@@ -68,7 +68,7 @@ void sound_default_evtime(void)
 			break;
 
 		case 1:
-		default:                
+		default: // MAXVPOS_PAL?
 #endif
 			if (pal)
 				scaled_sample_evtime=(MAXHPOS_PAL*313*VBLANK_HZ_PAL*CYCLE_UNIT)/sound_rate;
@@ -92,7 +92,7 @@ static void *sound_thread(void *unused)
 	int cnt = 0, sem_val = 0;
 	sound_thread_active = 1;
 
-	                                   
+	//printf("sound_thread started\n");
 	for (;;)
 	{
 		sem_getvalue(&sound_sem, &sem_val);
@@ -113,7 +113,7 @@ static void *sound_thread(void *unused)
 		cnt++;
 	}
 
-	                                   
+	//printf("leaving sound_thread\n");
 	return NULL;
 }
 
@@ -124,8 +124,8 @@ static int gp2x_start_sound(int rate, int bits, int stereo)
 
 	if (!sound_thread_active)
 	{
-		                               
-		                                      
+		// init sem, start sound thread
+		//printf("starting sound thread..\n");
 		pthread_t thr;
 		ret = sem_init(&sound_sem, 0, 0);
 		if (ret != 0) printf("sem_init() failed: %i, errno=%i\n", ret, errno);
@@ -134,7 +134,7 @@ static int gp2x_start_sound(int rate, int bits, int stereo)
 		pthread_detach(thr);
 	}
 
-	                                    
+	//if (sounddev > 0) close(sounddev);
 	if (sounddev <= 0)
 	{
 		sounddev = open("/dev/dsp", O_WRONLY);
@@ -145,22 +145,22 @@ static int gp2x_start_sound(int rate, int bits, int stereo)
 		}
 	}
 
-	                                                      
+	// if no settings change, we don't need to do anything
 	if (rate == s_oldrate && s_oldbits == bits && s_oldstereo == stereo) 
 	  return 0;
 
 	ioctl(sounddev, SNDCTL_DSP_SPEED,  &rate);
 	ioctl(sounddev, SNDCTL_DSP_SETFMT, &bits);
 	ioctl(sounddev, SNDCTL_DSP_STEREO, &stereo);
-	                        
+	// calculate buffer size
 	buffers = 16;
 	bsize = rate / 32;
-	if (rate > 22050) { bsize*=4; buffers*=2; }                                       
+	if (rate > 22050) { bsize*=4; buffers*=2; } // 44k mode seems to be very demanding
 	while ((bsize>>=1)) frag++;
-	frag |= buffers<<16;              
+	frag |= buffers<<16; // 16 buffers
 	ioctl(sounddev, SNDCTL_DSP_SETFRAGMENT, &frag);
-	                                                                 
-	                                                                   
+	//printf("gp2x_set_sound: %i/%ibit/%s, %i buffers of %i bytes\n",
+	//	rate, bits, stereo?"stereo":"mono", frag>>16, 1<<(frag&0xffff));
 
 	s_oldrate = rate; 
 	s_oldbits = bits; 
@@ -170,14 +170,14 @@ static int gp2x_start_sound(int rate, int bits, int stereo)
 }
 
 
-                                               
+// this is meant to be called only once on exit
 void gp2x_stop_sound(void)
 {
 	if (sound_thread_exit)
 		printf("don't call gp2x_stop_sound more than once!\n");
 	if (sound_thread_active)
 	{
-		                                      
+		//printf("stopping sound thread..\n");
 		sound_thread_exit = 1;
 		sem_post(&sound_sem);
 		usleep(100*1000);
@@ -200,7 +200,7 @@ void finish_sound_buffer (void)
 }
 
 
-                                                                                   
+/* Try to determine whether sound is available.  This is only for GUI purposes.  */
 int setup_sound (void)
 {
     if (gp2x_start_sound(sound_rate, 16, mainMenu_soundStereo) != 0)
@@ -228,9 +228,9 @@ void close_sound (void)
     if (!have_sound)
 	return;
 
-                                                                                                                 
-                                            
-                        
+    // testing shows that reopenning sound device is not a good idea on gp2x (causes random sound driver crashes)
+    // we will close it on real exit instead
+    //gp2x_stop_sound();
     have_sound = 0;
 }
 
@@ -242,12 +242,12 @@ int init_sound (void)
 
 void pause_sound (void)
 {
-                       
+    /* nothing to do */
 }
 
 void resume_sound (void)
 {
-                       
+    /* nothing to do */
 }
 
 void uae4all_init_sound(void)

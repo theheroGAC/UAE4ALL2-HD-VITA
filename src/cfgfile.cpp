@@ -1,11 +1,11 @@
-   
-                                 
-   
-                        
-                                                         
-   
-                                            
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Config file handling
+  * This still needs some thought before it's complete...
+  *
+  * Copyright 1998 Brian King, Bernd Schmidt
+  */
 
 #include "sysconfig.h"
 #include "sysdeps.h"
@@ -43,38 +43,60 @@ char * make_hard_dir_cfg_line (char *dst) {
 
 
 char * make_hard_file_cfg_line (char *dst) {
-	char buffer[256];		
-	
-	if (dst[0] != 0) {
-	
-		int surfaces = 1;
-		int sectors = 32;
-		int reserved = 2;
-		int blocksize = 512;
-	
-		FILE *myFile = fopen(dst, "rb");
-		if (myFile == 0)
-			return 0;
-		fseek(myFile, 0, SEEK_END);
-		unsigned long mySize = ftell(myFile);
-		fclose(myFile);
-		if (mySize >= 1073741824UL && mySize < 2147483648UL)
-			surfaces = 2;                                                            
-		else if (mySize >= 2147483648UL)
-			surfaces = 4;                                                                   
-		sprintf(buffer, "%d:%d:%d:%d:", sectors, surfaces, reserved, blocksize);
-		                                
-		strncat(buffer, dst, 256 - strlen(buffer));
-		strcpy(dst, buffer);
-	}	
-	return dst;
+    char filepath[256];
+    char buffer[256];
+
+    if (!dst || dst[0] == '\0')
+        return dst;
+
+    const char *p = dst;
+    int colons = 0;
+    for (int i = 0; p[i] != '\0'; i++) {
+        if (p[i] == ':') {
+            colons++;
+            if (colons == 4) {
+                p = &p[i + 1];
+                break;
+            }
+        }
+    }
+    strncpy(filepath, p, sizeof(filepath) - 1);
+    filepath[sizeof(filepath) - 1] = '\0';
+
+    int surfaces = 1;
+    int sectors = 32;
+    int reserved = 2;
+    int blocksize = 512;
+
+    FILE *myFile = fopen(filepath, "rb");
+    if (myFile == NULL) {
+        myFile = fopen(dst, "rb");
+        if (myFile == NULL)
+            return dst;
+        strncpy(filepath, dst, sizeof(filepath) - 1);
+        filepath[sizeof(filepath) - 1] = '\0';
+    }
+
+    fseek(myFile, 0, SEEK_END);
+    unsigned long mySize = ftell(myFile);
+    fclose(myFile);
+
+    if (mySize >= 1073741824UL && mySize < 2147483648UL)
+        surfaces = 2;
+    else if (mySize >= 2147483648UL)
+        surfaces = 4;
+
+    snprintf(buffer, sizeof(buffer), "%d:%d:%d:%d:%s", sectors, surfaces, reserved, blocksize, filepath);
+    strncpy(dst, buffer, 255);
+    dst[255] = '\0';
+    return dst;
 }
 
-           void parse_filesys_spec (int readonly, char *spec)
+/*static*/ void parse_filesys_spec (int readonly, char *spec)
 {
-	                                   
-                      
-    
+	/* spec example (<UAE name>:<dir>):
+	 * rw,AmigaHD:AmigaHD
+	 */
     char buf[256];
     char *s2;
 
@@ -98,11 +120,11 @@ char * make_hard_file_cfg_line (char *dst) {
     }
 }
 
-           void parse_hardfile_spec (char *spec)
+/*static*/ void parse_hardfile_spec (int readonly, char *spec)
 {
-	                
-                                 
-    
+	/* spec example:
+	 * rw,32:1:2:512:hdd/AmigaHD.hdf
+	 */
     char *x0 = my_strdup (spec);
     char *x1, *x2, *x3, *x4;
 
@@ -122,7 +144,7 @@ char * make_hard_file_cfg_line (char *dst) {
     if (x4 == NULL)
 	goto argh;
     *x4++ = '\0';
-    x4 = add_filesys_unit (currprefs.mountinfo, 0, x4, 0, atoi (x0), atoi (x1), atoi (x2), atoi (x3));
+    x4 = add_filesys_unit (currprefs.mountinfo, 0, x4, readonly, atoi (x0), atoi (x1), atoi (x2), atoi (x3));
     if (x4)
 	fprintf (stderr, "%s\n", x4);
 

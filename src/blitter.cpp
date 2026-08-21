@@ -1,13 +1,13 @@
-   
-                                 
-   
-                         
-   
-                                               
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Custom chip emulation
+  *
+  * (c) 1995 Bernd Schmidt, Alessandro Bissacco
+  */
 
 
-                                  
+//#define USE_BLITTER_EXTRA_INLINE
 #define STOP_WHEN_NASTY
 
 #include "sysconfig.h"
@@ -59,7 +59,7 @@ uae_u32 blit_masktable[BLITTER_MAX_WORDS];
 enum blitter_states bltstate;
 
 static long int blit_cyclecounter;
-                                                                                   
+// blitter_slowdown used to cause gfx glitches in Shadow of the Beast but works now
 static int blit_slowdown;
 
 static long blit_firstline_cycles;
@@ -69,108 +69,108 @@ static int blit_nod;
 static const uae_u8 *blit_diag;
 static int ddat1use;
 
-                                      
-int blitter_in_partial_mode = 0;                                   
-static int blit_total_required_cycles;                                                    
-static int blit_cycles_per_op;                                            
-static int blit_cycles_per_vsize;                                   
-static int blit_vblitsize_done;                                              
+// New vars for blitter mode "partial"
+int blitter_in_partial_mode = 0;        // Flag for new mode active
+static int blit_total_required_cycles;  // Estimated number of cycles of entire blitter op
+static int blit_cycles_per_op;          // Number of cycles per blitter op
+static int blit_cycles_per_vsize;       // Number of cycles per line
+static int blit_vblitsize_done;         // Number of vblitsize-lines are done
 static unsigned long blit_cycle_at_start;
-static unsigned long blit_init_cycles;                                               
+static unsigned long blit_init_cycles;  // Cycles required for blitter initialisation
 static unsigned long blit_cycle_current;
-static unsigned long blit_cycle_entered_wait;                                                                           
+static unsigned long blit_cycle_entered_wait;    // At this cycle, blitter entered in wait-state because of disabled DMA
 
 
-  
-                   
+/*
+Blitter Idle Cycle:
 
-                                                   
-                                                    
-                                                      
-                                
+Cycles that are free cycles (available for CPU) and
+are not used by any other Agnus DMA channel. Blitter
+idle cycle is not "used" by blitter, CPU can still use
+it normally if it needs the bus.
 
-                                 
+same in both block and line modes
 
-                                           
-  
+number of cycles, initial cycle, main cycle
+*/
 
 #define DIAGSIZE 10
 
 static const uae_u8 blit_cycle_diagram[][DIAGSIZE] =
 {
-	{ 2, 0,0,	    0,0 },		            
-	{ 2, 0,0,	    0,4 },		            
-	{ 2, 0,3,	    0,3 },		            
-	{ 3, 0,3,0,	    0,3,4 },                
-	{ 3, 0,2,0,	    0,2,0 },                
-	{ 3, 0,2,0,	    0,2,4 },                
-	{ 3, 0,2,3,	    0,2,3 },                
-	{ 4, 0,2,3,0,   0,2,3,4 },              
-	{ 2, 1,0,	    1,0 },		            
-	{ 2, 1,0,	    1,4 },		            
-	{ 2, 1,3,	    1,3 },		            
-	{ 3, 1,3,0,	    1,3,4, },	            
-	{ 3, 1,2,0,	    1,2,0 },	            
-	{ 3, 1,2,0,	    1,2,4 },	            
-	{ 3, 1,2,3,	    1,2,3 },	            
-	{ 4, 1,2,3,0,   1,2,3,4 }	            
+	{ 2, 0,0,	    0,0 },		/* 0   -- */
+	{ 2, 0,0,	    0,4 },		/* 1   -D */
+	{ 2, 0,3,	    0,3 },		/* 2   -C */
+	{ 3, 0,3,0,	    0,3,4 },    /* 3  -CD */
+	{ 3, 0,2,0,	    0,2,0 },    /* 4  -B- */
+	{ 3, 0,2,0,	    0,2,4 },    /* 5  -BD */
+	{ 3, 0,2,3,	    0,2,3 },    /* 6  -BC */
+	{ 4, 0,2,3,0,   0,2,3,4 },  /* 7 -BCD */
+	{ 2, 1,0,	    1,0 },		/* 8   A- */
+	{ 2, 1,0,	    1,4 },		/* 9   AD */
+	{ 2, 1,3,	    1,3 },		/* A   AC */
+	{ 3, 1,3,0,	    1,3,4, },	/* B  ACD */
+	{ 3, 1,2,0,	    1,2,0 },	/* C  AB- */
+	{ 3, 1,2,0,	    1,2,4 },	/* D  ABD */
+	{ 3, 1,2,3,	    1,2,3 },	/* E  ABC */
+	{ 4, 1,2,3,0,   1,2,3,4 }	/* F ABCD */
 };
 
-  
+/*
 
-                                                        
-                                                
+following 4 channel combinations in fill mode have extra
+idle cycle added (still requires free bus cycle)
 
-  
+*/
 
 static const uae_u8 blit_cycle_diagram_fill[][DIAGSIZE] =
 {
-	{ 0 },						       
-	{ 3, 0,0,0,	    0,4,0 },	       
-	{ 0 },						       
-	{ 0 },						       
-	{ 0 },						       
-	{ 4, 0,2,0,0,   0,2,4,0 },	       
-	{ 0 },						       
-	{ 0 },						       
-	{ 0 },						       
-	{ 3, 1,0,0,	    1,4,0 },	       
-	{ 0 },						       
-	{ 0 },						       
-	{ 0 },						       
-	{ 4, 1,2,0,0,   1,2,4,0 },	       
-	{ 0 },						       
-	{ 0 },						       
+	{ 0 },						/* 0 */
+	{ 3, 0,0,0,	    0,4,0 },	/* 1 */
+	{ 0 },						/* 2 */
+	{ 0 },						/* 3 */
+	{ 0 },						/* 4 */
+	{ 4, 0,2,0,0,   0,2,4,0 },	/* 5 */
+	{ 0 },						/* 6 */
+	{ 0 },						/* 7 */
+	{ 0 },						/* 8 */
+	{ 3, 1,0,0,	    1,4,0 },	/* 9 */
+	{ 0 },						/* A */
+	{ 0 },						/* B */
+	{ 0 },						/* C */
+	{ 4, 1,2,0,0,   1,2,4,0 },	/* D */
+	{ 0 },						/* E */
+	{ 0 },						/* F */
 };
 
-  
-                     
+/*
+-C-D C-D- ... C-D- --
 
-                               
-                                               
-                                        
+line draw takes 4 cycles (-C-D)
+idle cycles do the same as above, 2 dma fetches
+(read from C, write to D, but see below)
 
-         
+Oddities:
 
-                                                    
-                                                         
-                                                     
-                     
-                                                 
-                                                
-                                                   
-                                        
+- first word is written to address pointed by BLTDPT
+but all following writes go to address pointed by BLTCPT!
+(some kind of internal copy because all bus cyles are
+using normal BLTDDAT)
+- BLTDMOD is ignored by blitter (BLTCMOD is used)
+- state of D-channel enable bit does not matter!
+- disabling A-channel freezes the content of BPLAPT
+- C-channel disabled: nothing is written
 
-                                                            
-                                                            
-                                                            
-                                             
+There is one tricky situation, writing to DFF058 just before
+last D write cycle (which is normally free) does not disturb
+blitter operation, final D is still written correctly before
+blitter starts normally (after 2 idle cycles)
 
-                                           
+There is at least one demo that does this..
 
-  
+*/
 
-                                  
+// 5 = internal "processing cycle"
 static const uae_u8 blit_cycle_diagram_line[] =
 {
 	4, 0,3,5,4,	    0,3,5,4
@@ -395,7 +395,7 @@ static __inline__ void blitter_write(void)
 {
 	if (blt_info.bltddat)
 		blt_info.blitzero = 0;
-	                                                                                           
+	/* D-channel state has no effect on linedraw, but C must be enabled or nothing is drawn! */
 	if (bltcon0 & 0x200) {
       CHIPMEM_WPUT_CUSTOM(bltdpt, blt_info.bltddat);
 	}
@@ -529,13 +529,13 @@ void blitter_handler(void)
 	if (!dmaen (DMA_BLITTER)) {
 	eventtab[ev_blitter].active = 1;
 	eventtab[ev_blitter].oldcycles = get_cycles ();
-	eventtab[ev_blitter].evtime = 10 * CYCLE_UNIT + get_cycles ();                    
+	eventtab[ev_blitter].evtime = 10 * CYCLE_UNIT + get_cycles (); /* wait a little */
 		blitter_stuck++;
 		if (blitter_stuck < 20000 || !currprefs.immediate_blits)
-			return;                             
-		                                                                    
-                                         
-    
+			return; /* gotta come back later. */
+		/* "free" blitter in immediate mode if it has been "stuck" ~3 frames
+		* fixes some JIT game incompatibilities
+		*/
 	}
 	blitter_stuck = 0;
 
@@ -545,11 +545,11 @@ void blitter_handler(void)
     return;
   }
 
-	                                                                                   
+	// blitter_slowdown used to cause gfx glitches in Shadow of the Beast but works now
 	if (!currprefs.immediate_blits && blit_slowdown > 0) {
 	eventtab[ev_blitter].active = 1;
 	eventtab[ev_blitter].oldcycles = get_cycles ();
-	eventtab[ev_blitter].evtime = blit_slowdown * CYCLE_UNIT + get_cycles ();                    
+	eventtab[ev_blitter].evtime = blit_slowdown * CYCLE_UNIT + get_cycles (); /* wait a little */
 		blit_slowdown = -1;
 		return;
 	}
@@ -640,17 +640,17 @@ void do_blitter(void)
     if(blitline)
     {
       blit_cycles_per_op = blit_dmacount2 + (blit_nod ? 0 : 1);
-                                          
+      //blit_cycles_per_op = blit_diag[0];
       blit_cycles_per_vsize = blit_cycles_per_op;
-      blit_init_cycles = 2;                                                                                
+      blit_init_cycles = 2;   // HRM says nothing about how much cycles required for blitter initialisation
     }
     else
     {
       blit_cycles_per_op = blit_dmacount2 + (blit_nod ? 0 : 1);
-                                          
+      //blit_cycles_per_op = blit_diag[0];
       blit_cycles_per_vsize = blit_cycles_per_op * blt_info.hblitsize;
-      blit_init_cycles = 2;                                                                                
-                                                                               
+      blit_init_cycles = 2;   // HRM says nothing about how much cycles required for blitter initialisation
+      // Used from code below so that maybe_blit behaves same as in normal mode
       blit_firstline_cycles = blit_first_cycle + (blit_diag[0] * blt_info.hblitsize) * CYCLE_UNIT;
     }
     blit_total_required_cycles = blit_cycles_per_vsize * blt_info.vblitsize;
@@ -670,7 +670,7 @@ void do_blitter(void)
   }
   
 	bltstate = BLT_init;
-	                                                                                   
+	// blitter_slowdown used to cause gfx glitches in Shadow of the Beast but works now
 	if (!blitter_in_partial_mode && !currprefs.immediate_blits) {
 		blit_slowdown = 0;
 	}
@@ -711,11 +711,11 @@ void blitter_dma_disabled(void)
 {
   if(bltstate != BLT_work || !blitter_in_partial_mode)
     return;
-                                       
+  // execute blitter till current cycle
   blitter_do_partial(0);
   if(bltstate == BLT_work)
   {
-                                       
+    // We still have something to do...
     bltstate = BLT_waitDMA;
     blit_cycle_entered_wait = get_cycles();
     eventtab[ev_blitter].active = 0;
@@ -729,7 +729,7 @@ void blitter_dma_enabled(void)
     return;
     
   bltstate = BLT_work;
-                                              
+  // Add cycles we waited to current cycles...
   unsigned long cycles_waited = get_cycles() - blit_cycle_entered_wait;
   blit_cycle_current += cycles_waited;
   eventtab[ev_blitter].active = 1;
@@ -748,7 +748,7 @@ void blitter_do_partial(int do_all)
   
   unsigned long curr_cpu_cycles = get_cycles();
   if((curr_cpu_cycles < blit_cycle_current + blit_init_cycles) && !do_all)
-    return;                                            
+    return; // Blitter not finished with initialisation
   if(blit_init_cycles > 0)
   {
     blit_cycle_current += blit_init_cycles;
@@ -778,17 +778,17 @@ void blitter_do_partial(int do_all)
       blitter_done();
     }
     else
-      bltstate = BLT_work;                      
+      bltstate = BLT_work; // still not finished
   }
 }
 
-                                                            
+// Called only from custom.cpp if blitter DMA is now enabled
 void blitter_check_start (void)
 {
 	if (bltstate != BLT_init)
 		return;
 
-                                                   
+  // do the same as in do_blitter after dmaen check
 	bltstate = BLT_work;
 
 	if (blitline && blt_info.hblitsize != 2) {
@@ -850,8 +850,8 @@ int blitnasty (void)
 	return ccnt;
 }
 
-                                                                                   
-                                                                           
+// blitter_slowdown used to cause gfx glitches in Shadow of the Beast but works now
+/* very approximate emulation of blitter slowdown caused by bitplane DMA */
 
 void blitter_slowdown (int ddfstrt, int ddfstop, int totalcycles, int freecycles)
 {

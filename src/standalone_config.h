@@ -17,28 +17,28 @@
 extern "C" {
 #endif
 
-   
-                                             
-   
+/**
+ * Verifica se un file esiste sul filesystem.
+ */
 bool FileExists(const char *path);
 
-   
-                                                                                                         
-   
+/**
+ * Mostra a schermo una finestra di errore formattata con SDL, attende 5 secondi e chiude in modo sicuro.
+ */
 void ShowErrorAndExit(const char *line1, const char *line2, const char *line3, const char *line4);
 
-   
-                                                                                    
-   
+/**
+ * Esegue il controllo al boot dei file richiesti (kick3.rom, disk1.adf, disk2.adf).
+ */
 bool Standalone_CheckBootFiles(void);
 
-   
-                                                                                         
-   
+/**
+ * Configura i parametri UAE4All2 per l'avvio immediato con Kickstart 3.x e DF0 caricato.
+ */
 void Standalone_ConfigureEmulator(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif                       
+#endif // STANDALONE_CONFIG_H

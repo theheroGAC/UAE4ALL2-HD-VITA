@@ -47,10 +47,20 @@ addrbank akiko_bank = {
 unsigned prefs_chipmem_size;
 unsigned prefs_bogomem_size;
 
-const char *kickstarts_rom_names[] = { "kick12.rom\0", "kick13.rom\0", "kick20.rom\0", "kick31.rom\0", "kickcustom.rom\0", "aros-amiga-m68k-rom.bin\0", "kick40060.CD32\0" };
-const char *extended_rom_names[] = { "\0", "\0", "\0", "\0", "\0", "aros-amiga-m68k-ext.bin\0", "kick40060.CD32.ext\0" };
+const char *kickstarts_rom_names[KICKSTART_ROM_COUNT] = {
+    "kick12.rom", "kick13.rom", "kick20.rom", "kick31.rom",
+    "kickcustom.rom", "aros-amiga-m68k-rom.bin", "kick40060.CD32",
+    "kick31034.A1000", "kick32034.A1000", "kick33180.A500",
+    "kick37175.A500", "kick37350.A600", "kick40063.A600",
+    "kick39106.A1200", "kick40068.A1200", "kick39106.A4000",
+    "kick40068.A4000", "kick13.rom"
+};
+const char *extended_rom_names[KICKSTART_ROM_COUNT] = {
+    "", "", "", "", "", "aros-amiga-m68k-ext.bin", "kick40060.CD32.ext",
+    "", "", "", "", "", "", "", "", "", "", "kick34005.CDTV"
+};
 #ifdef ANDROIDSDL
-const char *af_kickstarts_rom_names[] = { "amiga-os-120.rom\0", "amiga-os-130.rom\0", "amiga-os-204.rom\0", "amiga-os-310-a1200.rom\0" };
+const char *af_kickstarts_rom_names[] = { "amiga-os-120.rom", "amiga-os-130.rom", "amiga-os-204.rom", "amiga-os-310-a1200.rom" };
 #endif
 
 void clear_fame_mem_dummy(void);
@@ -823,6 +833,10 @@ static int read_kickstart (FILE *f, uae_u8 *mem, int size, int dochecksum, int *
     }
 
     i = uae4all_rom_fread (mem, 1, size, f);
+    if (i == 262656 || i == 524800) {
+        memmove (mem, mem + 512, i - 512);
+        i -= 512;
+    }
     if (i == 8192) {
 	a1000_bootrom = (uae_u8*)xmalloc (8192);
 	memcpy (a1000_bootrom, kickmemory, 8192);
@@ -850,22 +864,41 @@ static int load_extendedkickstart (void)
   FILE *f;
   int size;
 
-  if (strlen (extfile) == 0)
-	  return 0;
-  f = fopen (extfile, "rb");
-  if (!f) 
-  {
-	  printf ("No extended Kickstart ROM found.\n");
-	  return 0;
+  if (extendedkickmemory) {
+      mapped_free(extendedkickmemory);
+      extendedkickmemory = 0;
   }
+  extendedkickmem_bank.baseaddr = 0;
+  extendedkickmem_size = 0;
+
+  int combined = 0;
+  f = 0;
+  if (strlen (extfile) != 0)
+      f = fopen (extfile, "rb");
+  if (!f && strlen (romfile) != 0) {
+      f = fopen (romfile, "rb");
+      combined = 1;
+  }
+  if (!f)
+      return 0;
 
   fseek (f, 0, SEEK_END);
+
   size = ftell (f);
+  if (combined && size <= 700000) {
+      /* Not a combined kickstart+extended ROM: a normal-sized ROM with no
+       * separate extended ROM. Do not leave extendedkickmem_size set, or
+       * extromtype() will wrongly report CD32/CDTV and memory_reset() will
+       * map a NULL-baseaddr bank over 0xE00000/0xF00000 -> crash. */
+      fclose (f);
+      extendedkickmem_size = 0;
+      return 0;
+  }
   if (size > 300000)
 	  extendedkickmem_size = 524288;
   else
 	  extendedkickmem_size = 262144;
-  fseek (f, 0, SEEK_SET);
+  fseek (f, combined ? 524288 : 0, SEEK_SET);
 
   switch (extromtype ()) 
   {
@@ -881,10 +914,13 @@ static int load_extendedkickstart (void)
   
   //read_kickstart (f, extendedkickmemory, 524288, 0, 0);
   int i;
-  i = fread (extendedkickmemory, 1, 524288, f);
-  if (i != 8192 && i != 65536 && i != 131072 && i != 262144 && i != 524288 && i != 524288 * 2 && i != 524288 * 4) 
+  i = fread (extendedkickmemory, 1, extendedkickmem_size, f);
+  if (i != extendedkickmem_size)
   {
-	  printf ("Error while reading Kickstart ROM file.\n");
+	  mapped_free(extendedkickmemory);
+	  extendedkickmemory = 0;
+	  extendedkickmem_bank.baseaddr = 0;
+	  extendedkickmem_size = 0;
 	  fclose (f);
 	  return 0;
   }
@@ -1043,6 +1079,7 @@ void memory_reset (void)
 {
     int bnk, bnk_end, custom_start;
 
+    akiko_reset();
     init_mem_banks ();
 
     allocate_memory ();
@@ -1053,16 +1090,11 @@ void memory_reset (void)
     /* Can't be done here, or we'll lose all the extension/filesys traps that were set up */
 //    rtarea_cleanup();
     
-    if (kickmem_checksum!=get_kickmem_checksum() | bReloadKickstart)
+    if (kickmem_checksum != get_kickmem_checksum() || bReloadKickstart)
     {
-       bReloadKickstart=0;
-       unsigned chksum=kickmem_checksum;
+       bReloadKickstart = 0;
+       uae4all_rom_reinit();
        reload_kickstart();
-       if (chksum!=kickmem_checksum)
-       {
-          uae4all_rom_reinit();
-          reload_kickstart();
-       }
     }
 
     custom_start = 0xC0;
@@ -1100,6 +1132,9 @@ void memory_reset (void)
        map_banks (&a3000mem_bank, a3000mem_start >> 16, allocated_a3000mem >> 16, allocated_a3000mem);
     }
 #endif
+
+    /* Map dummy_bank across 0xE0..0xF7 first as background */
+    map_banks (&dummy_bank, 0xE0, 0x18, 0);
 
     map_banks (&rtarea_bank, RTAREA_BASE >> 16, 1, 0);
     
@@ -1159,7 +1194,7 @@ void memory_init (void)
     memory_reset ();
 
     kickmem_mask = kickmem_size - 1;
-    extendedkickmem_mask = extendedkickmem_size - 1;
+    extendedkickmem_mask = extendedkickmem_size ? extendedkickmem_size - 1 : 0;
 }
 
 void memory_cleanup (void)

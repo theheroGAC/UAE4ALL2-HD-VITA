@@ -1,18 +1,18 @@
 int kickstart=1;
-int oldkickstart=-1;	                          
+int oldkickstart=-1;	/* reload KS at startup */
 
 extern char launchDir[300];
 
 extern "C" int main( int argc, char *argv[] );
 
-  
-                                 
-   
-                
-   
-                            
-                                            
-    
+/*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Main program
+  *
+  * Copyright 1995 Ed Hanway
+  * Copyright 1995, 1996, 1997 Bernd Schmidt
+  */
 #include "sysconfig.h"
 #include "sysdeps.h"
 #include <assert.h>
@@ -34,6 +34,7 @@ extern "C" int main( int argc, char *argv[] );
 #include "custom.h"
 #include "m68k/m68k_intrf.h"
 #include "disk.h"
+#include "disk_sound.h"
 #include "debug.h"
 #include "xwin.h"
 #include "joystick.h"
@@ -48,7 +49,7 @@ extern "C" int main( int argc, char *argv[] );
 #include "menu.h" 
 #include "menu_config.h"
 #include "gp2xutil.h"
-               
+/* PocketUAE */
 #include "native2amiga.h"
 
 #ifdef USE_SDL
@@ -63,20 +64,20 @@ extern SDL_Surface *current_screenshot;
 #include "vkbd.h"
 #endif
 
-#if defined(__PSP2__)                  
-                         
+#if defined(__PSP2__) // NOT __SWITCH__
+//Allow locking PS Button
 #include <psp2/shellutil.h>
-             
+//Touch input
 #include "psp2_touch.h"
-               
+//Custom bubble
 #include <psp2/appmgr.h>
 #ifdef DEBUG_UAE4ALL
-                                                                             
+/* psp2shell is not available in this VitaSDK; use vita_write_log fallback */
 #endif
 #endif
 
 #if defined(__SWITCH__)
-             
+//Touch input
 #include "switch_touch.h"
 #endif
 
@@ -137,14 +138,14 @@ static void vita_debug_log_close(void)
 bool resetOnStartingApp = false;
 extern char config_load_filename[300];
 
-                                                                   
-                                 
-                                                                      
-                                                          
-  
-                                                                 
-                                           
-   
+/* If you want to pipe printer output to a file, put something like
+ * "cat >>printerfile.tmp" above.
+ * The printer support was only tested with the driver "PostScript" on
+ * Amiga side, using apsfilter for linux to print ps-data.
+ *
+ * Under DOS it ought to be -p LPT1: or -p PRN: but you'll need a
+ * PostScript printer or ghostscript -=SR=-
+ */
 
 
 void discard_prefs ()
@@ -200,7 +201,7 @@ void default_prefs ()
 	}
 #endif
 
-	         
+	/* 1MB */
     prefs_chipmem_size = 0x00100000;
     prefs_bogomem_size = 0;
 	changed_prefs.fastmem_size = 0;
@@ -212,7 +213,7 @@ void uae_reset (void)
 {
     gui_purge_events();
 #ifdef USE_UAE4ALL_VKBD
-	vkbd_reset_sticky_keys();                                                       
+	vkbd_reset_sticky_keys(); // keyvalues clear on reset, so vkbd must reflect this
 #endif
     black_screen_now();
     quit_program = 2;
@@ -229,21 +230,21 @@ void reset_all_systems (void)
 {
     init_eventtab ();
     memory_reset ();
-                                                                                    
+    // the following is a workaround to prevent failed fdopen commands for hdf files
     filesys_reset ();
     reset_hdConf();
     filesys_start_threads ();
 }
 
-                                                                         
-                                                                          
-                                                                         
-                                                                           
-                                                                       
-                                                                         
-                                                                             
-                                           
-   
+/* Okay, this stuff looks strange, but it is here to encourage people who
+ * port UAE to re-use as much of this code as possible. Functions that you
+ * should be using are do_start_program() and do_leave_program(), as well
+ * as real_main(). Some OSes don't call main() (which is braindamaged IMHO,
+ * but unfortunately very common), so you need to call real_main() from
+ * whatever entry point you have. You may want to write your own versions
+ * of start_program() and leave_program() if you need to do anything special.
+ * Add #ifdefs around these as appropriate.
+ */
 void do_start_program (void)
 {
 	quit_program = 2;
@@ -253,12 +254,12 @@ void do_start_program (void)
 void do_leave_program (void)
 {
 #ifdef USE_SDL
-#if defined(__PSP2__) || defined(__SWITCH__)                                                                           
+#if defined(__PSP2__) || defined(__SWITCH__) //On Vita, only remove keyboard graphics from memory when quitting the emu
 #ifdef USE_UAE4ALL_VKBD
 	vkbd_quit();
 #endif
-#ifdef __PSP2__                  
-	                            
+#ifdef __PSP2__ // NOT __SWITCH__
+	//De-Initialize touch panels
 	psp2QuitTouch();
 #endif
 #endif
@@ -294,16 +295,16 @@ void leave_program (void)
 
 void real_main (int argc, char **argv)
 {
-#if defined(__PSP2__)                  
+#if defined(__PSP2__) // NOT __SWITCH__
     vita_debug_log_init();
 	write_log("[VITA] real_main() start argc=%d argv=%p\n", argc, argv);
 #ifdef DEBUG_UAE4ALL
-	                                                                           
+	/* psp2shell is not available in this VitaSDK; using vita file logs only */
 	write_log("[VITA] DEBUG_UAE4ALL active, shell log disabled\n");
 #endif
 #endif
 
-#if defined(__PSP2__)                  
+#if defined(__PSP2__) // NOT __SWITCH__
 	write_log("[VITA] init touch\n");
 	psp2InitTouch();
 	write_log("[VITA] touch init done\n");
@@ -332,11 +333,11 @@ void real_main (int argc, char **argv)
     write_log("[VITA] set gpu xbar\n");
 #endif
 
-                        
+  // Initialize timebase
   g_uae_epoch = read_processor_time();
-  syncbase = 1000000;                
+  syncbase = 1000000; // Microseconds
 
-#if defined(__PSP2__)                  
+#if defined(__PSP2__) // NOT __SWITCH__
 	mkdir("ux0:/data/uae4all", 0777);
 	mkdir("ux0:/data/uae4all/roms", 0777);
 	mkdir("ux0:/data/uae4all/saves", 0777);
@@ -356,23 +357,23 @@ void real_main (int argc, char **argv)
 #else
 	getcwd(launchDir,250);
 #endif
-                         
+    /* PocketUAE prefs */
     default_prefs_uae (&currprefs);
     default_prefs();
 
 #ifdef GP2X
     gp2x_init(argc, argv);
 #endif
-	                                                 
+	// Set everthing to default and clear HD settings
 	SetDefaultMenuSettings(1);
-                                                       
+    //Check if UAE4All2 was launched by a custom bubble
 #if defined(__SWITCH__)
     if (argc == 2) {
         snprintf(config_load_filename, 300, argv[1]);
         resetOnStartingApp = true;
     }
 #endif
-#if defined(__PSP2__)                  
+#if defined(__PSP2__) // NOT __SWITCH__
     char boot_params[1024];
     sceAppMgrGetAppParam(boot_params);
 	if (strstr(boot_params,"psgm:play") && strstr(boot_params, "&param=")) {
@@ -405,7 +406,7 @@ void real_main (int argc, char **argv)
 	if (err == -1) {
 	    write_log ("Failed to initialize the GUI\n");
 #ifdef __PSP2__
-                                                                              
+        /* Do not continue into emulator startup with no valid framebuffer. */
         vita_debug_log_close();
         return;
 #endif
@@ -419,10 +420,10 @@ void real_main (int argc, char **argv)
 	produce_sound = 0;
     }
     write_log("[VITA] init_audio done produce_sound=%d sound_available=%d\n", produce_sound, sound_available);
-                                                                  
+    /* Install resident module to get 8MB chipmem, if requested */
     rtarea_setup ();
 
-    keybuf_init ();                                    
+    keybuf_init (); /* Must come after init_joystick */
 
 #ifdef USE_AUTOCONFIG
     expansion_init ();
@@ -433,8 +434,11 @@ void real_main (int argc, char **argv)
     filesys_install (); 
     native2amiga_install ();
 
-    custom_init ();                                  
+    custom_init (); /* Must come after memory_init */
     DISK_init ();
+#ifdef __PSP2__
+    disk_sound_reset ();
+#endif
 
     m68k_init(0);
 

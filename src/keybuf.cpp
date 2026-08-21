@@ -1,16 +1,16 @@
-   
-                                 
-   
-                                                                          
-                      
-   
-                                                                          
-                                                                           
-                                                                         
-                                                      
-   
-                                      
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Keyboard buffer. Not really needed for X, but for SVGAlib and possibly
+  * Mac and DOS ports.
+  *
+  * Note: it's possible to have two threads in UAE, one reading keystrokes
+  * and the other one writing them. Despite this, no synchronization effort
+  * is needed. This code should be perfectly thread safe. At least if you
+  * assume that integer store instructions are atomic.
+  *
+  * Copyright 1995, 1997 Bernd Schmidt
+  */
 
 #include "sysconfig.h"
 #include "sysdeps.h"

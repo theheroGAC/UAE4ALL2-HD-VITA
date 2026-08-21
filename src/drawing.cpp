@@ -1,32 +1,32 @@
-   
-                                 
-   
-                            
-   
-                                     
-                                      
-                                  
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Screen drawing functions
+  *
+  * Copyright 1995-2000 Bernd Schmidt
+  * Copyright 1995 Alessandro Bissacco
+  * Copyright 2000,2001 Toni Wilen
+  */
 
 #define UNROLL_PFIELD
 
-                                                                
-                    
-                                                                                       
-                      
-                                                                               
-                                                                                        
-                                                                                     
-                                        
-                                                                                   
-                                                                                     
-                                                               
+/* There are a couple of concepts of "coordinates" in this file.
+   - DIW coordinates
+   - DDF coordinates (essentially cycles, resolution lower than lores by a factor of 2)
+   - Pixel coordinates
+     * in the Amiga's resolution as determined by BPLCON0 ("Amiga coordinates")
+     * in the window resolution as determined by the preferences ("window coordinates").
+     * in the window resolution, and with the origin being the topmost left corner of
+       the window ("native coordinates")
+   One note about window coordinates.  The visible area depends on the width of the
+   window, and the centering code.  The first visible horizontal window coordinate is
+   often _not_ 0, but the value of VISIBLE_LEFT_BORDER instead.
 
-                                                                              
-              
+   One important thing to remember: DIW coordinates are in the lowest possible
+   resolution.
 
-                                                                                    
-                                                                                       
+   To prevent extremely bad things (think pixels cut in half by window borders) from
+   happening, all ports should restrict window widths to be multiples of 16 pixels.  */
 
 #include "sysconfig.h"
 #include "sysdeps.h"
@@ -58,16 +58,16 @@
 #endif
 
 #define GFXVIDINFO_PIXBYTES 2
-                              
-                                              
-                               
-       
+//#define GFXVIDINFO_WIDTH 320
+//#if defined(__PSP2__) || defined(__SWITCH__)
+//#define GFXVIDINFO_HEIGHT 240
+//#else
 #define GFXVIDINFO_HEIGHT 286
-        
+//#endif
 #define MAXBLOCKLINES 286
-                                
-                                  
-                                      
+//#define VISIBLE_LEFT_BORDER 72
+//#define VISIBLE_RIGHT_BORDER 392
+//#define LINETOSCR_X_ADJUST_BYTES 144
 
 static int var_GFXVIDINFO_WIDTH = 320;
 static int var_VISIBLE_LEFT_BORDER = 73;
@@ -77,7 +77,7 @@ static int var_LINETOSCR_X_ADJUST_BYTES = 144;
 static char screenshot_filename_default[255] = { "" };
 char *screenshot_filename = (char *) &screenshot_filename_default[0];
 
-                              
+// newWidth is always in LORES
 void InitDisplayArea(int newWidth)
 {
 	int deltaToBorder = newWidth - 320;
@@ -89,10 +89,10 @@ void InitDisplayArea(int newWidth)
 }
 
 
-                                                                                 
-                                                                                   
-                                                                                 
-                                                                            
+/* The shift factor to apply when converting between Amiga coordinates and window
+   coordinates.  Zero if the resolution is the same, positive if window coordinates
+   have a higher resolution (i.e. we're stretching the image), negative if window
+   coordinates have a lower resolution (i.e. we're shrinking the image).  */
 static int res_shift;
 
 static int interlace_seen = 0;
@@ -100,13 +100,13 @@ extern int drawfinished;
 
 extern SDL_Surface *prSDLScreen;
 
-                                                                             
-                                                                           
-                                                                                    
-                                                                              
-                                                                          
-                                                                             
-                 
+/* Lookup tables for dual playfields.  The dblpf_*1 versions are for the case
+   that playfield 1 has the priority, dbplpf_*2 are used if playfield 2 has
+   priority.  If we need an array for non-dual playfield mode, it has no number.  */
+/* The dbplpf_ms? arrays contain a shift value.  plf_spritemask is initialized
+   to contain two 16 bit words, with the appropriate mask if pf1 is in the
+   foreground being at bit offset 0, the one used if pf2 is in front being at
+   offset 16.  */
 static int dblpf_ms1[256], dblpf_ms2[256], dblpf_ms[256];
 static int dblpf_ind1[256], dblpf_ind2[256];
 static int dblpf_2nd1[256], dblpf_2nd2[256];
@@ -118,20 +118,20 @@ static int sprite_col_nat[65536];
 static int sprite_col_at[65536];
 static int sprite_bit[65536];
 
-                                                                       
-                     
-                                 
+/* Video buffer description structure. Filled in by the graphics system
+ * dependent code. */
+/* OCS/ECS color lookup table. */
 xcolnr xcolors[4096];
-                                  
+/* AGA mode color lookup tables */
 unsigned int xredcolors[256], xgreencolors[256], xbluecolors[256];
 
 struct color_entry colors_for_drawing;
 
-                                                                          
-                                                                         
-                                                                            
+/* The size of these arrays is pretty arbitrary; it was chosen to be "more
+   than enough".  The coordinates used for indexing into these arrays are
+   almost, but not quite, Amiga coordinates (there's a constant offset).  */
 union {
-                                        
+    /* Let's try to align this thing. */
     double uupzuq;
     long int cruxmedo;
     uae_u8 apixels[MAX_PIXELS_PER_LINE * 2];
@@ -140,11 +140,11 @@ union {
 } pixdata UAE4ALL_ALIGN;
 
 uae_u16 spixels[MAX_SPR_PIXELS];
-                                  
+/* Eight bits for every pixel.  */
 union sps_union spixstate;
 
 static uae_u32 ham_linebuf[MAX_PIXELS_PER_LINE * 2];
-static uae_u8 spriteagadpfpixels[MAX_PIXELS_PER_LINE * 2];                               
+static uae_u8 spriteagadpfpixels[MAX_PIXELS_PER_LINE * 2]; /* AGA dualplayfield sprite */
 
 char *xlinebuffer;
 
@@ -152,7 +152,7 @@ static int *amiga2aspect_line_map, *native2amiga_line_map;
 static char *row_map[gfxHeight + 1] UAE4ALL_ALIGN;
 static int max_drawn_amiga_line;
 
-                                                               
+/* line_draw_funcs: pfield_do_linetoscr, pfield_do_fill_line */
 typedef void (*line_draw_func)(int, int);
 
 #define LINE_UNDECIDED 1
@@ -163,20 +163,20 @@ static int linestate_first_undecided = 0;
 
 uae_u8 line_data[(MAXVPOS + 1) * 2][MAX_PLANES * MAX_WORDS_PER_LINE * 2] UAE4ALL_ALIGN;
 
-                           
+/* Centering variables.  */
 static int min_diwstart, max_diwstop;
 static int thisframe_y_adjust;
 static int thisframe_y_adjust_real, max_ypos_thisframe, min_ypos_for_screen;
 static int extra_y_adjust;
 int moveX = 0, moveY = 16;
 
-                                                                           
-                      
+/* A frame counter that forces a redraw after at least one skipped frame in
+   interlace mode.  */
 static int last_redraw_point;
 
-                                                                            
-                                                                          
-                                            
+/* These are generated by the drawing code from the line_decisions array for
+   each line that needs to be drawn.  These are basically extracted out of
+   bit fields in the hardware registers.  */
 static int bplehb, bplham, bpldualpf, bpldualpfpri, bpldualpf2of, bplplanecnt, bplres;
 static int plf1pri, plf2pri, bplxor;
 static uae_u32 plf_sprite_mask;
@@ -184,12 +184,12 @@ static int sbasecol[2];
 
 int framecnt = 0, fs_framecnt = 0;
 
-                                                  
+/* Calculate idle time (time to wait for vsync) */
 int idletime_frames = 0;
 unsigned long idletime_time = 0;
 int idletime_percent = 0;
 #define IDLETIME_FRAMES 25
-unsigned long time_per_frame = 20000;                                     
+unsigned long time_per_frame = 20000; // Default for PAL (50 Hz): 20000 ns
 
 void adjust_idletime(unsigned long ns_waited)
 {
@@ -212,11 +212,11 @@ static __inline__ void count_frame (void)
 {
 	switch(prefs_gfx_framerate)
 	{
-		case 0:                                                               
+		case 0: // draw every frame (Limiting is done by waiting for vsync...)
 			fs_framecnt = 0;
 			break;
 			
-		case 1:                           
+		case 1: // draw every second frame
 			fs_framecnt++;
 			if (fs_framecnt > 1)
 				fs_framecnt = 0;
@@ -265,7 +265,7 @@ void notice_screen_contents_lost (void)
 static struct decision *dp_for_drawing;
 static struct draw_info *dip_for_drawing;
 
-                                                                
+/* Record DIW of the current line for use by centering code.  */
 void record_diw_line (int first, int last)
 {
     if (last > max_diwstop)
@@ -274,19 +274,19 @@ void record_diw_line (int first, int last)
 		min_diwstart = first;
 }
 
-  
-                                 
-   
+/*
+ * Screen update macros/functions
+ */
 
-                                                                                  
-                                                                                       
-                                                                                                 
-                                                                   
+/* The important positions in the line: where do we start drawing the left border,
+   where do we start drawing the playfield, where do we start drawing the right border.
+   All of these are forced into the visible window (VISIBLE_LEFT_BORDER .. VISIBLE_RIGHT_BORDER).
+   PLAYFIELD_START and PLAYFIELD_END are in window coordinates.  */
 static int playfield_start, playfield_end;
 static int real_playfield_start, real_playfield_end;
 static int pixels_offset;
 static int src_pixel, ham_src_pixel;
-                                                                                      
+/* How many pixels in window coordinates which are to the left of the left border.  */
 static int unpainted;
 static int seen_sprites;
 
@@ -330,7 +330,7 @@ static int seen_sprites;
 
 static void pfield_do_linetoscr_0_640 (int start, int stop)
 {
-	int local_res_shift = 1 - bplres;                                                           
+	int local_res_shift = 1 - bplres; // stretch LORES, nothing for HIRES, shrink for SUPERHIRES
 	start = start << 1;
 	stop = stop << 1;
 
@@ -340,7 +340,7 @@ static void pfield_do_linetoscr_0_640 (int start, int stop)
 			src_pixel = linetoscr_16_aga (src_pixel, start, stop);
 		else if (local_res_shift == 1)
 			src_pixel = linetoscr_16_stretch1_aga (src_pixel, start, stop);
-		else                             
+		else //if (local_res_shift == -1)
 			src_pixel = linetoscr_16_shrink1_aga (src_pixel, start, stop);
 	}
 	else
@@ -349,7 +349,7 @@ static void pfield_do_linetoscr_0_640 (int start, int stop)
 			src_pixel = linetoscr_16 (src_pixel, start, stop);
 		else if (local_res_shift == 1)
 			src_pixel = linetoscr_16_stretch1 (src_pixel, start, stop);
-		else                             
+		else //if (local_res_shift == -1)
 			src_pixel = linetoscr_16_shrink1 (src_pixel, start, stop);
 	}
 }
@@ -362,7 +362,7 @@ static void pfield_do_linetoscr_0 (int start, int stop)
 			src_pixel = linetoscr_16_aga (src_pixel, start, stop);
 		else if (res_shift == 1)
 			src_pixel = linetoscr_16_stretch1_aga (src_pixel, start, stop);
-		else                       
+		else //if (res_shift == -1)
 			src_pixel = linetoscr_16_shrink1_aga (src_pixel, start, stop);
 	}
 	else
@@ -371,7 +371,7 @@ static void pfield_do_linetoscr_0 (int start, int stop)
 			src_pixel = linetoscr_16 (src_pixel, start, stop);
 		else if (res_shift == 1)
 			src_pixel = linetoscr_16_stretch1 (src_pixel, start, stop);
-		else                       
+		else //if (res_shift == -1)
 			src_pixel = linetoscr_16_shrink1 (src_pixel, start, stop);
 	}
 }
@@ -400,16 +400,16 @@ static void pfield_do_fill_line_0(int start, int stop)
 static line_draw_func *pfield_do_linetoscr=(line_draw_func *)pfield_do_linetoscr_0;
 static line_draw_func *pfield_do_fill_line=(line_draw_func *)pfield_do_fill_line_0;
 
-                                                         
-                                                                   
-               
+/* Initialize the variables necessary for drawing a line.
+ * This involves setting up start/stop positions and display window
+ * borders.  */
 static _INLINE_ void pfield_init_linetoscr (void)
 {
-	                                                           
+	/* First, get data fetch start/stop in DIW coordinates.  */
 	int ddf_left = (dp_for_drawing->plfleft << 1) + DIW_DDF_OFFSET;
 	int ddf_right = (dp_for_drawing->plfright << 1) + DIW_DDF_OFFSET;
 
-	                                                                          
+	/* Compute datafetch start/stop in pixels; native display coordinates.  */
 	int native_ddf_left = coord_hw_to_window_x (ddf_left);
 	int native_ddf_right = coord_hw_to_window_x (ddf_right);
 
@@ -423,7 +423,7 @@ static _INLINE_ void pfield_init_linetoscr (void)
 			linetoscr_diw_end = native_ddf_right;
 	}
 
-	                            
+	/* Perverse cases happen. */
 	if (linetoscr_diw_end < linetoscr_diw_start)
 		linetoscr_diw_end = linetoscr_diw_start;
 
@@ -448,7 +448,7 @@ static _INLINE_ void pfield_init_linetoscr (void)
 
 	res_shift = -bplres;
 
-	                                 
+	/* Now, compute some offsets.  */
 	ddf_left -= DISPLAY_LEFT_SHIFT;
 	ddf_left <<= bplres;
 	pixels_offset = MAX_PIXELS_PER_LINE - ddf_left;
@@ -457,7 +457,7 @@ static _INLINE_ void pfield_init_linetoscr (void)
    
 	if (dip_for_drawing->nr_sprites == 0)
 		return;
-	                                   
+	/* Must clear parts of apixels.  */
 	if (linetoscr_diw_start < native_ddf_left) {
 		int size = res_shift_from_window (native_ddf_left - linetoscr_diw_start);
 		linetoscr_diw_start = native_ddf_left;
@@ -473,7 +473,7 @@ static _INLINE_ void pfield_init_linetoscr (void)
 
 static __inline__ void fill_line (void)
 {
-                      
+    //int nints, nrem;
 	unsigned int nints;
     int *start;
     xcolnr val;
@@ -512,9 +512,9 @@ static unsigned int ham_lastcolor;
 static unsigned int ham_lastcolor_pix0;
 static int ham_firstpixel_in_line;
 
-                                                                                    
-                                                                                
-                            
+/* Decode HAM in the invisible portion of the display (left of VISIBLE_LEFT_BORDER),
+   but don't draw anything in.  This is done to prepare HAM_LASTCOLOR for later,
+   when decode_ham runs.  */
 static void init_ham_decoding (void)
 {
 	int unpainted_amiga = res_shift_from_window (unpainted);
@@ -531,7 +531,7 @@ static void init_ham_decoding (void)
 				ham_lastcolor = colors_for_drawing.color_uae_regs_ecs[pv];
 		}
 	} else if (currprefs.chipset_mask & CSMASK_AGA) {
-		if (bplplanecnt == 8) {                    
+		if (bplplanecnt == 8) { /* AGA mode HAM8 */
 			while (unpainted_amiga-- > 0) {
 				if(ham_firstpixel_in_line)
 					ham_lastcolor = ham_lastcolor_pix0;
@@ -548,7 +548,7 @@ static void init_ham_decoding (void)
 					ham_firstpixel_in_line = 0;
 				}
 			}
-		} else if (bplplanecnt == 6) {                    
+		} else if (bplplanecnt == 6) { /* AGA mode HAM6 */
 			while (unpainted_amiga-- > 0) {
 				if(ham_firstpixel_in_line)
 					ham_lastcolor = ham_lastcolor_pix0;
@@ -567,7 +567,7 @@ static void init_ham_decoding (void)
 			}
 		}
 	} else {
-		if (bplplanecnt == 6) {                        
+		if (bplplanecnt == 6) { /* OCS/ECS mode HAM6 */
 			while (unpainted_amiga-- > 0) {
 				if(ham_firstpixel_in_line)
 					ham_lastcolor = ham_lastcolor_pix0;
@@ -603,7 +603,7 @@ static void decode_ham (int pix, int stoppos)
 			ham_linebuf[ham_decode_pixel++] = ham_lastcolor;
 		}
 	} else if (currprefs.chipset_mask & CSMASK_AGA) {
-		if (bplplanecnt == 8) {                    
+		if (bplplanecnt == 8) { /* AGA mode HAM8 */
 			while (todraw_amiga-- > 0) {
 				if(ham_firstpixel_in_line)
 					ham_lastcolor = ham_lastcolor_pix0;
@@ -621,7 +621,7 @@ static void decode_ham (int pix, int stoppos)
 				}
 				ham_linebuf[ham_decode_pixel++] = ham_lastcolor;
 			}
-		} else if (bplplanecnt == 6) {                    
+		} else if (bplplanecnt == 6) { /* AGA mode HAM6 */
 			while (todraw_amiga-- > 0) {
 				if(ham_firstpixel_in_line)
 					ham_lastcolor = ham_lastcolor_pix0;
@@ -641,7 +641,7 @@ static void decode_ham (int pix, int stoppos)
 			}
 		}
 	} else {
-		if (bplplanecnt == 6) {                        
+		if (bplplanecnt == 6) { /* OCS/ECS mode HAM6 */
 			while (todraw_amiga-- > 0) {
 				if(ham_firstpixel_in_line)
 					ham_lastcolor = ham_lastcolor_pix0;
@@ -667,10 +667,10 @@ static __inline__ void gen_pfield_tables (void)
 {
 	int i;
 
-                                                                             
-                                                                           
-                                                                              
-                                                             
+    /* For now, the AGA stuff is broken in the dual playfield case. We encode
+     * sprites in dpf mode by ORing the pixel value with 0x80. To make dual
+     * playfield rendering easy, the lookup tables contain are made linear for
+     * values >= 128. That only works for OCS/ECS, though. */
 
 	for (i = 0; i < 256; i++) {
 		int plane1 = (i & 1) | ((i >> 1) & 2) | ((i >> 2) & 4) | ((i >> 3) & 8);
@@ -992,12 +992,12 @@ static draw_sprites_func draw_sprites_sp_lo[2]={
 
 static draw_sprites_func *draw_sprites_punt = draw_sprites_sp_lo;
 
-                                                                          
-                                                                           
-                                                                       
-                                                                             
+/* When looking at this function and the ones that inline it, bear in mind
+   what an optimizing compiler will do with this code.  All callers of this
+   function only pass in constant arguments (except for E).  This means
+   that many of the if statements will go away completely after inlining.  */
 
-                                                        
+/* NOTE: This function is called for AGA modes *only* */
 STATIC_INLINE void draw_sprites_aga_1 (struct sprite_entry *e, int ham, int dualpf,
 				   int doubling, int skip, int has_attach)
 {
@@ -1020,9 +1020,9 @@ STATIC_INLINE void draw_sprites_aga_1 (struct sprite_entry *e, int ham, int dual
       int maskshift, plfmask;
       unsigned int v = buf[pos];
 
-                                                                         
-                                                                    
-                        
+      /* The value in the shift lookup table is _half_ the shift count we
+	   need.  This is because we can't shift 32 bits at once (undefined
+	   behaviour in C).  */
       maskshift = shift_lookup[pixdata.apixels[window_pos]];
       plfmask = (plf_sprite_mask >> maskshift) >> maskshift;
       v &= ~plfmask;
@@ -1062,7 +1062,7 @@ STATIC_INLINE void draw_sprites_aga_1 (struct sprite_entry *e, int ham, int dual
 	}
 }
 
-                                                 
+// ENTRY, ham, dualpf, doubling, skip, has_attach
 STATIC_INLINE void draw_sprites_aga_sp_lo_nat(struct sprite_entry *e)   { draw_sprites_aga_1 (e, 0, 0, 0, 1, 0); }
 STATIC_INLINE void draw_sprites_aga_dp_lo_nat(struct sprite_entry *e)   { draw_sprites_aga_1 (e, 0, 1, 0, 1, 0); }
 STATIC_INLINE void draw_sprites_aga_ham_lo_nat(struct sprite_entry *e)  { draw_sprites_aga_1 (e, 1, 0, 0, 1, 0); }
@@ -1114,47 +1114,47 @@ static __inline__ void decide_draw_sprites(void)
   {
     int diff = RES_HIRES - bplres;
     if (diff > 0)
-    {                          
+    { // doubling = 0, skip = 1
       if(bpldualpf)
-      {                       
+      { // ham = 0, dualpf = 1
         draw_sprites_punt = draw_sprites_aga_dp_lo;
       }
       else if(dp_for_drawing->ham_seen)
-      {                       
+      { // ham = 1, dualpf = 0
         draw_sprites_punt = draw_sprites_aga_ham_lo;
       }
       else
-      {                       
+      { // ham = 0, dualpf = 0
         draw_sprites_punt = draw_sprites_aga_sp_lo;
       }
     }
     else if(diff == 0)
-    {                          
+    { // doubling = 0, skip = 0
       if(bpldualpf)
-      {                       
+      { // ham = 0, dualpf = 1
         draw_sprites_punt = draw_sprites_aga_dp_hi;
       }
       else if(dp_for_drawing->ham_seen)
-      {                       
+      { // ham = 1, dualpf = 0
         draw_sprites_punt = draw_sprites_aga_ham_hi;
       }
       else
-      {                       
+      { // ham = 0, dualpf = 0
         draw_sprites_punt = draw_sprites_aga_sp_hi;
       }
     }
     else
-    {                          
+    { // doubling = 1, skip = 0
       if(bpldualpf)
-      {                       
+      { // ham = 0, dualpf = 1
         draw_sprites_punt = draw_sprites_aga_dp_shi;
       }
       else if(dp_for_drawing->ham_seen)
-      {                       
+      { // ham = 1, dualpf = 0
         draw_sprites_punt = draw_sprites_aga_ham_shi;
       }
       else
-      {                       
+      { // ham = 0, dualpf = 0
         draw_sprites_punt = draw_sprites_aga_sp_shi;
       }
     }
@@ -1297,7 +1297,7 @@ static _INLINE_ void pfield_doline (int lineno)
 #else
 
 #if defined(__SYMBIAN32__) && !defined(__WINS__) && defined(USE_ASSEMBLER_CODE)
-                                            
+   /* Assembler functions (arm_support.s) */
    #ifdef __cplusplus
       extern "C" {
    #endif
@@ -1807,7 +1807,7 @@ static _INLINE_ void init_aspect_maps (void)
     if (amiga2aspect_line_map)
 	free (amiga2aspect_line_map);
 
-                                                      
+    /* At least for this array the +1 is necessary. */
     amiga2aspect_line_map = (int *)xmalloc (sizeof (int) * (MAXVPOS + 1)*2 + 1);
     native2amiga_line_map = (int *)xmalloc (sizeof (int) * GFXVIDINFO_HEIGHT);
 
@@ -1835,9 +1835,9 @@ static _INLINE_ void init_aspect_maps (void)
     }
 }
 
-  
-                                                                        
-   
+/*
+ * One drawing frame has been finished. Tell the graphics code about it.
+ */
 static __inline__ void do_flush_screen ()
 {
 	flush_block ();
@@ -1847,8 +1847,8 @@ static __inline__ void do_flush_screen ()
 static int drawing_color_matches;
 static enum { color_match_acolors, color_match_full } color_match_type;
 
-                                                                                 
-                                                                         
+/* Set up colors_for_drawing to the state at the beginning of the currently drawn
+   line.  Try to avoid copying color tables around whenever possible.  */
 static __inline__ void adjust_drawing_colors (int ctable, int need_full)
 {
     if (drawing_color_matches != ctable)
@@ -1929,9 +1929,9 @@ static _INLINE_ void do_color_changes (line_draw_func worker_border, line_draw_f
     }
 }
 
-                                                                       
-                                                                    
-           
+/* We only save hardware registers during the hardware frame. Now, when
+ * drawing the frame, we expand the data into a slightly more useful
+ * form. */
 static __inline__ void pfield_expand_dp_bplcon (void)
 {
     int brdblank_2;
@@ -1942,8 +1942,8 @@ static __inline__ void pfield_expand_dp_bplcon (void)
     bplham = dp_for_drawing->ham_seen;
 
     if (currprefs.chipset_mask & CSMASK_AGA) {
-    	                                                                     
-                                                                        
+    	/* The KILLEHB bit exists in ECS, but is apparently meant for Genlock
+    	 * stuff, and it's set by some demos (e.g. Andromeda Seven Seas) */
     	bplehb = ((dp_for_drawing->bplcon0 & 0xFCC0) == 0x6000 && !(dp_for_drawing->bplcon2 & 0x200));
         bpldualpf2of = (dp_for_drawing->bplcon3 >> 10) & 7;
         sbasecol[0] = ((dp_for_drawing->bplcon4 >> 4) & 15) << 4;
@@ -1964,15 +1964,15 @@ static __inline__ void pfield_draw_line_1 (int lineno) {
 
    adjust_drawing_colors (dp_for_drawing->ctable, dp_for_drawing->ham_seen || bplehb);
    
-                                                                    
-                 
+   /* The problem is that we must call decode_ham() BEFORE we do the
+    * sprites. */
    if (dp_for_drawing->ham_seen)
    {
       init_ham_decoding ();
       if (dip_for_drawing->nr_color_changes == 0)
       {
-                                                                    
-                         
+         /* The easy case: need to do HAM decoding only once for the
+          * full line. */
          decode_ham (var_VISIBLE_LEFT_BORDER, var_VISIBLE_RIGHT_BORDER);
       }
       else
@@ -2001,9 +2001,9 @@ static __inline__ void pfield_draw_line (int lineno, int gfx_ypos)
 		pfield_init_linetoscr ();
 		pfield_draw_line_1 (lineno);
       
-		                                                                   
-                               
-    
+		/* Lines in which sprites are drawn (transparent color is ignored),
+		* have to be redrawn as well.
+		*/
 		if (dip_for_drawing->nr_sprites)
 		{
 			int i;
@@ -2014,7 +2014,7 @@ static __inline__ void pfield_draw_line (int lineno, int gfx_ypos)
 			}
 		}
    
-		                                                        
+		/* Line was changed or sprites have been drawn in it? */
 		do_color_changes ((void (*)(int, int))pfield_do_fill_line, (void (*)(int, int))pfield_do_linetoscr);
 	}
 	else
@@ -2055,9 +2055,9 @@ static _INLINE_ void init_drawing_frame (void)
     	ham_lastcolor_pix0 = colors_for_drawing.color_uae_regs_ecs[0];
 }
 
-  
-                                                     
-   
+/*
+ * Some code to put status information on the screen.
+ */
 #define TD_PADX 10
 #define TD_PADY 2
 #define TD_WIDTH 32
@@ -2074,7 +2074,7 @@ static int td_pos = (TD_RIGHT|TD_BOTTOM);
 
 #define TD_TOTAL_HEIGHT (TD_PADY * 2 + TD_NUM_HEIGHT)
 
-static const char *numbers = {           
+static const char *numbers = { /* ugly */
 "------ ------ ------ ------ ------ ------ ------ ------ ------ ------ "
 "-xxxxx ---xx- -xxxxx -xxxxx -x---x -xxxxx -xxxxx -xxxxx -xxxxx -xxxxx "
 "-x---x ----x- -----x -----x -x---x -x---- -x---- -----x -x---x -x---x "
@@ -2084,7 +2084,7 @@ static const char *numbers = {
 "------ ------ ------ ------ ------ ------ ------ ------ ------ ------ "
 };
 
-static const char *letters = {           
+static const char *letters = { /* ugly */
 "------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ "
 "-xxxxx -xxxxx -xxxxx -xxxx- -xxxxx -xxxxx -xxxxx -x---x --xx-- -----x -x--x- -x---- -x---x -x---x --xxx- -xxxx- -xxxx- -xxxx- -xxxxx -xxxxx -x---x -x---x -x---x -x---x -x---x -xxxxx "
 "-x---x -x---x -x---- -x---x -x---- -x---- -x---- -x---x --xx-- -----x -x-x-- -x---- -xxxxx -xx--x -x---x -x---x -x---- -x---x -x---- ---x-- -x---x -x---x --x-x- --x-x- -x---x ----x- "
@@ -2152,25 +2152,25 @@ static _INLINE_ void draw_status_line (int line)
 	for (led = -2; led < (mainMenu_drives+1); led++) {
 		int track;
 		if (led > 0) {
-			            
+			/* Floppy */
 			track = gui_data.drive_track[led-1];
 			on = gui_data.drive_motor[led-1];
 			on_rgb = 0x0f0;
 			off_rgb = 0x040;
 		} else if (led < -1) {
-			               
+			/* Idle time */
 			track = idletime_percent;
 			on = 1;
 			on_rgb = 0x666;
 			off_rgb = 0x666;
 		} else if (led < 0) {
-			           
+			/* Power */
 			track = gui_data.fps;
 			on = gui_data.powerled;
 			on_rgb = 0xf00;
 			off_rgb = 0x400;
 		} else {
-			               
+			/* Hard disk */
 			track = -2;
 			
 			switch (gui_data.hdled) {
@@ -2264,7 +2264,7 @@ static _INLINE_ void finish_drawing_frame (void)
 		pfield_draw_line (active_line, where);
 	}
 
-		                      
+		/* HD LED off delay */
 		static int countdown = HDLED_TIMEOUT;
 		if (gui_data.hdled != HDLED_OFF) 
 		{
@@ -2276,10 +2276,10 @@ static _INLINE_ void finish_drawing_frame (void)
 			countdown = HDLED_TIMEOUT;
 		}
 
-	                                                            
-                                                                     
-                                                                        
-                 
+	/* Vita status-bar modes: 0 = bottom, 1 = top, 2 = disabled.
+	   The legacy renderer treated this value as a boolean, so selecting
+	   "Top Bar" still rendered the LEDs at the bottom and "Disabled" still
+	   drew them. */
 	if (mainMenu_showStatus == 0 || mainMenu_showStatus == 1)
 	{
 		int first_line = (mainMenu_showStatus == 1)
@@ -2298,7 +2298,7 @@ void vsync_handle_redraw (int long_frame, int lof_changed)
 {
 	if(gfx_mem != (char *)prSDLScreen->pixels)
 	{
-		                                          
+		// These may have changed in vsync_handler
     init_row_map();
 	}
 
@@ -2311,11 +2311,11 @@ void vsync_handle_redraw (int long_frame, int lof_changed)
 		if (framecnt == 0)
 			finish_drawing_frame ();
 		
-		                                                            
-                                                                
-                                                                
-                         
-     
+		/* At this point, we have finished both the hardware and the
+		 * drawing frame. Essentially, we are outside of all loops and
+		 * can do some things which would cause confusion if they were
+		 * done at other times.
+		 */
 		if (savestate_state == STATE_DOSAVE)
 		{
 			custom_prepare_savestate ();

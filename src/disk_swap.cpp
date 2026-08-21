@@ -29,14 +29,14 @@ void SwapDisk(void)
     int target_disk = (g_current_disk == 1) ? 2 : 1;
     const char *target_path = (target_disk == 1) ? PATH_DISK1 : PATH_DISK2;
 
-                                           
+    // Controllo esistenza prima dello swap
     if (!FileExists(target_path)) {
-                                                                                                 
+        // Se il dischetto non esiste, manteniamo il disco corrente e mostriamo un OSD di allerta
         OSD_TriggerDiskSwap(g_current_disk, true);
         return;
     }
 
-                                                                                          
+    // Eseguiamo l'inserimento nel drive DF0 (indice 0) con la funzione nativa di UAE4All2
     strncpy(changed_df[0], target_path, 255);
     changed_df[0][255] = '\0';
 
@@ -48,6 +48,6 @@ void SwapDisk(void)
 
     g_current_disk = target_disk;
 
-                            
+    // Attiva OSD per 2500ms
     OSD_TriggerDiskSwap(g_current_disk, false);
 }

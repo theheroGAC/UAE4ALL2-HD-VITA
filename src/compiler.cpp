@@ -1,10 +1,10 @@
-   
-                                 
-   
-                  
-   
-                                
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * m68k emulation
+  *
+  * Copyright 1996 Bernd Schmidt
+  */
 #ifndef USE_FAME_CORE
 #include "sysconfig.h"
 #include "sysdeps.h"
@@ -71,7 +71,7 @@ static uae_u16 bitswap(uae_u16 v)
 
 static long long compiled_hits = 0;
 
-                                    
+/* 16K areas with 512 byte blocks */
 #define SUBUNIT_ORDER 9
 #define PAGE_SUBUNIT (1 << SUBUNIT_ORDER)
 #define PAGE_ALLOC_UNIT (PAGE_SUBUNIT * 32)
@@ -91,25 +91,25 @@ static struct code_page *new_code_page(void)
     if (ncp) {
 	ncp->next = first_code_page;
 	first_code_page = ncp;
-	ncp->allocmask = 1;                   
+	ncp->allocmask = 1; /* what a waste */
     }
     return ncp;
 }
 
-#define NUM_HASH 32768                                                         
+#define NUM_HASH 32768 /* larger values cause some paging on my 16MB machine */
 #define HASH_MASK (NUM_HASH-1)
 #define MAX_UNUSED_HASH 512
 
-static int SCAN_MARK = 1;                                                     
-static int COMPILE_MARK = 5;                                                        
+static int SCAN_MARK = 1; /* Number of calls after which to scan a function */
+static int COMPILE_MARK = 5; /* Number of calls after which to compile a function */
 
-                                                                          
-                                   
+/* The main address -> function lookup hashtable. We use the lower bits of
+ * the address as hash function. */
 static struct hash_entry cpu_hash[NUM_HASH];
-                                                                             
-                                                                                 
-                                                                              
-                                             
+/* These aren't really LRU lists... They used to be, but keeping them in that
+ * order is costly. The hash LRU list is now a two-part list: Functions that have
+ * no code allocated for them are placed at the beginning. Such entries can be
+ * recycled when we need a new hash entry. */
 static struct hash_block lru_first_block;
 static struct hash_entry lru_first_hash;
 static struct hash_entry *freelist_hash;
@@ -142,15 +142,15 @@ static char *alloc_code(struct hash_block *hb, int ninsns)
 	}
     }
 
-                                                    
+    /* Nothing large enough free: make a new page */
     cp = new_code_page();
     if (cp == NULL)
 	return NULL;
     j = 1;
 
 found_page:
-                                                                             
-                                                                  
+    /* See whether there is in fact more space for us. If so, allocate all of
+     * it. compile_block() will free everything it didn't need. */
 
     allocmask <<= j;
     last_bit = allocbits + j;
@@ -257,7 +257,7 @@ uae_u32 flush_icache(void)
     while (hb != &lru_first_block) {
 	struct hash_block *next = hb->lru_next;
 	if (hb->cpage != NULL) {
-	                                                    
+	    /* Address in chipmem? Then forget about block*/
 	    if ((hb->he_first->addr & ~0xF80000) != 0xF80000) {
 		hb->cpage->allocmask &= ~hb->page_allocmask;
 		hb->cpage = NULL;
@@ -327,7 +327,7 @@ static struct hash_entry *new_hash(uaecptr addr)
 
     h->addr = addr;
 
-                            
+    /* Chain the new node */
     h->prev = cpu_hash + ((addr >> 1) & HASH_MASK);
     h->next = h->prev->next;
     h->next->prev = h->prev->next = h;
@@ -351,8 +351,8 @@ static struct hash_entry *find_hash(uaecptr addr)
 
     for (h = h1->next; h != h1; h = h->next) {
 	if (h->addr == addr) {
-	                                                                
-                                           
+	    /* Put it at the head of the list so that the above shortcut
+	     * works the next time we come here */
 	    h->next->prev = h->prev; h->prev->next = h->next;
 	    h->prev = h1;
 	    h->next = h1->next;
@@ -368,7 +368,7 @@ static struct hash_entry *get_hash_for_func(uaecptr addr, int mark_locked)
     struct hash_entry *h = find_hash(addr);
     if (h == NULL)
 	h = new_hash (addr);
-#if 0                    
+#if 0 /* Too expensive */
     else
 	lru_touch(h);
 #endif
@@ -429,7 +429,7 @@ STATIC_INLINE void m68k_setpc_hash(uaecptr newpc)
 STATIC_INLINE void m68k_setpc_nohash(uaecptr newpc)
 {
 #if 0
-                                                               
+    /* This is probably not too good for efficiency... FIXME */
     struct hash_entry *h = find_hash(newpc);
 
     if (h != NULL && h->cacheflush)
@@ -497,22 +497,22 @@ static void code_init(void)
 STATIC_INLINE int cc_flagmask_68k(const int cc)
 {
     switch(cc){
-     case 0: return 0;                              
-     case 1: return 0;                              
-     case 2: return CC68K_C|CC68K_Z;                 
-     case 3: return CC68K_C|CC68K_Z;                 
-     case 4: return CC68K_C;                         
-     case 5: return CC68K_C;                         
-     case 6: return CC68K_Z;                         
-     case 7: return CC68K_Z;                         
-     case 8: return CC68K_V;                         
-     case 9: return CC68K_V;                         
-     case 10:return CC68K_N;                         
-     case 11:return CC68K_N;                         
-     case 12:return CC68K_N|CC68K_V;                 
-     case 13:return CC68K_N|CC68K_V;                 
-     case 14:return CC68K_N|CC68K_V|CC68K_Z;         
-     case 15:return CC68K_N|CC68K_V|CC68K_Z;         
+     case 0: return 0;                       /* T */
+     case 1: return 0;                       /* F */
+     case 2: return CC68K_C|CC68K_Z;         /* HI */
+     case 3: return CC68K_C|CC68K_Z;         /* LS */
+     case 4: return CC68K_C;                 /* CC */
+     case 5: return CC68K_C;                 /* CS */
+     case 6: return CC68K_Z;                 /* NE */
+     case 7: return CC68K_Z;                 /* EQ */
+     case 8: return CC68K_V;                 /* VC */
+     case 9: return CC68K_V;                 /* VS */
+     case 10:return CC68K_N;                 /* PL */
+     case 11:return CC68K_N;                 /* MI */
+     case 12:return CC68K_N|CC68K_V;         /* GE */
+     case 13:return CC68K_N|CC68K_V;         /* LT */
+     case 14:return CC68K_N|CC68K_V|CC68K_Z; /* GT */
+     case 15:return CC68K_N|CC68K_V|CC68K_Z; /* LE */
     }
     abort();
     return 0;
@@ -533,7 +533,7 @@ STATIC_INLINE void translate_step_over_ea(uae_u8 **pcpp, amodes m,
      case imm:
 	if (size == sz_long)
 	    goto is_long;
-	                  
+	/* fall through */
      case Ad16:
      case PC16:
      case imm0:
@@ -547,7 +547,7 @@ STATIC_INLINE void translate_step_over_ea(uae_u8 **pcpp, amodes m,
 	    uae_u16 extra = *(*pcpp)++;
 	    extra <<= 8;
 	    extra |= *(*pcpp)++;
-	                                     
+	    /* @@@ handle 68020 stuff here */
 	}
 	break;
      case absl:
@@ -713,18 +713,18 @@ static int m68k_scan_func(struct hash_entry *h)
 
     found_block = NULL;
 
-                                                                       
+    /* First, lock the hash entries we already have to prevent grief */
     for (i = 0; i < top_bb; i++) {
 	struct hash_entry *h = find_hash(bcc_target_stack[i]);
 	if (h != NULL)
 	    h->locked = 1;
     }
 
-                           
+    /* Allocate new ones */
     for (i = 0; i < top_bb; i++) {
 	struct hash_entry *h = get_hash_for_func(bcc_target_stack[i], 1);
 	bb_stack[i].h = h;
-#if 0                                     
+#if 0 /* This doesn't work in all cases */
 	if (h->block != NULL && h->block != found_block) {
 	    if (found_block == NULL) {
 		if (h->block->cpage != NULL)
@@ -787,8 +787,8 @@ struct insn_info_struct {
     int flags_live_at_end;
     int jump_target;
     int jumps_to;
-    char *compiled_jumpaddr;                                            
-    char *compiled_fillin;                                                     
+    char *compiled_jumpaddr; /* Address to use for jumps to this insn */
+    char *compiled_fillin;   /* Address where to put offset if this is a Bcc */
     int uae_regs_set:16;
     int uae_regs_used:16;
     int stop_translation:2;
@@ -890,7 +890,7 @@ static void analyze_ea_for_insn(amodes mode, int reg, wordsizes size,
 	if (size == sz_word)
 	    goto imm1_const;
 
-	                  
+	/* fall through */
      case imm0:
 	eai->ea_type = eat_imm;
 	eai->temp1 = (uae_s8)*(p+1);
@@ -987,7 +987,7 @@ static int m68k_scan_block(struct hash_block *hb, int *movem_count)
 
 	    if (dp->mnemo == i_Scc || dp->mnemo == i_Bcc || dp->mnemo == i_DBcc) {
 		fset = 0, fuse = cc_flagmask_68k(dp->cc);
-		if (prev_ii && dp->mnemo != i_Scc)                                               
+		if (prev_ii && dp->mnemo != i_Scc) /* Don't use Scc here: ea can cause an exit */
 		    prev_ii->ccuser_follows = 1;
 	    }
 
@@ -998,7 +998,7 @@ static int m68k_scan_block(struct hash_block *hb, int *movem_count)
 	    thisii->address = thisinsn_addr;
 	    thisii->stop_translation = 0;
 	    thisii->ccuser_follows = 0;
-                                  
+/*	    thisii->have_reginfo = 0;*/
 	    thisii->jump_target = 0;
 	    thisii->sync_cache = thisii->sync_flags = 0;
 	    thisii->flags_set = fset;
@@ -1090,7 +1090,7 @@ static int m68k_scan_block(struct hash_block *hb, int *movem_count)
 	    iip = bb->last_iip;
 	    mnemo = insn_info[iip].dp->mnemo;
 
-	                         
+	    /* Fix up branches */
 	    if (round == 0 && (mnemo == i_DBcc || mnemo == i_Bcc)) {
 		if (bb->bb_next1 != NULL) {
 		    insn_info[bb->last_iip].jumps_to = bb->bb_next1->first_iip;
@@ -1098,7 +1098,7 @@ static int m68k_scan_block(struct hash_block *hb, int *movem_count)
 		}
 	    }
 
-	                                                
+	    /* And take care of flag life information */
 	    dp = insn_info[iip].dp;
 	    if (insn_info[iip].stop_translation)
 		current_live = 31;
@@ -1133,12 +1133,12 @@ static int m68k_scan_block(struct hash_block *hb, int *movem_count)
     return last_iip;
 }
 
-#define MAX_JSRS 4096                             
+#define MAX_JSRS 4096 /* must be a power of two */
 
 static uaecptr jsr_rets[MAX_JSRS];
 static struct hash_entry *jsr_hash[MAX_JSRS];
 static int jsr_num;
-static struct hash_entry dummy_hash;                                       
+static struct hash_entry dummy_hash; /* This is for safety purposes only */
 
 
 static void jsr_stack_init(void)
@@ -1183,7 +1183,7 @@ void m68k_do_bsr(uaecptr oldpc, uae_s32 offset)
     m68k_do_jsr(oldpc, m68k_getpc() + offset);
 }
 
-                                           
+/* Here starts the actual compiling part */
 
 static char *compile_current_addr;
 static char *compile_last_addr;
@@ -1257,20 +1257,20 @@ STATIC_INLINE char *compile_here(void)
 #define BO_SWAPPED_WORD 2
 
 struct register_mapping {
-    int dreg_map[8], areg_map[8];                           
+    int dreg_map[8], areg_map[8]; /* 68000 register cache */
     int x86_const_offset[8];
     int x86_dirty[8];
-    int x86_cache_reg[8];                                             
-    int x86_cr_type[8];                                        
-    int x86_locked[8];                                 
+    int x86_cache_reg[8]; /* Regs used for the 68000 register cache */
+    int x86_cr_type[8]; /* Caching data or address register? */
+    int x86_locked[8]; /* Regs used for some purpose */
     int x86_users[8];
     int x86_byteorder[8];
     int x86_verified[8];
 };
 
-  
-                                                         
-   
+/*
+ * First, code to compile some primitive x86 instructions
+ */
 
 static void compile_lea_reg_with_offset(int dstreg, int srcreg, uae_u32 srcoffs)
 {
@@ -1353,7 +1353,7 @@ static void compile_byteswap(int x86r, wordsizes size, int save_flags)
      case sz_word:
 	if (save_flags)
 	    assemble(0x9C);
-	assemble(0x66);                   
+	assemble(0x66); /* rolw $8,x86r */
 	assemble(0xC1);
 	assemble(0xC0 + x86r);
 	assemble(8);
@@ -1361,7 +1361,7 @@ static void compile_byteswap(int x86r, wordsizes size, int save_flags)
 	    assemble(0x9D);
 	break;
      case sz_long:
-	assemble(0x0F);                  
+	assemble(0x0F); /* bswapl x86r */
 	assemble(0xC8+x86r);
 	break;
      default:
@@ -1387,8 +1387,8 @@ static void compile_force_byteorder(struct register_mapping *map, int x86r,
     map->x86_byteorder[x86r] = desired_bo;
 }
 
-                                                                           
-                                                                        
+/* Add a constant offset to a x86 register. If it's in the cache, make sure
+ * we update the const_offset value. The flags are unaffected by this */
 
 static void compile_offset_reg(struct register_mapping *map, int x86r,
 			       uae_u32 offset)
@@ -1423,11 +1423,11 @@ static int get_unused_x86_register(struct register_mapping *map)
     return -1;
 }
 
-  
-                                     
-                                                                           
-                   
-   
+/*
+ * sync_reg() may not touch the flags
+ * If may_clobber is 1 and the reg had an offset, the reg will be offsetted
+ * by this function
+ */
 static void sync_reg(struct register_mapping *map, int x86r, void *m68kr,
 		     uae_u32 offset, int dirty, int may_clobber)
 {
@@ -1445,7 +1445,7 @@ static void sync_reg(struct register_mapping *map, int x86r, void *m68kr,
 		dirty = 1;
 	    } else {
 		compile_lea_reg_with_offset(x86r, x86r, offset);
-		assemble(0x89);                               
+		assemble(0x89);          /* movl x86r,m68kr */
 		assemble(0x05 + (x86r << 3));
 		assemble_long(m68kr);
 		compile_lea_reg_with_offset(x86r, x86r, -offset);
@@ -1454,7 +1454,7 @@ static void sync_reg(struct register_mapping *map, int x86r, void *m68kr,
 	}
     }
     if (dirty) {
-	assemble(0x89);                               
+	assemble(0x89);          /* movl x86r,m68kr */
 	assemble(0x05 + (x86r << 3));
 	assemble_long(m68kr);
     }
@@ -1520,13 +1520,13 @@ static int get_free_x86_register(struct register_mapping *map,
     int cnt;
     for (cnt = 0; cnt < 24; cnt++) {
 	int x86r = cnt & 7;
-	                                                                       
+	/* In the first two passes, try to get one of the preferred uae_regs */
 	if (cnt < 16 && ((1 << x86r) & preferred_mask) == 0)
 	    continue;
-	                                                                   
+	/* In the first pass, don't discard any registers from the cache */
 	if (cnt < 8 && map->x86_cache_reg[x86r] != -1)
 	    continue;
-	                                
+	/* Never use locked registers */
 	if (map->x86_users[x86r] > 0)
 	    continue;
 
@@ -1548,13 +1548,13 @@ static int get_typed_x86_register(struct register_mapping *map,
     int cnt;
     for (cnt = 0; cnt < 16; cnt++) {
 	int x86r = cnt & 7;
-	                                       
+	/* Get one of the preferred uae_regs */
 	if (((1 << x86r) & preferred_mask) == 0)
 	    continue;
-	                                                                   
+	/* In the first pass, don't discard any registers from the cache */
 	if (cnt < 8 && map->x86_cache_reg[x86r] != -1)
 	    continue;
-	                                
+	/* Never use locked registers */
 	if (map->x86_users[x86r] > 0)
 	    continue;
 
@@ -1627,7 +1627,7 @@ static int get_and_lock_68k_reg(struct register_mapping *map, int reg, int is_dr
     x86r = regmap[reg];
     if (x86r == -1) {
 	x86r = get_free_x86_register(map, preferred);
-	assemble(0x8B); assemble(0x05 + (x86r << 3));                                
+	assemble(0x8B); assemble(0x05 + (x86r << 3)); /* movl uae_regs.d[reg],x86r */
 	assemble_long(reghome + reg);
 	map->x86_cache_reg[x86r] = reg;
 	map->x86_cr_type[x86r] = is_dreg;
@@ -1656,7 +1656,7 @@ static int get_and_lock_68k_reg(struct register_mapping *map, int reg, int is_dr
 		old_dirty = 1;
 		const_off = 0;
 	    }
-	                                      
+	    /* Remove old reg from cache... */
 	    map->x86_cache_reg[x86r] = -1;
 	    map->x86_cr_type[x86r] = is_dreg;
 	    map->x86_const_offset[x86r] = 0;
@@ -1666,7 +1666,7 @@ static int get_and_lock_68k_reg(struct register_mapping *map, int reg, int is_dr
 	    map->x86_verified[x86r] = 0;
 	    map->x86_dirty[x86r] = 0;
 	    x86r = newr;
-	                                                     
+	    /* ... and make the new one the cache register */
 	    map->x86_cache_reg[x86r] = reg;
 	    map->x86_cr_type[x86r] = is_dreg;
 	    map->x86_const_offset[x86r] = 0;
@@ -1688,10 +1688,10 @@ static int get_and_lock_68k_reg(struct register_mapping *map, int reg, int is_dr
     return x86r;
 }
 
-  
-                                                                        
-                                               
-   
+/*
+ * Move a constant to a register. Don't do anything if we already have a
+ * register, even if it is offset by a constant
+ */
 
 static int compile_force_const_reg(struct register_mapping *map, int x86r,
 				   uae_u32 *offs, int desired)
@@ -1724,7 +1724,7 @@ static void compile_extend_long(struct register_mapping *map, int x86r,
 
     if (size != sz_long) {
 	if (x86r == r_EAX && size == sz_word) {
-	    assemble(0x98);           
+	    assemble(0x98); /* cwtl */
 	} else {
 	    assemble(0x0F);
 	    if (size == sz_byte) {
@@ -1741,13 +1741,13 @@ struct ea_info {
     int reg;
     amodes mode;
     wordsizes size;
-    int address_reg;                                                                           
-                                                                    
-    uae_u32 addr_const_off;                                     
-    int data_reg;                                                                           
-                                 
+    int address_reg;    /* The x86 reg holding the address, or -1 if ea doesn't refer to memory
+			 * -2 if it refers to memory, but only with a constant address */
+    uae_u32 addr_const_off; /* Constant offset to the address */
+    int data_reg;         /* The x86 reg that holds the data. -1 if data is not present yet.
+			   * -2 if data is constant */
     uae_u32 data_const_off;
-    int flags;                                                                
+    int flags;            /* Extra info. Contains the dp field of d8r modes */
     int purpose;
 };
 
@@ -1765,9 +1765,9 @@ struct insn_reg_needs {
     int dreg_mask[8], areg_mask[8];
 };
 
-  
-                                                                          
-   
+/*
+ * This structure holds information about predec/postinc addressing modes.
+ */
 
 struct pid_undo {
     int used;
@@ -1791,10 +1791,10 @@ static void add_undo(struct pid_undo *pud, int x86r, int m68kr, int offs,
     pud->used++;
 }
 
-  
-                                                                           
-                                
-   
+/*
+ * Lock previous contents of address registers used in predec/postinc modes
+ * for generate_possible_exit().
+ */
 
 static void compile_prepare_undo(struct register_mapping *map, amodes mode,
 			      int reg, struct pid_undo *pud)
@@ -1807,14 +1807,14 @@ static void compile_prepare_undo(struct register_mapping *map, amodes mode,
 
      case Apdi:
 	x86r = get_and_lock_68k_reg(map, reg, 0, ADDRESS_X86_REGS, 0, 1);
-	                                                                     
-                                         
+	/* This saves recording the byteorder in the pud structure, and we'll
+	 * need it in normal byteorder anyway */
 	compile_force_byteorder(map, x86r, BO_NORMAL, 0);
-	  
-                                                            
-                                                               
-             
-    
+	/*
+	 * Add this reg with its current offset to the undo buffer.
+	 * Since we have locked it, we are certain that it will not be
+	 * modified.
+	 */
 	add_undo(pud, x86r, reg, map->x86_const_offset[x86r], map->x86_dirty[x86r]);
 	break;
 
@@ -1826,11 +1826,11 @@ static void compile_prepare_undo(struct register_mapping *map, amodes mode,
     }
 }
 
-  
-                                                                        
-                                               
-                                                                                
-   
+/*
+ * Load all the registers absolutely needed to calculate and verify thea
+ * address. Load other registers if convenient.
+ * This contains a fair amount of magic to get the register cache working right.
+ */
 
 static void compile_prepareea(struct register_mapping *map, amodes mode,
 			      int reg, wordsizes size, uae_u8 **pcpp, uaecptr pca,
@@ -1909,23 +1909,23 @@ static void compile_prepareea(struct register_mapping *map, amodes mode,
 
 	if (dp & 0x800) {
 	    if (eai->addr_const_off == 0) {
-		assemble(0x03); assemble(0xC0 + tmpr + x86r*8);                           
+		assemble(0x03); assemble(0xC0 + tmpr + x86r*8); /* addl basereg,addrreg */
 	    } else if ((uae_s32)eai->addr_const_off >= -128 && (uae_s32)eai->addr_const_off <= 127) {
 		assemble(0x8D);
-		assemble(0x44 + x86r*8);                                          
+		assemble(0x44 + x86r*8); /* leal disp8(dispreg,basereg),dispreg */
 		assemble(x86r*8 + tmpr);
 		assemble(eai->addr_const_off);
 	    } else {
 		assemble(0x8D);
-		assemble(0x84 + x86r*8);                                           
+		assemble(0x84 + x86r*8); /* leal disp32(dispreg,basereg),dispreg */
 		assemble(x86r*8 + tmpr);
 		assemble_ulong(eai->addr_const_off);
 	    }
 	    eai->addr_const_off = 0;
 	} else {
 	    assemble(0x0F); assemble(0xBF);
-	    assemble(0xC0 + x86r*9);                             
-	    assemble(0x03); assemble(0xC0 + tmpr + x86r*8);                           
+	    assemble(0xC0 + x86r*9); /* movswl dispreg,addrreg */
+	    assemble(0x03); assemble(0xC0 + tmpr + x86r*8); /* addl basereg,addrreg */
 	}
 	compile_unlock_reg(map, tmpr);
 	break;
@@ -1946,7 +1946,7 @@ static void compile_prepareea(struct register_mapping *map, amodes mode,
 	    compile_force_byteorder(map, x86r, BO_NORMAL, 0);
 
 	    assemble(0x0F); assemble(0xBF);
-	    assemble(0xC0 + x86r*9);                             
+	    assemble(0xC0 + x86r*9); /* movswl dispreg,addrreg */
 	}
 	eai->address_reg = x86r;
 	break;
@@ -1975,7 +1975,7 @@ static void compile_prepareea(struct register_mapping *map, amodes mode,
 	if (size == sz_word)
 	    goto imm1_const;
 
-	                  
+	/* fall through */
      case imm0:
 	eai->data_const_off = (uae_s8)*(p+1);
 	eai->data_reg = -2;
@@ -2024,12 +2024,12 @@ static void compile_get_excl_lock(struct register_mapping *map, struct ea_info *
     }
 }
 
-  
-                                                                   
-                                                                    
-                                                                 
-                   
-   
+/*
+ * Some functions to assemble some 386 opcodes which have a similar
+ * structure (ADD, AND, OR, etc.). These take source and destination
+ * addressing modes, check their validity and assemble a complete
+ * 386 instruction.
+ */
 
 STATIC_INLINE int rmop_long(struct ea_info *eai)
 {
@@ -2039,10 +2039,10 @@ STATIC_INLINE int rmop_long(struct ea_info *eai)
 	if (eai->address_reg == -2)
 	    return 5;
 	if (eai->address_reg == -1) {
-	                                                          
+	    /* This must be a 68k register in its home location */
 	    return 5;
 	}
-#if 0                                      
+#if 0 /* We need to add address_space... */
 	if (eai->addr_const_off == 0 && eai->address_reg != r_EBP) {
 	    return eai->address_reg;
 	}
@@ -2083,17 +2083,17 @@ STATIC_INLINE void rmop_finalize(struct ea_info *eai)
 	assemble_ulong(eai->data_const_off);
     else if (eai->data_reg == -1) {
 	if (eai->address_reg == -2)
-	                          
+	    /* Constant address */
 	    assemble_long(address_space + (uae_s32)eai->addr_const_off);
 	else if (eai->address_reg == -1) {
-	                                       
+	    /* Register in its home location */
 	    if (eai->mode == Areg)
 		assemble_long(uae_regs.uae_regs + 8  + eai->reg);
 	    else
 		assemble_long(uae_regs.uae_regs + eai->reg);
 	} else {
 #if 0
-	                                      
+	    /* Indirect address with offset */
 	    if ((uae_s32)eai->addr_const_off >= -128 && (uae_s32)eai->addr_const_off <= 127) {
 	    }
 #endif
@@ -2198,11 +2198,11 @@ static void compile_fetchimm(struct register_mapping *map, struct ea_info *eai, 
     eai->data_const_off = 0;
 }
 
-  
-         
-         
-         
-   
+/*
+ * 1: reg
+ * 2: mem
+ * 4: imm
+ */
 
 static int binop_alternatives[] = {
     7, 1,
@@ -2283,9 +2283,9 @@ static void compile_loadeas(struct register_mapping *map, struct ea_info *eainf,
 	    cost++;
 
 	if (dtype == -1 && ((adst & 2) == 0 || (eaid->size != sz_byte && !scramble_poss)))
-	                                                             
-                                                                  
-        
+	    /* The !load_dest case isn't handled by the current code,
+	     * and it isn't desirable anyway. Use a different alternative
+	     */
 	    cost += load_dest ? 1 : 100;
 	else if (dtype == 0 && dcreg == -1 && (adst & 2) == 0)
 	    cost++;
@@ -2312,17 +2312,17 @@ static void compile_loadeas(struct register_mapping *map, struct ea_info *eainf,
 		    eaid->data_reg = get_free_x86_register(map, ALL_X86_REGS);
 	    }
 	}
-	                                         
+	/* Scrambled in both mem and reg cases */
 	if (eaid->size != sz_byte && scramble_poss)
 	    scrambled = 1;
     } else {
 	if (dcreg == -1 && !load_dest && (adst & 2) == 0 && eaid->size == sz_long) {
-	                                                                   
-                                                                     
-                                                                
-                                                                  
-                                                               
-                   
+	    /* We need a register, but we don't need to fetch the old data.
+	     * See storeea for some more code handling this case. This first
+	     * if statement could be eliminated, we would generate some
+	     * superfluous moves. This is an optimization. If it were not
+	     * done, the mem-mem-move warning could be commented in in
+	     * storeea. */
 	    if (eaid->size == sz_byte)
 		eaid->data_reg = get_typed_x86_register(map, DATA_X86_REGS);
 	    else
@@ -2345,7 +2345,7 @@ static void compile_loadeas(struct register_mapping *map, struct ea_info *eainf,
     }
 
     if (stype == -2) {
-	                                                        
+	/* @@@ may need to scramble imm, this is a workaround */
 	if ((asrc & 4) == 0 || scrambled)
 	    compile_fetchimm(map, eais, scrambled ? scrambled_bo : BO_NORMAL);
     } else if (stype == -1) {
@@ -2358,7 +2358,7 @@ static void compile_loadeas(struct register_mapping *map, struct ea_info *eainf,
 	}
     }
 
-                      
+    /* Optimization */
     if (scrambled && eais->data_reg >= 0 && !load_dest
 	&& map->x86_byteorder[eais->data_reg] == BO_NORMAL
 	&& eaid->size == sz_long && dtype == 0)
@@ -2376,8 +2376,8 @@ static void compile_loadeas(struct register_mapping *map, struct ea_info *eainf,
 	eaid->data_reg = tmpr;
     }
 
-                                                                            
-                     
+    /* Now set the byteorder once and for all (should already be correct for
+     * most cases) */
     if (scrambled) {
 	if (eaid->data_reg >= 0)
 	    compile_force_byteorder(map, eaid->data_reg, scrambled_bo, 0);
@@ -2435,11 +2435,11 @@ static void compile_fetchea(struct register_mapping *map, struct ea_info *eainf,
 	compile_force_byteorder(map, eais->data_reg, BO_NORMAL, 0);
 }
 
-  
-                                                                          
-                                                                            
-            
-   
+/*
+ * compile_note_modify() should be called on destination EAs obtained from
+ * compile_loadeas(), if their value was modified (e.g. by the compile_eas()
+ * function)
+ */
 
 static void compile_note_modify(struct register_mapping *map, struct ea_info *eainf,
 				int eaino)
@@ -2449,8 +2449,8 @@ static void compile_note_modify(struct register_mapping *map, struct ea_info *ea
     int szflag = eai->size == sz_byte ? 0 : 1;
 
     if (eai->mode == Dreg) {
-	                                                                   
-                                                        
+	/* We only need to do something if we have the value in a register,
+	 * otherwise, the home location was modified already */
 	if (eai->data_reg >= 0) {
 	    if (eai->data_reg != map->dreg_map[eai->reg]) {
 		remove_x86r_from_cache(map, eai->data_reg, 0);
@@ -2469,8 +2469,8 @@ static void compile_note_modify(struct register_mapping *map, struct ea_info *ea
 	if (eai->size != sz_long)
 	    printf("Areg put != long\n");
 
-	                                                                   
-                                                        
+	/* We only need to do something if we have the value in a register,
+	 * otherwise, the home location was modified already */
 	if (eai->data_reg >= 0) {
 	    if (eai->data_reg != map->areg_map[eai->reg]) {
 		remove_x86r_from_cache(map, eai->data_reg, 0);
@@ -2486,7 +2486,7 @@ static void compile_note_modify(struct register_mapping *map, struct ea_info *ea
 	}
 	return;
     } else {
-	                                 
+	/* Storing to memory from reg? */
 	if (eai->data_reg >= 0) {
 	    compile_offset_reg(map, eai->data_reg, eai->data_const_off);
 
@@ -2512,17 +2512,17 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
     int szflag = eaid->size == sz_byte ? 0 : 1;
 
     if (eaid->mode == Dreg) {
-	                                                                 
-                   
+	/* Is the reg to move from already the register cache reg for the
+	 * destination? */
 	if (eais->data_reg >= 0 && eais->data_reg == map->dreg_map[eaid->reg]) {
 	    map->x86_dirty[eais->data_reg] = 1; map->x86_verified[eais->data_reg] = 0;
 	    map->x86_const_offset[eais->data_reg] = eais->data_const_off;
 	    return;
 	}
-	                                                       
+	/* Is the destination register in its home location? */
 	if (map->dreg_map[eaid->reg] < 0) {
 	    if (eais->data_reg == -2) {
-		                                         
+		/* Move immediate to uae_regs.uae_regs */
 		if (eaid->size == sz_word) assemble(0x66);
 		assemble(0xC6 + szflag); assemble(0x05); assemble_long(uae_regs.uae_regs + eaid->reg);
 		switch (eaid->size) {
@@ -2534,10 +2534,10 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
 #if 0
 		printf("Shouldn't happen (mem-mem-move)\n");
 #endif
-		                                                      
-                                                           
-                                                         
-                            
+		/* This _can_ happen: move.l $4,d0, if d0 isn't in the
+		 * cache, will come here. But a reg will be allocated for
+		 * dest. We use this. This _really_ shouldn't happen if
+		 * the size isn't long. */
 		if (eaid->size != sz_long)
 		    printf("_Really_ shouldn't happen (Dreg case)\n");
 		map->x86_cache_reg[eaid->data_reg] = eaid->reg;
@@ -2548,7 +2548,7 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
 		goto have_cache_reg_d;
 	    } else {
 		if (eais->size == sz_long) {
-		                                              
+		    /* Make this the new register cache reg */
 		    remove_x86r_from_cache(map, eais->data_reg, 0);
 		    map->x86_cache_reg[eais->data_reg] = eaid->reg;
 		    map->x86_cr_type[eais->data_reg] = 1;
@@ -2556,7 +2556,7 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
 		    map->dreg_map[eaid->reg] = eais->data_reg;
 		    map->x86_verified[eais->data_reg] = 0;
 		} else {
-		                                            
+		    /* Move from reg to uae_regs.uae_regs */
 		    compile_force_byteorder(map, eais->data_reg, BO_NORMAL, 1);
 		    compile_offset_reg (map, eais->data_reg, eais->data_const_off);
 		    if (eaid->size == sz_word) assemble(0x66);
@@ -2574,7 +2574,7 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
 		compile_force_byteorder(map, destr, BO_NORMAL, 1);
 
 	    if (eais->data_reg == -2) {
-		                           
+		/* Move immediate to reg */
 		if (eaid->size == sz_word) assemble(0x66);
 		assemble(0xC6 + szflag); assemble(0xC0 + destr);
 		switch (eaid->size) {
@@ -2582,8 +2582,8 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
 		 case sz_word: assemble_uword(eais->data_const_off); break;
 		 case sz_long: assemble_ulong(eais->data_const_off); break;
 		}
-		                                                              
-                  
+		/* normal byteorder comes either from force above or from long
+		 * const move */
 		map->x86_byteorder[destr] = BO_NORMAL;
 	    } else if (eais->data_reg == -1) {
 		if (eais->mode == Dreg) {
@@ -2595,7 +2595,7 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
 						      eais->size);
 		    map->x86_byteorder[destr] = BO_NORMAL;
 		} else {
-		                         
+		    /* Move mem to reg */
 		    compile_force_byteorder(map, eais->address_reg, BO_NORMAL, 0);
 		    compile_move_reg_from_mem_regoffs(destr, eais->address_reg,
 						      (uae_u32)(eais->addr_const_off + address_space),
@@ -2609,7 +2609,7 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
 		}
 	    } else {
 		if (eais->size == sz_long) {
-		                                              
+		    /* Make this the new register cache reg */
 		    remove_x86r_from_cache(map, eais->data_reg, 0);
 		    remove_x86r_from_cache(map, destr, 0);
 		    map->x86_cache_reg[eais->data_reg] = eaid->reg;
@@ -2618,7 +2618,7 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
 		    map->dreg_map[eaid->reg] = eais->data_reg;
 		    map->x86_verified[eais->data_reg] = 0;
 		} else {
-		                              
+		    /* Move from reg to reg */
 		    compile_force_byteorder(map, eais->data_reg, BO_NORMAL, 1);
 		    compile_offset_reg (map, eais->data_reg, eais->data_const_off);
 		    if (eaid->size == sz_word) assemble(0x66);
@@ -2634,21 +2634,21 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
 	if (eaid->size != sz_long)
 	    printf("Areg put != long\n");
 
-	                                                                 
-                   
+	/* Is the reg to move from already the register cache reg for the
+	 * destination? */
 	if (eais->data_reg >= 0 && eais->data_reg == map->areg_map[eaid->reg]) {
 	    map->x86_dirty[eais->data_reg] = 1; map->x86_verified[eais->data_reg] = 0;
 	    map->x86_const_offset[eais->data_reg] = eais->data_const_off;
 	    return;
 	}
-	                                                       
+	/* Is the destination register in its home location? */
 	if (map->areg_map[eaid->reg] < 0) {
 	    if (eais->data_reg == -2) {
-		                                         
+		/* Move immediate to uae_regs.uae_regs */
 		assemble(0xC7); assemble(0x05); assemble_long(uae_regs.uae_regs + 8 + eaid->reg);
 		assemble_ulong(eais->data_const_off);
 	    } else if (eais->data_reg == -1) {
-#if 0                   
+#if 0 /* see above... */
 		printf("Shouldn't happen (mem-mem-move)\n");
 #endif
 		map->x86_cache_reg[eaid->data_reg] = eaid->reg;
@@ -2658,7 +2658,7 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
 		map->x86_verified[eaid->data_reg] = 0;
 		goto have_cache_reg_a;
 	    } else {
-		                                          
+		/* Make this the new register cache reg */
 		remove_x86r_from_cache(map, eais->data_reg, 0);
 		map->x86_cache_reg[eais->data_reg] = eaid->reg;
 		map->x86_cr_type[eais->data_reg] = 0;
@@ -2676,12 +2676,12 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
 		compile_force_byteorder(map, destr, BO_NORMAL, 1);
 
 	    if (eais->data_reg == -2) {
-		                           
+		/* Move immediate to reg */
 		assemble(0xC7); assemble(0xC0 + destr);
 		assemble_ulong(eais->data_const_off);
 
-		                                                              
-                  
+		/* normal byteorder comes either from force above or from long
+		 * const move */
 		map->x86_byteorder[destr] = BO_NORMAL;
 	    } else if (eais->data_reg == -1) {
 		if (eais->mode == Dreg) {
@@ -2693,7 +2693,7 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
 						      eais->size);
 		    map->x86_byteorder[destr] = BO_NORMAL;
 		} else {
-		                         
+		    /* Move mem to reg */
 		    compile_force_byteorder(map, eais->address_reg, BO_NORMAL, 0);
 		    compile_move_reg_from_mem_regoffs(destr, eais->address_reg,
 						      (uae_u32)(eais->addr_const_off + address_space),
@@ -2702,7 +2702,7 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
 		    map->x86_byteorder[destr] = BO_SWAPPED_LONG;
 		}
 	    } else {
-		                                          
+		/* Make this the new register cache reg */
 		remove_x86r_from_cache(map, eais->data_reg, 0);
 		remove_x86r_from_cache(map, destr, 0);
 		map->x86_cache_reg[eais->data_reg] = eaid->reg;
@@ -2720,7 +2720,7 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
 
     if (eais->data_reg == -1)
 	printf("Storing to mem, but not from reg\n");
-                               
+    /* Correct the byteorder */
     if (eais->data_reg != -2) {
 	compile_offset_reg(map, eais->data_reg, eais->data_const_off);
 
@@ -2747,13 +2747,13 @@ static void compile_storeea(struct register_mapping *map, struct ea_info *eainf,
 	    break;
 	}
 	compile_force_byteorder(map, eaid->address_reg, BO_NORMAL, 0);
-	                                                       
+	/* generate code to move valueoffset,eaoffset(eareg) */
 	switch(eaid->size) {
 	 case sz_byte: assemble(0xC6); break;
-	 case sz_word: assemble(0x66);                   
+	 case sz_word: assemble(0x66); /* fall through */
 	 case sz_long: assemble(0xC7); break;
 	}
-	if (eaid->address_reg == -2) {                              
+	if (eaid->address_reg == -2) { /* absolute or PC-relative */
 	    assemble(0x05);
 	    assemble_long(eaid->addr_const_off + address_space);
 	} else {
@@ -2787,9 +2787,9 @@ static void generate_exit(struct register_mapping *map, int address)
 
     if (map != NULL)
 	sync_reg_cache (map, 1);
-    assemble(0xB8);                        
+    assemble(0xB8); /* movl $new_pc,%eax */
     assemble_ulong(address);
-    assemble(0xC3);          
+    assemble(0xC3); /* RET */
 }
 
 static void copy_map_with_undo(struct register_mapping *dst,
@@ -2837,10 +2837,10 @@ static void generate_possible_exit(struct register_mapping *map,
     compile_force_byteorder(map, eai->address_reg, BO_NORMAL, 0);
     switch (eai->address_reg) {
      case -1:
-	                                
+	/* EA doesn't refer to memory */
 	break;
      case -2:
-	                            
+	/* Only a constant offset */
 	eai->addr_const_off &= (1<<24)-1;
 	if (!good_address_map[eai->addr_const_off]) {
 	    copy_map_with_undo(&exit_regmap, map, pud);
@@ -2858,10 +2858,10 @@ static void generate_possible_exit(struct register_mapping *map,
 	}
 	copy_map_with_undo(&compile_exit_stack[cesp].map, map, pud);
 	compile_exit_stack[cesp].address = insn_info[iip].address;
-	assemble(0x80); assemble(0xB8 + eai->address_reg);                                      
+	assemble(0x80); assemble(0xB8 + eai->address_reg); /* cmpb $0, good_address_map(x86r) */
 	assemble_long(good_address_map + eai->addr_const_off);
 	assemble(0);
-	assemble(0x0F); assemble(0x84);                
+	assemble(0x0F); assemble(0x84); /* JE finish */
 	compile_exit_stack[cesp].jmpoffs = compile_here();
 	compile_exit_stack[cesp].noflush = 0;
 	assemble_ulong(0);
@@ -2925,7 +2925,7 @@ static void compile_do_cc_test_reg(struct register_mapping *map)
     compile_force_byteorder(map, cc_reg, BO_NORMAL, 1);
     if (cc_offset != 0)
 	printf("Pull my finger\n");
-    if (cc_size == sz_word)                 
+    if (cc_size == sz_word) /* test ccreg */
 	assemble(0x66);
     if (cc_size == sz_byte)
 	assemble(0x84);
@@ -2953,7 +2953,7 @@ static int compile_flush_cc_cache(struct register_mapping *map, int status,
 	if (user_flagmask & CC68K_V)
 	    need_for_user |= CC_V_FROM_86V;
 
-	                                                                    
+	/* Check whether we can satisfy the user's needs in a simple way. */
 	if ((need_for_user & status) == need_for_user)
 	    status_for_user = status;
 	else if (user_flagmask == CC68K_Z && status == CC_Z_FROM_86C)
@@ -2966,7 +2966,7 @@ static int compile_flush_cc_cache(struct register_mapping *map, int status,
 		status_for_user = status = (CC_C_FROM_86C | CC_Z_FROM_86Z | CC_N_FROM_86N | CC_V_FROM_86V);
 	    }
 	} else if (status == CC_AFTER_RO) {
-	                                          
+	    /* We fake some information here... */
 	    if (user_flagmask == CC68K_C && (user_live_at_end & ~CC68K_C) == 0)
 		status = status_for_user = CC_C_FROM_86C;
 	    else if (((user_flagmask | user_live_at_end) & (CC68K_C|CC68K_V)) == 0) {
@@ -2983,17 +2983,17 @@ static int compile_flush_cc_cache(struct register_mapping *map, int status,
 	    } else
 		status_for_user = CC_SAHF;
 	} else if (need_for_user != 0) {
-	                                    
+	    /* No way to handle it easily */
 	    status_for_user = CC_SAHF;
 	}
 	if (status_for_user != CC_SAHF)
 	    live_at_end = user_live_at_end;
     }
 
-      
-                                                                            
-                                   
-       
+    /*
+     * Now store the flags which are live at the end of this insn and set by
+     * us into their home locations
+     */
     if (status == CC_TEST_REG) {
 	if ((live_at_end & (CC68K_C|CC68K_V|CC68K_Z|CC68K_N)) == 0)
 	    goto all_ok;
@@ -3017,7 +3017,7 @@ static int compile_flush_cc_cache(struct register_mapping *map, int status,
 	    int tmpr = get_free_x86_register(map, ALL_X86_REGS);
 	    compile_do_cc_test_reg(map);
 
-	                                                 
+	    /* pushfl; popl tmpr; movl tempr, regflags */
 	    assemble(0x9C); assemble(0x58+tmpr);
 	    compile_move_reg_to_mem_regoffs(-2, (uae_u32)&regflags, tmpr, sz_long);
 	}
@@ -3025,7 +3025,7 @@ static int compile_flush_cc_cache(struct register_mapping *map, int status,
 	if ((live_at_end & CC68K_Z) != 0) {
 	    int tmpr = get_typed_x86_register(map, DATA_X86_REGS);
 	    assemble(0x9C);
-	                                                                             
+	    /* setnc tmpr; shl $6, tmpr; andb $~0x40, regflags; orb tmpr, regflags */
 	    assemble(0x0F); assemble(0x93); assemble(0xC0 + tmpr);
 	    assemble(0xC0); assemble(4*8 + 0xC0 + tmpr); assemble(6);
 	    assemble(0x80); assemble(0x05+0x20); assemble_long(&regflags); assemble((uae_u8)~0x40);
@@ -3036,11 +3036,11 @@ static int compile_flush_cc_cache(struct register_mapping *map, int status,
 	int tmpr = get_typed_x86_register(map, DATA_X86_REGS);
 	assemble(0x9C);
 	compile_do_cc_test_reg(map);
-	                                                                                         
+	/* pushfl; popl tmpr; andl $0xff,tmpr (mask out V flag which is cleared after rotates) */
 	assemble(0x9C); assemble(0x58 + tmpr);
 	assemble(0x81); assemble(0xC0 + tmpr + 8*4); assemble_ulong(0xFF);
 	assemble(0x9D);
-	                  
+	/* adc $0, tmpr */
 	assemble(0x80); assemble(0xC0 + tmpr + 8*2); assemble(0);
 	compile_move_reg_to_mem_regoffs(-2, (uae_u32)&regflags, tmpr, sz_long);
 	if (status == CC_AFTER_ROX)
@@ -3062,12 +3062,12 @@ static int compile_flush_cc_cache(struct register_mapping *map, int status,
 
 	    if (live_at_end) {
 		if ((status & CC_X_FROM_86C) != 0 && live_at_end == CC68K_X) {
-		                           
+		    /* SETC regflags + 4 */
 		    assemble(0x0F); assemble(0x92);
 		    assemble(0x05); assemble_long(4 + (uae_u32)&regflags);
 		} else {
 		    int tmpr = get_free_x86_register(map, ALL_X86_REGS);
-		                                                 
+		    /* pushfl; popl tmpr; movl tempr, regflags */
 		    assemble(0x9C); assemble(0x58+tmpr);
 		    compile_move_reg_to_mem_regoffs(-2, (uae_u32)&regflags, tmpr, sz_long);
 
@@ -3101,7 +3101,7 @@ static char *compile_condbranch(struct register_mapping *map, int iip,
 	flagsneeded |= CC_V_FROM_86V;
 
     if (flagsneeded == 0)
-	          ;
+	/* Fine */;
     else if (new_cc_status == CC_SAHF) {
 	int tmpr = get_free_x86_register(map, ALL_X86_REGS);
 	compile_move_reg_from_mem_regoffs(tmpr, -2, (uae_u32)&regflags, sz_long);
@@ -3119,25 +3119,25 @@ static char *compile_condbranch(struct register_mapping *map, int iip,
 	flagsneeded = 0;
 	new_cc_status = 0;
 	switch (cc) {
-	 case 2: cc = !z ? Bcc_TRUE : Bcc_FALSE; break;                     
-	 case 3: cc = z ? Bcc_TRUE : Bcc_FALSE; break;                   
-	 case 4: cc = Bcc_TRUE; break;            
-	 case 5: cc = Bcc_FALSE; break;           
-	 case 6: cc = !z ? Bcc_TRUE : Bcc_FALSE; break;            
-	 case 7: cc = z ? Bcc_TRUE : Bcc_FALSE; break;           
-	 case 8: cc = Bcc_TRUE; break;            
-	 case 9: cc = Bcc_FALSE; break;           
-	 case 10:cc = !n ? Bcc_TRUE : Bcc_FALSE; break;            
-	 case 11:cc = n ? Bcc_TRUE : Bcc_FALSE; break;           
-	 case 12:cc = !n ? Bcc_TRUE : Bcc_FALSE; break;                   
-	 case 13:cc = n ? Bcc_TRUE : Bcc_FALSE; break;                   
-	 case 14:cc = !n && !z ? Bcc_TRUE : Bcc_FALSE; break;                              
-	 case 15:cc = n || z ? Bcc_TRUE : Bcc_FALSE; break;                             
+	 case 2: cc = !z ? Bcc_TRUE : Bcc_FALSE; break; /* !CFLG && !ZFLG */
+	 case 3: cc = z ? Bcc_TRUE : Bcc_FALSE; break; /* CFLG || ZFLG */
+	 case 4: cc = Bcc_TRUE; break; /* !CFLG */
+	 case 5: cc = Bcc_FALSE; break; /* CFLG */
+	 case 6: cc = !z ? Bcc_TRUE : Bcc_FALSE; break; /* !ZFLG */
+	 case 7: cc = z ? Bcc_TRUE : Bcc_FALSE; break; /* ZFLG */
+	 case 8: cc = Bcc_TRUE; break; /* !VFLG */
+	 case 9: cc = Bcc_FALSE; break; /* VFLG */
+	 case 10:cc = !n ? Bcc_TRUE : Bcc_FALSE; break; /* !NFLG */
+	 case 11:cc = n ? Bcc_TRUE : Bcc_FALSE; break; /* NFLG */
+	 case 12:cc = !n ? Bcc_TRUE : Bcc_FALSE; break; /* NFLG == VFLG */
+	 case 13:cc = n ? Bcc_TRUE : Bcc_FALSE; break; /* NFLG != VFLG */
+	 case 14:cc = !n && !z ? Bcc_TRUE : Bcc_FALSE; break; /* !ZFLG && (NFLG == VFLG) */
+	 case 15:cc = n || z ? Bcc_TRUE : Bcc_FALSE; break; /* ZFLG || (NFLG != VFLG) */
 	}
     } else if (new_cc_status == CC_Z_FROM_86C) {
 	if (cc == 6 || cc == 7) {
 	    cc = (cc - 2) ^ 1;
-	                 
+	    /* Fake... */
 	    flagsneeded = new_cc_status = CC_C_FROM_86C;
 	} else if (cc != 0 && cc != 1)
 	    printf("Groan!\n");
@@ -3148,26 +3148,26 @@ static char *compile_condbranch(struct register_mapping *map, int iip,
 
     if ((flagsneeded & new_cc_status) == flagsneeded) {
 	char *result;
-	                                     
+	/* We can generate a simple branch */
 	if (cc == 0)
 	    assemble(0xE9);
 	else
 	    assemble(0x0F);
 	switch(cc) {
-	 case 2: assemble(0x87); break;                  
-	 case 3: assemble(0x86); break;                  
-	 case 4: assemble(0x83); break;                  
-	 case 5: assemble(0x82); break;                  
-	 case 6: assemble(0x85); break;                  
-	 case 7: assemble(0x84); break;                  
-	 case 8: assemble(0x81); break;                  
-	 case 9: assemble(0x80); break;                  
-	 case 10:assemble(0x89); break;                  
-	 case 11:assemble(0x88); break;                  
-	 case 12:assemble(0x8D); break;                  
-	 case 13:assemble(0x8C); break;                  
-	 case 14:assemble(0x8F); break;                  
-	 case 15:assemble(0x8E); break;                  
+	 case 2: assemble(0x87); break;          /* HI */
+	 case 3: assemble(0x86); break;          /* LS */
+	 case 4: assemble(0x83); break;          /* CC */
+	 case 5: assemble(0x82); break;          /* CS */
+	 case 6: assemble(0x85); break;          /* NE */
+	 case 7: assemble(0x84); break;          /* EQ */
+	 case 8: assemble(0x81); break;          /* VC */
+	 case 9: assemble(0x80); break;          /* VS */
+	 case 10:assemble(0x89); break;          /* PL */
+	 case 11:assemble(0x88); break;          /* MI */
+	 case 12:assemble(0x8D); break;          /* GE */
+	 case 13:assemble(0x8C); break;          /* LT */
+	 case 14:assemble(0x8F); break;          /* GT */
+	 case 15:assemble(0x8E); break;          /* LE */
 	}
 	result = compile_here();
 	assemble_ulong(0);
@@ -3188,7 +3188,7 @@ static void compile_handle_dbcc(struct register_mapping *map, int iip,
 {
     char *fillin1 = compile_condbranch(map, iip, new_cc_status);
 
-                               
+    /* subw $1,dreg; jnc ... */
     assemble(0x66); assemble(0x83); assemble(0x05 + 5*8);
     assemble_long(uae_regs.uae_regs + dreg);
     assemble(1);
@@ -3210,7 +3210,7 @@ static void handle_bit_insns(struct register_mapping *map, struct ea_info *eainf
     int code = (optype == i_BTST ? 0
 		: optype == i_BSET ? 1
 		: optype == i_BCLR ? 2
-		:                        3);
+		: /* optype == i_BCHG */ 3);
 
     compile_fetchea(map, eainf, eaino_s, 5);
     compile_fetchea(map, eainf, eaino_d, 3);
@@ -3218,7 +3218,7 @@ static void handle_bit_insns(struct register_mapping *map, struct ea_info *eainf
     if (srcea->data_reg != -2) {
 	compile_force_byteorder(map, srcea->data_reg, BO_NORMAL, 0);
 	remove_x86r_from_cache(map, srcea->data_reg, 0);
-	                            
+	/* andl $something,srcreg */
 	assemble(0x83); assemble(0xC0 + 4*8 + srcea->data_reg);
 	if (dstea->size == sz_byte)
 	    assemble(7);
@@ -3230,7 +3230,7 @@ static void handle_bit_insns(struct register_mapping *map, struct ea_info *eainf
 	else
 	    srcea->data_const_off &= 31;
 
-                                  
+    /* Areg isn't possible here */
     if (dstea->mode == Dreg && dstea->data_reg == -1) {
 	if (srcea->data_reg == -2) {
 	    assemble(0x0F); assemble(0xBA); assemble(5 + 8*(4 + code));
@@ -3255,7 +3255,7 @@ static void handle_bit_insns(struct register_mapping *map, struct ea_info *eainf
     } else {
 	int addr_code = dstea->address_reg == -2 ? 5 : dstea->address_reg + 0x80;
 	compile_force_byteorder(map, dstea->address_reg, BO_NORMAL, 0);
-	                                  
+	/* We have an address in memory */
 	if (dstea->data_reg != -1)
 	    printf("Things don't look good in handle_bit_insns\n");
 	if (srcea->data_reg == -2) {
@@ -3349,10 +3349,10 @@ static void handle_rotshi(struct register_mapping *map, int iip,
 	shiftcode = 0; cc_status = CC_AFTER_RO;
 	break;
      case i_ROXL:
-	shiftcode = 2; assemble(0x9E);            cc_status = CC_AFTER_ROX; compile_unlock_reg(map, r_EAX);
+	shiftcode = 2; assemble(0x9E); /* SAHF */ cc_status = CC_AFTER_ROX; compile_unlock_reg(map, r_EAX);
 	break;
      case i_ROXR:
-	shiftcode = 3; assemble(0x9E);            cc_status = CC_AFTER_ROX; compile_unlock_reg(map, r_EAX);
+	shiftcode = 3; assemble(0x9E); /* SAHF */ cc_status = CC_AFTER_ROX; compile_unlock_reg(map, r_EAX);
 	break;
     }
 
@@ -3364,7 +3364,7 @@ static void handle_rotshi(struct register_mapping *map, int iip,
     cc_offset = 0; cc_size = size; cc_reg = eai.data_reg;
 
     if (locked_eax_for_sahf) {
-	                                                                        
+	/* The trick here is that the overflow flag isn't put into AH in SAHF */
 	assemble(0x9E);
 	assemble(0x0B); assemble(9*1 + 0xC0);
 	assemble(0x9F);
@@ -3404,7 +3404,7 @@ static void handle_rotshi_variable(struct register_mapping *map, int iip,
 	compile_move_reg_from_mem_regoffs(r_AH, -2, 4 + (uae_u32)&regflags,
 					  sz_byte);
     }
-                                          
+    /* Both src and dest are Dreg modes */
     compile_prepareea(map, insn_info[iip].dp->smode, insn_info[iip].dp->sreg,
 		      sz_long, &realpc, current_addr,
 		      &eais, 0, EA_LOAD, 1);
@@ -3417,8 +3417,8 @@ static void handle_rotshi_variable(struct register_mapping *map, int iip,
     compile_force_byteorder(map, eais.data_reg, BO_NORMAL, 0);
     compile_force_byteorder(map, eaid.data_reg, BO_NORMAL, 0);
     compile_move_reg_reg(r_ECX, eais.data_reg, sz_long);
-                                                                            
-                                               
+    /* Test against zero, and test bit 6. If 1 <= count <= 31, we can do the
+     * operation, otherwise, we have to exit */
     assemble(0xF6); assemble(0xC0 + r_ECX); assemble(0x1F);
     assemble(0x74); assemble(9);
     assemble(0xF6); assemble(0xC0 + r_ECX); assemble(0x20);
@@ -3447,10 +3447,10 @@ static void handle_rotshi_variable(struct register_mapping *map, int iip,
 	shiftcode = 0; cc_status = CC_AFTER_RO;
 	break;
      case i_ROXL:
-	shiftcode = 2; assemble(0x9E);            cc_status = CC_AFTER_ROX; compile_unlock_reg(map, r_EAX);
+	shiftcode = 2; assemble(0x9E); /* SAHF */ cc_status = CC_AFTER_ROX; compile_unlock_reg(map, r_EAX);
 	break;
      case i_ROXR:
-	shiftcode = 3; assemble(0x9E);            cc_status = CC_AFTER_ROX; compile_unlock_reg(map, r_EAX);
+	shiftcode = 3; assemble(0x9E); /* SAHF */ cc_status = CC_AFTER_ROX; compile_unlock_reg(map, r_EAX);
 	break;
     }
 
@@ -3461,7 +3461,7 @@ static void handle_rotshi_variable(struct register_mapping *map, int iip,
     cc_offset = 0; cc_size = insn_info[iip].dp->size; cc_reg = eaid.data_reg;
 
     if (locked_eax_for_sahf) {
-	                                                                        
+	/* The trick here is that the overflow flag isn't put into AH in SAHF */
 	assemble(0x9E);
 	assemble(0x0B); assemble(9*1 + 0xC0);
 	assemble(0x9F);
@@ -3493,7 +3493,7 @@ static int m68k_compile_block(struct hash_block *hb)
 
     cc_status = 0; compile_failure = 0;
 
-                                
+    /* Kickstart ROM address? */
     if ((hb->he_first->addr & 0xF80000) != 0xF80000
 	&& 0 && !patched_syscalls)
 	return 1;
@@ -3507,7 +3507,7 @@ static int m68k_compile_block(struct hash_block *hb)
     compile_org(hb->compile_start);
     compile_last_addr = (char *)hb->compile_start + hb->alloclen;
 
-                                                      
+    /* m68k_scan_block() will leave this all set up */
     current_bb = bb_stack;
 
     for (i = 0; i < 8; i++) {
@@ -3533,8 +3533,8 @@ static int m68k_compile_block(struct hash_block *hb)
 	struct pid_undo pub;
 	struct insn_reg_needs this_reg_needs = reg_needs_init;
 
-	                                                             
-                                         
+	/* Set up locks for a new insn. We don't bother to clear this
+	 * properly after compiling one insn. */
 	for (i = 0; i < 8; i++) {
 	    map.x86_users[i] = i == r_ESP ? 1 : 0;
 	    map.x86_locked[i] = i == r_ESP ? 2 : 0;
@@ -3565,7 +3565,7 @@ static int m68k_compile_block(struct hash_block *hb)
 		compile_failure = 1;
 	    } else {
 		assemble(0xFE); assemble(0x05 + 8*1); assemble_long(&nr_bbs_to_run);
-		assemble(0x0F); assemble(0x84);                
+		assemble(0x0F); assemble(0x84); /* JE finish */
 		compile_exit_stack[cesp].noflush = 1;
 		compile_exit_stack[cesp].address = current_bb->h;
 		compile_exit_stack[cesp].jmpoffs = compile_here();
@@ -3573,9 +3573,9 @@ static int m68k_compile_block(struct hash_block *hb)
 		cesp++;
 	    }
 	}
-	  
-                                                            
-                              
+	/*
+	 * This will sort out all insns we can't compile, including
+	 * jumps out of this block */
 	if (insn_info[iip].stop_translation == 1) {
 	    generate_exit(&map, insn_info[iip].address);
 	    cc_status = 0;
@@ -3593,24 +3593,24 @@ static int m68k_compile_block(struct hash_block *hb)
 	    {
 		char *tmp1, *tmp2, *tmp3;
 
-		                
+		/* fetch (A7) */
 		assemble(0x8B); assemble(0x5 + r_EBX*8); assemble_long(uae_regs.uae_regs + 15);
 		assemble(0x8B); assemble(0x80 + 9*r_EBX); assemble_long(address_space);
-		assemble(0x0F);                  
+		assemble(0x0F); /* bswapl x86r */
 		assemble(0xC8 + r_EBX);
-		                   
+		/* fetch jsr_num */
 		assemble(0x8B); assemble(0x5 + r_ECX*8); assemble_long(&jsr_num);
 		assemble(0x09); assemble(0xC0 + 9*r_ECX);
 		assemble(0x0F); assemble(0x84); tmp1 = compile_here(); assemble_ulong(0);
 		assemble(0xFF); assemble(1*8 + 0xC0 + r_ECX);
-		                               
+		/* cmpl %ebx,disp32(,%ecx,4) */
 		assemble(0x39); assemble(0x04 + 8*r_EBX); assemble(0x8d);
 		assemble_long(jsr_rets);
 		assemble(0x0F); assemble(0x85); tmp2 = compile_here(); assemble_ulong(0);
-		                               
+		/* movl disp32(,%ecx,4),%ebx */
 		assemble(0x8B); assemble(0x04 + 8*r_EBX); assemble(0x8d);
 		assemble_long(jsr_hash);
-		                              
+		/* movl execute(%ebx), %ebx */
 		assemble(0x8B); assemble(0x040 + 9*r_EBX); assemble((int)&((struct hash_entry *)0)->execute);
 		assemble(0x09); assemble(0xC0 + 9*r_EBX);
 		assemble(0x0F); assemble(0x85); tmp3 = compile_here(); assemble_ulong(0);
@@ -3623,7 +3623,7 @@ static int m68k_compile_block(struct hash_block *hb)
 		compile_org(tmp1);
 		assemble(0x89); assemble(0x5 + r_ECX*8); assemble_long(&jsr_num);
 		assemble(0x83); assemble(0x05 + 5*8); assemble_long(uae_regs.uae_regs + 15); assemble(-4);
-		               
+		/* Off we go */
 		assemble(0xFF); assemble(4*8 + 0xC0 + r_EBX);
 	    }
 	    break;
@@ -3644,7 +3644,7 @@ static int m68k_compile_block(struct hash_block *hb)
 		    generate_exit(&map, insn_info[iip].address);
 		    break;
 		}
-		                                                     
+		/* check whether the destination has compiled code */
 		assemble(0x8B); assemble(r_EBX*8 + 0x05); assemble_long(&(tmph->execute));
 		assemble(0x09); assemble(0xC0 + 9*r_EBX);
 		assemble(0x0F); assemble(0x85); tmp1 = compile_here(); assemble_ulong(0);
@@ -3652,7 +3652,7 @@ static int m68k_compile_block(struct hash_block *hb)
 		tmp2 = compile_here(); compile_org(tmp1);
 		assemble_ulong((tmp2 - tmp1) - 4);
 		compile_org(tmp2);
-		               
+		/* Off we go */
 		assemble(0xFF); assemble(4*8 + 0xC0 + r_EBX);
 	    }
 	    cc_status = 0;
@@ -3678,11 +3678,11 @@ static int m68k_compile_block(struct hash_block *hb)
 		}
 		assert(iip + 1 < last_iip);
 		assert(iip == current_bb->last_iip);
-		                                                     
+		/* check whether the destination has compiled code */
 		assemble(0x8B); assemble(r_EBX*8 + 0x05); assemble_long(&(tmph->execute));
 		assemble(0x09); assemble(0xC0 + 9*r_EBX);
 		assemble(0x0F); assemble(0x84); tmp3 = compile_here(); assemble_ulong(0);
-		                              
+		/* check for stack overflow */
 		assemble(0x8B); assemble(r_ECX*8 + 0x05); assemble_long(&jsr_num);
 		assemble(0xF7); assemble(0xC0+r_ECX); assemble_ulong(MAX_JSRS);
 		assemble(0x0F); assemble(0x84); tmp1 = compile_here(); assemble_ulong(0);
@@ -3690,19 +3690,19 @@ static int m68k_compile_block(struct hash_block *hb)
 		tmp2 = compile_here(); compile_org(tmp1); assemble_ulong((tmp2 - tmp1) - 4);
 		compile_org(tmp3); assemble_ulong(tmp1-tmp3);
 		compile_org(tmp2);
-		                                     
+		/* movl $something,disp32(,%ecx,4) */
 		assemble(0xC7); assemble(0x04); assemble(0x8d);
 		assemble_long(jsr_rets); assemble_ulong(insn_info[iip+1].address);
 		assemble(0xC7); assemble(0x04); assemble(0x8d);
 		assemble_long(jsr_hash); assemble_long((current_bb + 1)->h);
-		                  
+		/* incl jsr_num */
 		assemble(0xFF); assemble(0x05); assemble_long(&jsr_num);
-		                                 
+		/* Put things on the 68k stack */
 		assemble(0x83); assemble(0x05 + 5*8); assemble_long(uae_regs.uae_regs + 15); assemble(4);
 		assemble(0x8B); assemble(r_ECX*8+ 0x05); assemble_long(uae_regs.uae_regs + 15);
 		assemble(0xC7); assemble(0x80 + r_ECX); assemble_long(address_space);
 		assemble_ulong_68k(insn_info[iip+1].address);
-		               
+		/* Off we go */
 		assemble(0xFF); assemble(4*8 + 0xC0 + r_EBX);
 	    }
 	    break;
@@ -3726,11 +3726,11 @@ static int m68k_compile_block(struct hash_block *hb)
 		assert(iip + 1 < last_iip);
 		assert(iip == current_bb->last_iip);
 
-		                                                     
+		/* check whether the destination has compiled code */
 		assemble(0x8B); assemble(r_EBX*8 + 0x05); assemble_long(&(tmph->execute));
 		assemble(0x09); assemble(0xC0 + 9*r_EBX);
 		assemble(0x0F); assemble(0x84); tmp3 = compile_here(); assemble_ulong(0);
-		                              
+		/* check for stack overflow */
 		assemble(0x8B); assemble(r_ECX*8 + 0x05); assemble_long(&jsr_num);
 		assemble(0xF7); assemble(0xC0+r_ECX); assemble_ulong(MAX_JSRS);
 		assemble(0x0F); assemble(0x84); tmp1 = compile_here(); assemble_ulong(0);
@@ -3738,19 +3738,19 @@ static int m68k_compile_block(struct hash_block *hb)
 		tmp2 = compile_here(); compile_org(tmp1); assemble_ulong((tmp2 - tmp1) - 4);
 		compile_org(tmp3); assemble_ulong(tmp1-tmp3);
 		compile_org(tmp2);
-		                                     
+		/* movl $something,disp32(,%ecx,4) */
 		assemble(0xC7); assemble(0x04); assemble(0x8d);
 		assemble_long(jsr_rets); assemble_ulong(insn_info[iip+1].address);
 		assemble(0xC7); assemble(0x04); assemble(0x8d);
 		assemble_long(jsr_hash); assemble_long((current_bb + 1)->h);
-		                  
+		/* incl jsr_num */
 		assemble(0xFF); assemble(0x05); assemble_long(&jsr_num);
-		                                 
+		/* Put things on the 68k stack */
 		assemble(0x83); assemble(0x05 + 5*8); assemble_long(uae_regs.uae_regs + 15); assemble(4);
 		assemble(0x8B); assemble(r_ECX*8+ 0x05); assemble_long(uae_regs.uae_regs + 15);
 		assemble(0xC7); assemble(0x80 + r_ECX); assemble_long(address_space);
 		assemble_ulong_68k(insn_info[iip+1].address);
-		               
+		/* Off we go */
 		assemble(0xFF); assemble(4*8 + 0xC0 + r_EBX);
 	    }
 	    break;
@@ -3844,7 +3844,7 @@ static int m68k_compile_block(struct hash_block *hb)
 
 	    compile_loadeas(&map, eainfo, 0, 1, binop_alternatives, 0, 1);
 
-	                                       
+	    /* bt $0, regflags+4 ; get carry */
 	    assemble(0x0F); assemble(0xBA); assemble(0x5+4*8);
 	    assemble_ulong(4 + (uae_u32)&regflags); assemble(0);
 
@@ -3855,19 +3855,19 @@ static int m68k_compile_block(struct hash_block *hb)
 	    compile_note_modify(&map, eainfo, 1);
 
 	    if (insn_info[iip].flags_live_at_end & CC68K_Z) {
-		           
+		/* Darn. */
 		int tmpr = get_free_x86_register(&map, ALL_X86_REGS);
-		                       
+		/* pushfl; popl tmpr */
 		assemble(0x9C); assemble(0x58+tmpr);
-		            
-		                                                               
+		/* Magic! */
+		/* andl tmpr, regflags; andl $~0x40,tmpr; orl tmpr, regflags */
 		assemble(0x21); assemble(0x05 + 8*tmpr); assemble_long(&regflags);
 		assemble(0x81); assemble(0xC0 + 8*4 + tmpr); assemble_ulong(~0x40);
 		assemble(0x09); assemble(0x05 + 8*tmpr); assemble_long(&regflags);
 		compile_move_reg_to_mem_regoffs(-2, 4 + (uae_u32)&regflags, tmpr, sz_long);
 		cc_status = 0;
 	    } else {
-		           
+		/* Lies! */
 		cc_status = CC_X_FROM_86C | CC_Z_FROM_86Z |CC_C_FROM_86C |CC_V_FROM_86V |CC_N_FROM_86N;
 	    }
 	    break;
@@ -3890,7 +3890,7 @@ static int m68k_compile_block(struct hash_block *hb)
 
 	    compile_loadeas(&map, eainfo, 0, 1, regonly_alternatives, 0, 1);
 
-	                                      
+	    /* Extend the uae_regs properly */
 	    remove_x86r_from_cache(&map, eainfo[0].data_reg, 0);
 	    switch (insn_info[iip].dp->mnemo) {
 	     case i_MULU:
@@ -3902,7 +3902,7 @@ static int m68k_compile_block(struct hash_block *hb)
 		assemble(0x0F); assemble(0xBF); assemble(0xC0 + 9*eainfo[1].data_reg);
 		break;
 	    }
-	                      
+	    /* and multiply */
 	    assemble(0x0F); assemble(0xAF); assemble(0xC0 + 8*eainfo[1].data_reg + eainfo[0].data_reg);
 	    compile_note_modify(&map, eainfo, 1);
 	    cc_status = CC_TEST_REG;
@@ -4058,23 +4058,23 @@ static int m68k_compile_block(struct hash_block *hb)
 	    generate_possible_exit(&map, eainfo+2, iip, &pub);
 
 	    compile_fetchea(&map, eainfo, 0, 1);
-	                                                         
-	                                           
-	    compile_storeea(&map, eainfo, 0, 2);                  
+	    /* we know this is a constant - no need to fetch it*/
+	    /* compile_fetchea(&map, eainfo, 1); */
+	    compile_storeea(&map, eainfo, 0, 2); /* An -> -(A7) */
 
 	    compile_prepareea(&map, Areg, 7, sz_long, &realpc, current_addr,
 			      eainfo, 3, EA_STORE, 1);
 	    compile_fetchea(&map, eainfo, 3, 1);
-	    compile_storeea(&map, eainfo, 3, 0);               
+	    compile_storeea(&map, eainfo, 3, 0); /* A7 -> An */
 
-	                 
+	    /* @@@ 020 */
 	    compile_prepareea(&map, Areg, 7, sz_long, &realpc, current_addr,
 			      eainfo, 4, EA_LOAD, 1);
 	    compile_prepareea(&map, Areg, 7, sz_long, &realpc, current_addr,
 			      eainfo, 5, EA_STORE, 1);
 	    compile_fetchea(&map, eainfo, 4, 1);
 	    eainfo[4].data_const_off += (uae_s16)eainfo[1].data_const_off;
-	    compile_storeea(&map, eainfo, 4, 5);                   
+	    compile_storeea(&map, eainfo, 4, 5); /* A7+off -> A7 */
 	    cc_status = 0;
 	    break;
 
@@ -4091,9 +4091,9 @@ static int m68k_compile_block(struct hash_block *hb)
 	    compile_fetchea(&map, eainfo, 0, 1);
 	    compile_storeea(&map, eainfo, 0, 1);
 
-	                                                                     
-                                                                     
-                     
+	    /* The Apdi could of course point to a non-memory area, but undos
+	     * are difficult here, and anyway: which program does evil hacks
+	     * with UNLK? */
 	    compile_prepareea(&map, Aipi, 7, sz_long, &realpc, current_addr,
 			      eainfo, 2, EA_LOAD, 1);
 	    compile_prepareea(&map, insn_info[iip].dp->smode,
@@ -4170,8 +4170,8 @@ static int m68k_compile_block(struct hash_block *hb)
 	    break;
 
 	 case i_EXT:
-	                                                                              
-                         
+	    /* No exits, no undo - this is always a Dreg; fetchea will get it in a reg
+	     * without offset */
 	    compile_prepareea(&map, insn_info[iip].dp->smode,
 			      insn_info[iip].dp->sreg,
 			      insn_info[iip].dp->size == sz_long ? sz_word : sz_byte,
@@ -4231,8 +4231,8 @@ static int m68k_compile_block(struct hash_block *hb)
 	    break;
 
 	 case i_SWAP:
-	                                                                              
-                         
+	    /* No exits, no undo - this is always a Dreg; fetchea will get it in a reg
+	     * without offset */
 	    compile_prepareea(&map, insn_info[iip].dp->smode,
 			      insn_info[iip].dp->sreg, sz_long,
 			      &realpc, current_addr,
@@ -4241,10 +4241,10 @@ static int m68k_compile_block(struct hash_block *hb)
 	    compile_fetchea(&map, eainfo, 0, 1);
 	    compile_force_byteorder(&map, eainfo[0].data_reg, BO_NORMAL, 0);
 
-	                          
+	    /* roll $16, srcreg */
 	    assemble(0xC1); assemble(0xC0 + eainfo[0].data_reg); assemble(16);
 
-	                         
+	    /* @@@ un-shortcut */
 	    map.x86_dirty[eainfo[0].data_reg] = 1;
 
 	    cc_status = CC_TEST_REG;
@@ -4254,7 +4254,7 @@ static int m68k_compile_block(struct hash_block *hb)
 	    break;
 
 	 case i_LEA:
-	                                                       
+	    /* No exits necessary here: never touches memory */
 	    compile_prepareea(&map, insn_info[iip].dp->smode,
 			      insn_info[iip].dp->sreg,
 			      insn_info[iip].dp->size, &realpc, current_addr,
@@ -4297,11 +4297,11 @@ static int m68k_compile_block(struct hash_block *hb)
 			      eainfo, 0, EA_LOAD, 1);
 	    sync_reg_cache(&map, 0);
 	    {
-		                                                           
-                                                              
-                                                          
-          
-     
+		/* Scratch 0 holds the registers while they are being moved
+		 * from/to memory. Scratch 1 points at uae_regs.d. Scratch 2
+		 * points at the base addr in memory where to fetch data
+		 * from.
+		 */
 		int scratch0, scratch1, scratch2;
 		uae_u16 mask = eainfo[0].data_const_off;
 		int bits = count_bits(mask);
@@ -4311,7 +4311,7 @@ static int m68k_compile_block(struct hash_block *hb)
 		uae_u32 current_offs = 0;
 
 		compile_prepare_undo(&map, insn_info[iip].dp->dmode, insn_info[iip].dp->dreg, &pub);
-		                                     
+		/* !!! Note current_addr + 2 here! */
 		compile_prepareea(&map, insn_info[iip].dp->dmode,
 				  insn_info[iip].dp->dreg,
 				  insn_info[iip].dp->size, &realpc, current_addr + 2,
@@ -4347,14 +4347,14 @@ static int m68k_compile_block(struct hash_block *hb)
 			compile_move_reg_from_mem_regoffs(scratch0, scratch2,
 							  current_offs, insn_info[iip].dp->size);
 			if (size == 2) {
-			    assemble(0x66);                       
+			    assemble(0x66); /* rolw $8,scratch0 */
 			    assemble(0xC1);
 			    assemble(0xC0 + scratch0);
 			    assemble(8);
-			    assemble(0x0F); assemble(0xBF);             
+			    assemble(0x0F); assemble(0xBF); /* extend */
 			    assemble(0xC0 + 9*scratch0);
 			} else {
-			    assemble(0x0F);                      
+			    assemble(0x0F); /* bswapl scratch0 */
 			    assemble(0xC8 + scratch0);
 			}
 			compile_move_reg_to_mem_regoffs(scratch1, (char *)(uae_regs.uae_regs + r68k) - (char *)uae_regs.uae_regs,
@@ -4394,7 +4394,7 @@ static int m68k_compile_block(struct hash_block *hb)
 		}
 		if (insn_info[iip].dp->dmode == Apdi)
 		    mask = bitswap(mask);
-		                                     
+		/* !!! Note current_addr + 2 here! */
 		compile_prepare_undo(&map, insn_info[iip].dp->dmode, insn_info[iip].dp->dreg, &pub);
 		compile_prepareea(&map, insn_info[iip].dp->dmode,
 				  insn_info[iip].dp->dreg,
@@ -4419,7 +4419,7 @@ static int m68k_compile_block(struct hash_block *hb)
 		for (i = 0; i < 16; i++) {
 		    int r68k = i;
 		    if (mask & 1) {
-			                       
+			/* move from 68k reg */
 			if (i < 8 || (i & 7) != insn_info[iip].dp->dreg || addrareg == -1) {
 			    compile_move_reg_from_mem_regoffs(scratch0, scratch1, (char *)(uae_regs.uae_regs + r68k) - (char *)uae_regs.uae_regs,
 							      sz_long);
@@ -4428,11 +4428,11 @@ static int m68k_compile_block(struct hash_block *hb)
 			}
 
 			if (size == 2) {
-			    assemble(0x66);                       
+			    assemble(0x66); /* rolw $8,scratch0 */
 			    assemble(0xC1);
 			    assemble(0xC0 + scratch0); assemble(8);
 			} else {
-			    assemble(0x0F);                      
+			    assemble(0x0F); /* bswapl scratch0 */
 			    assemble(0xC8 + scratch0);
 			}
 			compile_move_reg_to_mem_regoffs(scratch2, current_offs,
@@ -4473,7 +4473,7 @@ static int m68k_compile_block(struct hash_block *hb)
 		handle_rotshi_variable(&map, iip, realpc, current_addr, &pub);
 		break;
 	    }
-	                      
+	    /* fall through */
 	 case i_ASLW: case i_ASRW: case i_LSLW: case i_LSRW:
 	 case i_ROLW: case i_RORW: case i_ROXLW:case i_ROXRW:
 	    if (do_rotshi) {
@@ -4502,7 +4502,7 @@ static int m68k_compile_block(struct hash_block *hb)
     if (compile_failure)
 	goto oops;
 
-                                                    
+    /* Compile all exits that we prepared earlier */
     finish_exits();
     if (compile_failure)
 	goto oops;
@@ -4549,10 +4549,10 @@ void compiler_init(void)
     jsr_stack_init();
 }
 
-  
-                                                                           
-            
-   
+/*
+ * Why do compilers always have to be so complicated? And I thought GCC was
+ * a mess...
+ */
 
 #endif
-#endif                   
+#endif /* USE_COMPILER */

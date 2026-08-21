@@ -1,10 +1,10 @@
-   
-                                 
-   
-                                                    
-   
-                                      
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * routines to handle compressed file automatically
+  *
+  * (c) 1996 Samuel Devulder, Tim Gunn
+  */
 
 #include "sysconfig.h"
 #include "sysdeps.h"
@@ -119,14 +119,14 @@ void zfile_exit (void)
     while ((l = zlist)) {
 	zlist = l->next;
 	fclose (l->f);
-	unlink (l->name);                                                  
+	unlink (l->name); /* sam: in case unlink () after fopen () fails */
 	free (l);
     }
 }
 
-  
-                                      
-   
+/*
+ * fclose () but for a compressed file
+ */
 int zfile_fclose (struct zfile *f)
 {
     int ret;
@@ -164,9 +164,9 @@ size_t zfile_fwrite (void *b, size_t l1, size_t l2, struct zfile *z)
 }
 
 
-  
-                     
-   
+/*
+ * gzip decompression
+ */
 static int gunzip (const char *decompress, const char *src, const char *dst)
 {
 #if defined(__PSP2__) || defined(__SWITCH__)
@@ -182,7 +182,7 @@ static int gunzip (const char *decompress, const char *src, const char *dst)
             gzrewind(input);
             while(!gzeof(input))
             {
-                                                             
+                //buf contains len bytes of decompressed data
                 int len = gzread(input, buf, 1024*1024 - 2);
                 fwrite(buf, sizeof(char), len, output);
             }
@@ -204,9 +204,9 @@ static int gunzip (const char *decompress, const char *src, const char *dst)
 }
 
 
-  
-                           
-   
+/*
+ * bzip/bzip2 decompression
+ */
 static int bunzip (const char *decompress, const char *src, const char *dst)
 {
     char cmd[1024];
@@ -216,9 +216,9 @@ static int bunzip (const char *decompress, const char *src, const char *dst)
     return !system (cmd);
 }
 
-  
-                    
-   
+/*
+ * lha decompression
+ */
 static int lha (const char *src, const char *dst)
 {
 #ifdef __PSP2__
@@ -285,9 +285,9 @@ static int lha (const char *src, const char *dst)
 #endif
 }
 
-  
-                          
-   
+/*
+ * (pk)unzip decompression
+ */
 static int unzip (const char *src, const char *dst)
 {
 #if defined(__PSP2__) || defined(__SWITCH__)
@@ -307,7 +307,7 @@ static int unzip (const char *src, const char *dst)
                 FILE *output = fopen(dst,"wb");
                 if (output) {
                     char *buf = (char *) malloc(size);
-                                                                 
+                    //buf contains len bytes of decompressed data
                     int len = unzReadCurrentFile(input, buf, size);
                     if (len == size) {
                         int written = fwrite(buf, sizeof(char), len, output);
@@ -333,9 +333,9 @@ static int unzip (const char *src, const char *dst)
 #endif
 }
 
-  
-                                                   
-   
+/*
+ * decompresses the file (or check if dest is null)
+ */
 static int uncompress (const char *name, char *dest)
 {
     const char *ext = strrchr (name, '.');
@@ -394,9 +394,9 @@ static int uncompress (const char *name, char *dest)
     return 0;
 }
 
-  
-                                 
-   
+/*
+ * fopen () for a compressed file
+ */
 struct zfile *zfile_open (const char *name, const char *mode)
 {
     struct zfile *l = (struct zfile *)malloc (sizeof *l);
@@ -410,8 +410,8 @@ struct zfile *zfile_open (const char *name, const char *mode)
     if (! uncompress (name, NULL))
 	l->f = fopen (name, mode);
     else {
-                    
-                                           
+//	tmpnam (l->name);
+//	fd = creat (l->name, S_IRUSR | S_IWUSR);
 #if defined(__SWITCH__) || defined(__PSP2__)
     static int tempnr = 0;
     tempnr++;
@@ -442,7 +442,7 @@ struct zfile *zfile_open (const char *name, const char *mode)
 
     l->f = fopen (l->name, mode);
     close (fd);
-#endif                          
+#endif // __SWITCH__ || __PSP2__
     }
     if (l->f == NULL) {
 	if (strlen (l->name) > 0)
@@ -536,7 +536,7 @@ static void uae4all_disk_real_write(int num)
 			char *namefile=get_namefile(num);
 			void *bc=calloc(1,MAX_COMP_SIZE);
 			unsigned long sizecompressed=MAX_COMP_SIZE;
-			                                                                                                  
+			//int compress2(Bytef * dest, uLongf * destLen, const Bytef * source, uLong sourceLen, int level);
 			int retc=compress2((Bytef *)bc,&sizecompressed,(const Bytef *)uae4all_extra_buffer,changed,Z_BEST_COMPRESSION);
 			if (retc>=0)
 			{
@@ -566,7 +566,7 @@ static void uae4all_disk_real_write(int num)
 			}
 			free(bc);
 			uae4all_disk_actual_crc[num]=new_crc;
-                                                       
+// FIXME - error: 'sync' was not declared in this scope
 #ifndef WIN32
 #if !defined(__PSP2__) && !defined(__SWITCH__)
 			sync();
@@ -741,7 +741,7 @@ size_t uae4all_rom_fread(void *ptr, size_t tam, size_t nmiemb, FILE *flujo)
 		return 0;
 	memcpy(ptr,(void *)(((hostptr)uae4all_rom_memory)+((hostptr)uae4all_rom_pos)),tam*nmiemb);
 	uae4all_rom_pos+=tam*nmiemb;
-	return (uae4all_rom_len == 262155 || uae4all_rom_len == 524299)               ? uae4all_rom_len - 11 : uae4all_rom_len;
+	return (uae4all_rom_len == 262155 || uae4all_rom_len == 524299) /* cloanto */ ? uae4all_rom_len - 11 : uae4all_rom_len;
 }
 
 

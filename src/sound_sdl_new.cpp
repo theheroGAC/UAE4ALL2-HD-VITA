@@ -1,7 +1,7 @@
-    
-                                                
-                   
-    
+ /* 
+  * Minimalistic sound.c implementation for gp2x
+  * (c) notaz, 2007
+  */
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -25,6 +25,8 @@
 #include "sound.h"
 #include "custom.h"
 #include "menu_config.h"
+#include "cdrom.h"
+#include "disk_sound.h"
 
 #include "thread.h"
 #include <SDL.h>
@@ -101,38 +103,41 @@ static void sound_thread_mixer(void *ud, Uint8 *stream, int len)
 	if (sound_thread_exit) return;
 	int sem_val;
 	sound_thread_active = 1;
-	  
-                          
-                                    
-                    
-  
-                                           
-                           
-        
-                                     
-  
-   
+	/*
+	// Sound is choppy, arrgh
+	sem_getvalue(&sound_sem, &sem_val);
+	while (sem_val > 1)
+	{
+		//printf("skip %i (%i)\n", cnt, sem_val);
+		uae_sem_wait(&sound_sem);
+		cnt++;
+		sem_getvalue(&sound_sem, &sem_val);
+	}
+	*/
 
 #ifdef SOUND_USE_SEMAPHORES
 	uae_sem_wait(&sound_sem);
 	uae_sem_post(&callback_sem);
 #endif
 	cnt++;
-	                                                                                                                   
+	//__android_log_print(ANDROID_LOG_INFO, "UAE4ALL2","Sound callback cnt %d buf %d\n", cnt, cnt%SOUND_BUFFERS_COUNT);
 #ifdef __SWITCH__
-	memcpy(stream, sndbuffer[cnt%SOUND_BUFFERS_COUNT], MIN(SNDBUFFER_LEN*2, len));
+	int copied = MIN(SNDBUFFER_LEN * 2, len);
+	int channels = 2;
+	memcpy(stream, sndbuffer[cnt%SOUND_BUFFERS_COUNT], copied);
 #else
-	if(mainMenu_soundStereo)
-		memcpy(stream, sndbuffer[cnt%SOUND_BUFFERS_COUNT], MIN(SNDBUFFER_LEN*2, len));
-	else
-	  	memcpy(stream, sndbuffer[cnt%SOUND_BUFFERS_COUNT], MIN(SNDBUFFER_LEN, len));
+	int channels = mainMenu_soundStereo ? 2 : 1;
+	int copied = MIN(mainMenu_soundStereo ? SNDBUFFER_LEN * 2 : SNDBUFFER_LEN, len);
+	memcpy(stream, sndbuffer[cnt%SOUND_BUFFERS_COUNT], copied);
 #endif
+	cdrom_mix_audio((uae_s16 *)stream, copied / (channels * 2), channels, sound_rate);
+	disk_sound_mix((uae_s16 *)stream, copied / (channels * 2), channels, sound_rate);
 }
 
 static int gp2x_start_sound(int rate, int bits, int stereo)
 {
 #ifdef __SWITCH__
-	                                         
+	// only stereo, 48kHz supported on Switch
 	stereo = 1;
 	rate = 48000;
 #endif
@@ -143,23 +148,23 @@ static int gp2x_start_sound(int rate, int bits, int stereo)
 
 	if (!sound_thread_active)
 	{
-		                               
+		// init sem, start sound thread
 		printf("starting sound thread..\n");
 		uae_sem_init(&sound_sem, 0, 0);
 		uae_sem_init(&callback_sem, 0, 0);
-                                                                              
+//		if (ret != 0) printf("uae_sem_init() failed: %i, errno=%i\n", ret, errno);
 	}
 
-	                                                      
+	// if no settings change, we don't need to do anything
 	if (rate == s_oldrate && s_oldbits == bits && s_oldstereo == stereo)
 	   return 0;
 
 	if( audioOpened ) {
-		                                                                                                                   
+		// __android_log_print(ANDROID_LOG_INFO, "UAE4ALL2", "UAE tries to open SDL sound device 2 times, ignoring that.");
 #if defined(__PSP2__)
-		                                                          
-		                                           
-		                   
+		//this allows the user to change sound settings on the fly
+		//without having to save config and restart
+		//safely stop sound
 		SDL_PauseAudio(1);
 		sound_thread_exit = 1;
 		uae_sem_post(&sound_sem);
@@ -174,7 +179,7 @@ static int gp2x_start_sound(int rate, int bits, int stereo)
 	SDL_AudioSpec as;
 	memset(&as, 0, sizeof(as));
 
-	                                                                                                                     
+	// __android_log_print(ANDROID_LOG_INFO, "UAE4ALL2", "Opening audio: rate %d bits %d stereo %d", rate, bits, stereo);
 	as.freq = rate;
 	as.format = (bits == 8 ? AUDIO_S8 : AUDIO_S16);
 	as.channels = (stereo ? 2 : 1);
@@ -187,8 +192,9 @@ static int gp2x_start_sound(int rate, int bits, int stereo)
 	  as.samples = SNDBUFFER_LEN / as.channels / 2;
 #endif
 	as.callback = sound_thread_mixer;
-	SDL_OpenAudio(&as, NULL);
-	audioOpened = 1;
+    if (SDL_OpenAudio(&as, NULL) < 0)
+        return -1;
+    audioOpened = 1;
 
 	s_oldrate = rate; 
 	s_oldbits = bits; 
@@ -200,7 +206,7 @@ static int gp2x_start_sound(int rate, int bits, int stereo)
 }
 
 
-                                               
+// this is meant to be called only once on exit
 void gp2x_stop_sound(void)
 {
 	if (sound_thread_exit)
@@ -210,19 +216,19 @@ void gp2x_stop_sound(void)
 		printf("stopping sound thread..\n");
 		sound_thread_exit = 1;
 		uae_sem_post(&sound_sem);
-		                   
+		//usleep(100*1000);
 	}
 	SDL_PauseAudio (1);
 }
 
 void finish_sound_buffer (void)
 {
-	static int wrcnt = 2;                                       
+	static int wrcnt = 2; // Start from the middle of the buffer
 #ifdef DEBUG_SOUND
 	dbg("sound.c : finish_sound_buffer");
 #endif
 
-	                               
+	//printf("finish %i\n", wrcnt);
 #if 0
 	if(mainMenu_soundStereo)
 	write(sounddev, sndbuffer[0], SNDBUFFER_LEN*2);
@@ -237,7 +243,7 @@ void finish_sound_buffer (void)
 #endif
 	wrcnt++;
 	sndbufpt = render_sndbuff = sndbuffer[wrcnt%SOUND_BUFFERS_COUNT];
-	                                                                                                                           
+	//__android_log_print(ANDROID_LOG_INFO, "UAE4ALL2","Sound buffer write cnt %d buf %d\n", wrcnt, wrcnt%SOUND_BUFFERS_COUNT);
 #endif
 
 #ifdef DEBUG_SOUND
@@ -246,16 +252,16 @@ void finish_sound_buffer (void)
 }
 
 
-                                                                                   
+/* Try to determine whether sound is available.  This is only for GUI purposes.  */
 int setup_sound (void)
 {
 #ifdef DEBUG_SOUND
     dbg("sound.c : setup_sound");
 #endif
 
-	                                                           
-	                                                                  
-	               
+	// Android does not like opening sound device several times
+	//if (gp2x_start_sound(sound_rate, 16, mainMenu_soundStereo) != 0)
+	//    return 0;
 
 #ifdef DEBUG_SOUND
     dbg(" sound.c : ! setup_sound");
@@ -269,11 +275,12 @@ static int open_sound (void)
     dbg("sound.c : open_sound");
 #endif
 
-	                                                           
     if (gp2x_start_sound(sound_rate, 16, mainMenu_soundStereo) != 0)
-	    return 0;
+        return 0;
 
+    disk_sound_init();
     sound_default_evtime();
+
 
     have_sound = 1;
     scaled_sample_evtime_ok = 1;
@@ -293,10 +300,11 @@ void close_sound (void)
     if (!have_sound)
 	return;
 
-                                                                                                                 
-                                            
-                        
+    // testing shows that reopenning sound device is not a good idea on gp2x (causes random sound driver crashes)
+    // we will close it on real exit instead
+    //gp2x_stop_sound();
     have_sound = 0;
+    disk_sound_shutdown();
 
 #ifdef DEBUG_SOUND
     dbg(" sound.c : ! close_sound");
@@ -324,10 +332,10 @@ void pause_sound (void)
 #endif
 
 #ifndef __SWITCH__
-	                                                         
+	// not pausing/unpausing audio fixes savestates on Switch
 	SDL_PauseAudio (1);
 #endif
-                       
+    /* nothing to do */
 
 #ifdef DEBUG_SOUND
     dbg(" sound.c : ! pause_sound");
@@ -341,10 +349,10 @@ void resume_sound (void)
 #endif
 
 #ifndef __SWITCH__
-	                                                         
+	// not pausing/unpausing audio fixes savestates on Switch
 	SDL_PauseAudio (0);
 #endif
-                       
+    /* nothing to do */
 
 #ifdef DEBUG_SOUND
     dbg(" sound.c : ! resume_sound");

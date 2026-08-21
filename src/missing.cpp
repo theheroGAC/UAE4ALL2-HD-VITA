@@ -1,10 +1,10 @@
-   
-                                 
-   
-                                       
-   
-                                
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Various stuff missing in some OSes.
+  *
+  * Copyright 1997 Bernd Schmidt
+  */
 
 #include "sysconfig.h"
 #include "sysdeps.h"
@@ -16,7 +16,7 @@
 
 char *my_strdup (const char *s)
 {
-                                                                       
+    /* The casts to char * are there to shut up the compiler on HPUX */
     char *x = (char*)xmalloc(strlen((char *)s) + 1);
     strcpy(x, (char *)s);
     return x;

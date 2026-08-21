@@ -1,13 +1,13 @@
-   
-                                 
-   
-                                                          
-   
-                               
-    
-                                                       
-                             
-    
+ /*
+  * UAE - The Un*x Amiga Emulator
+  *
+  * Call Amiga Exec functions outside the main UAE thread.
+  *
+  * Copyright 1999 Patrick Ohly
+  * 
+  * Uses the EXTER interrupt that is setup in filesys.c
+  * and needs thread support.
+  */
 
 #include "sysconfig.h"
 #include "sysdeps.h"
@@ -26,18 +26,18 @@
 
 smp_comm_pipe native2amiga_pending;
 
-  
-                                            
-   
+/*
+ * to be called when setting up the hardware
+ */
 
 void native2amiga_install (void)
 {
     init_comm_pipe (&native2amiga_pending, 10, 2);
 }
 
-  
-                                                                 
-   
+/*
+ * to be called when the Amiga boots, i.e. by filesys_diagentry()
+ */
 void native2amiga_startup (void)
 {
 }
@@ -83,12 +83,12 @@ uaecptr uae_AllocMem (uae_u32 size, uae_u32 flags)
 {
     m68k_dreg (regs, 0) = size;
     m68k_dreg (regs, 1) = flags;
-    return CallLib (get_long (4), -198);               
+    return CallLib (get_long (4), -198); /* AllocMem */
 }
 
 void uae_FreeMem (uaecptr memory, uae_u32 size)
 {
     m68k_dreg (regs, 0) = size;
     m68k_areg (regs, 1) = memory;
-    CallLib (get_long (4), -0xD2);              
+    CallLib (get_long (4), -0xD2); /* FreeMem */
 }
