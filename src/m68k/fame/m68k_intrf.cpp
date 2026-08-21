@@ -47,7 +47,7 @@ void uae_chk_handler(unsigned vector)
 
 	if (opcode == 0xFF0D) {
 		if ((pc & 0xF80000) == 0xF80000) {
-			                                               
+			// This is from the dummy Kickstart replacement
 			uae_u16 arg = m68k_fetch(pc+2);
 			m68k_set_register(M68K_REG_PC,pc+4);
 			ersatz_perform (arg);
@@ -55,7 +55,7 @@ void uae_chk_handler(unsigned vector)
 		}
 		else
 		if ((pc & 0xFFFF0000) == RTAREA_BASE) {
-			                             
+			// User-mode STOP replacement
 			M68KCONTEXT.execinfo|=0x0080;
 			m68k_set_register(M68K_REG_PC,pc+2);
 			return;
@@ -63,21 +63,21 @@ void uae_chk_handler(unsigned vector)
 	}
 
 	if ((opcode & 0xF000) == 0xA000 && (pc & 0xFFFF0000) == RTAREA_BASE) {
-		            
+		// Calltrap.
 		m68k_set_register(M68K_REG_PC,pc+2);
 		call_calltrap (opcode & 0xFFF);
 		return;
 	}
 
 	if ((opcode & 0xF000) == 0xF000) {
-		                
+		// Exception 0xB
 		process_exception(0xB);
 		return;
 	}
 
 	if ((opcode & 0xF000) == 0xA000) {
 		if ((pc & 0xFFFF0000) == RTAREA_BASE) {
-			            
+			// Calltrap.
 			call_calltrap (opcode & 0xFFF);
 		}
 		process_exception(0xA);
@@ -100,7 +100,7 @@ void init_memmaps(addrbank* banco)
 
 	micontexto_fpa[0x04]=(hostptr)&uae_chk_handler;
 
-	                            
+	/* PocketUAE/WinUAE traps */
 	micontexto_fpa[0x0A]=(hostptr)&uae_chk_handler;
 	micontexto_fpa[0x10]=(hostptr)&uae_chk_handler;
 	micontexto_fpa[0x14]=(hostptr)&uae_chk_handler;

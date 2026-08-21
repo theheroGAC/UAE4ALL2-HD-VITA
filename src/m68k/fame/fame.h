@@ -1,10 +1,10 @@
-                                                                               
-                                                                               
-                                                                               
-                                                                               
-                                                                               
-                                                                               
-                                                                               
+/*****************************************************************************/
+/* FAME Fast and Accurate Motorola 68000 Emulation Core                      */
+/* (c) 2005 Oscar Orallo Pelaez                                              */
+/* Version: 1.24                                                             */
+/* Date: 08-20-2005                                                          */
+/* See FAME.HTML for documentation and license information                   */
+/*****************************************************************************/
 
 #ifndef __FAME_H__
 #define __FAME_H__
@@ -13,9 +13,9 @@
 #define unlikely(x)     __builtin_expect((x),0)
 #define UAE4ALL_ALIGN __attribute__ ((__aligned__ (16)))
 
-                                      
-                                      
-                                      
+/************************************/
+/* General library defines          */
+/************************************/
 
 #ifndef M68K_OK
     #define M68K_OK 0
@@ -30,7 +30,7 @@
     #define M68K_INV_REG -1
 #endif
 
-                              
+/* Hardware interrupt state */
 
 #ifndef M68K_IRQ_LEVEL_ERROR
     #define M68K_IRQ_LEVEL_ERROR -1
@@ -39,7 +39,7 @@
     #define M68K_IRQ_INV_PARAMS -2
 #endif
 
-                                                
+/* Defines to specify hardware interrupt type */
 
 #ifndef M68K_AUTOVECTORED_IRQ
     #define M68K_AUTOVECTORED_IRQ -1
@@ -55,7 +55,7 @@
 	#define M68K_MANUAL_LOWER_IRQ 0
 #endif
 
-                                      
+/* Defines to specify address space */
 
 #ifndef M68K_SUP_ADDR_SPACE
     #define M68K_SUP_ADDR_SPACE 0
@@ -71,9 +71,9 @@
 #endif
 
 
-                     
-                     
-                     
+/*******************/
+/* Data definition */
+/*******************/
 #ifdef u8
 #undef u8
 #endif
@@ -126,7 +126,7 @@
 #define hostptr u32
 #endif
 
-                    
+/* M68K registers */
 typedef enum {
       M68K_REG_D0=0,
       M68K_REG_D1,
@@ -160,7 +160,7 @@ typedef union
 } famec_union32;
 
 
-                      
+/* M68K CPU CONTEXT */
 typedef struct
 {
 	famec_union32   dreg[8];
@@ -172,12 +172,12 @@ typedef struct
 	u8  interrupts[8];
 	u16 sr;
 	u16 execinfo;
-   u32 vbr, sfc, dfc;                                 
-   u32 cacr, caar;                                    
-   u32 msp, isp;                                           
-                                                                             
-                                                                          
-                                                                                         
+   u32 vbr, sfc, dfc;  /* Control Registers, 68010+ */
+   u32 cacr, caar;     /* Control Registers, 68020+ */
+   u32 msp, isp;       /* Master/Interrupt Stack Pointer */
+// We put everything what is needed for m68k_emulate and the opcodes in this 
+// struct, so there is only one base register in generated assembly code. 
+// This reduces the number of used and backed up register and we have better performance.
   u32 flag_c;
   u32 flag_v;
   u32 flag_notz;
@@ -196,26 +196,26 @@ typedef struct
 } M68K_CONTEXT;
 
 
-                          
-                          
-                          
+/************************/
+/* Function definition  */
+/************************/
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-                               
+/* General purpose functions */
 void     m68k_init(int force_table);
 unsigned m68k_reset(void);
 void     m68k_emulate(int n);
 unsigned m68k_get_pc(void);
 int      m68k_fetch(unsigned address);
 
-                                    
+/* CPU context handling functions */
 M68K_CONTEXT *m68k_get_context(void);
 void famec_SetBank(u32 low_addr, u32 high_addr, hostptr fetch, void *rb, void *rw, void *wb, void *ww, void *data);
 int  m68k_set_register(m68k_register reg, unsigned value);
 
-                      
+/* Timing functions */
 void     m68k_release_timeslice(void);
 
 

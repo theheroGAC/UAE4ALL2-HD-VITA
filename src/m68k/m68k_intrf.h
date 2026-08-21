@@ -3,7 +3,7 @@
 
 #include "menu_config.h"
 
-                                   
+/* defined in m68k_cmn_intrf.cpp */
 extern unsigned mispcflags;
 
 void init_memmaps(addrbank* banco);
@@ -48,12 +48,12 @@ static __inline__ void unset_special (uae_u32 x)
 }
 
 
-               
+/* PocketUAE */
 
-                  
+/* UAE redefine */
 #define m68k_dreg(r,num) (m68kcontext.dreg[num].D)
 #define m68k_areg(r,num) (m68kcontext.areg[num].D)
 
-                 
+/***************/
 
 #endif

@@ -160,7 +160,7 @@ static void JUMPTABLE(int force_table)
 		JumpTable[0x0A3C] = CAST_OP(0x0A3C);
 		JumpTable[0x0A7C] = CAST_OP(0x0A7C);
 #ifdef OPCODES_M68020
-                        
+      /* CAS - 68020+ */
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
          JumpTable[0x0AD0 + i] = CAST_OP(0x0AD0);
       for(i = 0x0000; i <= 0x0006; i += 0x0001)
@@ -187,10 +187,10 @@ static void JUMPTABLE(int force_table)
          JumpTable[0x0CF0 + i] = CAST_OP(0x0CF0);
       JumpTable[0x0CF8] = CAST_OP(0x0CF8);
       JumpTable[0x0CF9] = CAST_OP(0x0CF9);
-                         
+      /* CAS2 - 68020+ */
       JumpTable[0x0CFC] = CAST_OP(0x0CFC);
       JumpTable[0x0EFC] = CAST_OP(0x0EFC);
-                       
+      /* End of CAS2 */
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
          JumpTable[0x0ED0 + i] = CAST_OP(0x0ED0);
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
@@ -203,7 +203,7 @@ static void JUMPTABLE(int force_table)
          JumpTable[0x0EF0 + i] = CAST_OP(0x0EF0);
       JumpTable[0x0EF8] = CAST_OP(0x0EF8);
       JumpTable[0x0EF9] = CAST_OP(0x0EF9);
-                      
+      /* End of CAS */
 #endif
 		for(i = 0x0000; i <= 0x0007; i += 0x0001)
 			JumpTable[0x0400 + i] = CAST_OP(0x0400);
@@ -302,11 +302,11 @@ static void JUMPTABLE(int force_table)
 		JumpTable[0x069F] = CAST_OP(0x069F);
 		JumpTable[0x06A7] = CAST_OP(0x06A7);
 #ifdef OPCODES_M68020
-                        
+      /* RTM - 68020+ */
       JumpTable[0x06C0] = CAST_OP(0x06C0);
       JumpTable[0x06C8] = CAST_OP(0x06C8);
-                      
-                          
+      /* End of RTM */
+      /* CALLM - 68020+ */
       JumpTable[0x06D0] = CAST_OP(0x06D0);
       JumpTable[0x06E8] = CAST_OP(0x06E8);
       JumpTable[0x06F0] = CAST_OP(0x06F0);
@@ -314,7 +314,7 @@ static void JUMPTABLE(int force_table)
       JumpTable[0x06F9] = CAST_OP(0x06F9);
       JumpTable[0x06FA] = CAST_OP(0x06FA);
       JumpTable[0x06FB] = CAST_OP(0x06FB);
-                        
+      /* End of CALLM */
 #endif
 		for(i = 0x0000; i <= 0x0007; i += 0x0001)
 			JumpTable[0x0C00 + i] = CAST_OP(0x0C00);
@@ -331,8 +331,8 @@ static void JUMPTABLE(int force_table)
 		JumpTable[0x0C38] = CAST_OP(0x0C38);
 		JumpTable[0x0C39] = CAST_OP(0x0C39);
 #ifdef OPCODES_M68020
-      JumpTable[0x0C3A] = CAST_OP(0x0C3A);                        
-      JumpTable[0x0C3B] = CAST_OP(0x0C3B);                        
+      JumpTable[0x0C3A] = CAST_OP(0x0C3A);         // CMP - 68020+
+      JumpTable[0x0C3B] = CAST_OP(0x0C3B);         // CMP - 68020+
 #endif
 		JumpTable[0x0C1F] = CAST_OP(0x0C1F);
 		JumpTable[0x0C27] = CAST_OP(0x0C27);
@@ -351,8 +351,8 @@ static void JUMPTABLE(int force_table)
 		JumpTable[0x0C78] = CAST_OP(0x0C78);
 		JumpTable[0x0C79] = CAST_OP(0x0C79);
 #ifdef OPCODES_M68020
-      JumpTable[0x0C7A] = CAST_OP(0x0C7A);                        
-      JumpTable[0x0C7B] = CAST_OP(0x0C7B);                        
+      JumpTable[0x0C7A] = CAST_OP(0x0C7A);         // CMP - 68020+
+      JumpTable[0x0C7B] = CAST_OP(0x0C7B);         // CMP - 68020+
 #endif
 		JumpTable[0x0C5F] = CAST_OP(0x0C5F);
 		JumpTable[0x0C67] = CAST_OP(0x0C67);
@@ -371,8 +371,8 @@ static void JUMPTABLE(int force_table)
 		JumpTable[0x0CB8] = CAST_OP(0x0CB8);
 		JumpTable[0x0CB9] = CAST_OP(0x0CB9);
 #ifdef OPCODES_M68020
-      JumpTable[0x0CBA] = CAST_OP(0x0CBA);                        
-      JumpTable[0x0CBB] = CAST_OP(0x0CBB);                        
+      JumpTable[0x0CBA] = CAST_OP(0x0CBA);         // CMP - 68020+
+      JumpTable[0x0CBB] = CAST_OP(0x0CBB);         // CMP - 68020+
 #endif
 		JumpTable[0x0C9F] = CAST_OP(0x0C9F);
 		JumpTable[0x0CA7] = CAST_OP(0x0CA7);
@@ -1613,22 +1613,22 @@ static void JUMPTABLE(int force_table)
 		JumpTable[0x429F] = CAST_OP(0x429F);
 		JumpTable[0x42A7] = CAST_OP(0x42A7);
 #ifdef OPCODES_M68020
-                    
+      /* MOVE CCR */
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
-         JumpTable[0x42C0 + i] = CAST_OP(0x42C0);                      
+         JumpTable[0x42C0 + i] = CAST_OP(0x42C0);  // MOVE CCR - 68020+
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
-         JumpTable[0x42D0 + i] = CAST_OP(0x42D0);                      
+         JumpTable[0x42D0 + i] = CAST_OP(0x42D0);  // MOVE CCR - 68020+
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
-         JumpTable[0x42D8 + i] = CAST_OP(0x42D8);                      
+         JumpTable[0x42D8 + i] = CAST_OP(0x42D8);  // MOVE CCR - 68020+
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
-         JumpTable[0x42E0 + i] = CAST_OP(0x42E0);                      
+         JumpTable[0x42E0 + i] = CAST_OP(0x42E0);  // MOVE CCR - 68020+
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
-         JumpTable[0x42E8 + i] = CAST_OP(0x42E8);                      
+         JumpTable[0x42E8 + i] = CAST_OP(0x42E8);  // MOVE CCR - 68020+
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
-         JumpTable[0x42F0 + i] = CAST_OP(0x42F0);                      
-      JumpTable[0x42F8] = CAST_OP(0x42F8);                             
-      JumpTable[0x42F9] = CAST_OP(0x42F9);                             
-                           
+         JumpTable[0x42F0 + i] = CAST_OP(0x42F0);  // MOVE CCR - 68020+
+      JumpTable[0x42F8] = CAST_OP(0x42F8);         // MOVE CCR - 68020+
+      JumpTable[0x42F9] = CAST_OP(0x42F9);         // MOVE CCR - 68020+
+      /* End of MOVE CCR */
 #endif
 		for(i = 0x0000; i <= 0x0007; i += 0x0001)
 			JumpTable[0x4400 + i] = CAST_OP(0x4400);
@@ -1836,7 +1836,7 @@ static void JUMPTABLE(int force_table)
 			JumpTable[0x48C0 + i] = CAST_OP(0x48C0);
 #ifdef OPCODES_M68020
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
-         JumpTable[0x49C0 + i] = CAST_OP(0x49C0);                   
+         JumpTable[0x49C0 + i] = CAST_OP(0x49C0);  // EXT.B - 68020+
 #endif
 		for(i = 0x0000; i <= 0x0007; i += 0x0001)
 			JumpTable[0x4A00 + i] = CAST_OP(0x4A00);
@@ -1853,9 +1853,9 @@ static void JUMPTABLE(int force_table)
 		JumpTable[0x4A38] = CAST_OP(0x4A38);
 		JumpTable[0x4A39] = CAST_OP(0x4A39);
 #ifdef OPCODES_M68020
-      JumpTable[0x4A3A] = CAST_OP(0x4A3A);                        
-      JumpTable[0x4A3B] = CAST_OP(0x4A3B);                        
-      JumpTable[0x4A3C] = CAST_OP(0x4A3C);                        
+      JumpTable[0x4A3A] = CAST_OP(0x4A3A);         // TST - 68020+
+      JumpTable[0x4A3B] = CAST_OP(0x4A3B);         // TST - 68020+
+      JumpTable[0x4A3C] = CAST_OP(0x4A3C);         // TST - 68020+
 #endif
 		JumpTable[0x4A1F] = CAST_OP(0x4A1F);
 		JumpTable[0x4A27] = CAST_OP(0x4A27);
@@ -1863,7 +1863,7 @@ static void JUMPTABLE(int force_table)
 			JumpTable[0x4A40 + i] = CAST_OP(0x4A40);
 #ifdef OPCODES_M68020
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
-         JumpTable[0x4A48 + i] = CAST_OP(0x4A48);                 
+         JumpTable[0x4A48 + i] = CAST_OP(0x4A48);  // TST - 68020+
 #endif
 		for(i = 0x0000; i <= 0x0007; i += 0x0001)
 			JumpTable[0x4A50 + i] = CAST_OP(0x4A50);
@@ -1878,9 +1878,9 @@ static void JUMPTABLE(int force_table)
 		JumpTable[0x4A78] = CAST_OP(0x4A78);
 		JumpTable[0x4A79] = CAST_OP(0x4A79);
 #ifdef OPCODES_M68020
-      JumpTable[0x4A7A] = CAST_OP(0x4A7A);                        
-      JumpTable[0x4A7B] = CAST_OP(0x4A7B);                        
-      JumpTable[0x4A7C] = CAST_OP(0x4A7C);                        
+      JumpTable[0x4A7A] = CAST_OP(0x4A7A);         // TST - 68020+
+      JumpTable[0x4A7B] = CAST_OP(0x4A7B);         // TST - 68020+
+      JumpTable[0x4A7C] = CAST_OP(0x4A7C);         // TST - 68020+
 #endif
 		JumpTable[0x4A5F] = CAST_OP(0x4A5F);
 		JumpTable[0x4A67] = CAST_OP(0x4A67);
@@ -1888,7 +1888,7 @@ static void JUMPTABLE(int force_table)
 			JumpTable[0x4A80 + i] = CAST_OP(0x4A80);
 #ifdef OPCODES_M68020
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
-         JumpTable[0x4A88 + i] = CAST_OP(0x4A88);                 
+         JumpTable[0x4A88 + i] = CAST_OP(0x4A88);  // TST - 68020+
 #endif
 		for(i = 0x0000; i <= 0x0007; i += 0x0001)
 			JumpTable[0x4A90 + i] = CAST_OP(0x4A90);
@@ -1903,9 +1903,9 @@ static void JUMPTABLE(int force_table)
 		JumpTable[0x4AB8] = CAST_OP(0x4AB8);
 		JumpTable[0x4AB9] = CAST_OP(0x4AB9);
 #ifdef OPCODES_M68020
-      JumpTable[0x4ABA] = CAST_OP(0x4ABA);                        
-      JumpTable[0x4ABB] = CAST_OP(0x4ABB);                        
-      JumpTable[0x4ABC] = CAST_OP(0x4ABC);                        
+      JumpTable[0x4ABA] = CAST_OP(0x4ABA);         // TST - 68020+
+      JumpTable[0x4ABB] = CAST_OP(0x4ABB);         // TST - 68020+
+      JumpTable[0x4ABC] = CAST_OP(0x4ABC);         // TST - 68020+
 #endif
 		JumpTable[0x4A9F] = CAST_OP(0x4A9F);
 		JumpTable[0x4AA7] = CAST_OP(0x4AA7);
@@ -1927,7 +1927,7 @@ static void JUMPTABLE(int force_table)
 		JumpTable[0x4AE7] = CAST_OP(0x4AE7);
 		JumpTable[0x4AFC] = CAST_OP(0x4AFC);
 #ifdef OPCODES_M68020
-                               
+      /* MULS/MULU.L, 68020+ */
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
          JumpTable[0x4C00 + i] = CAST_OP(0x4C00);
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
@@ -1945,8 +1945,8 @@ static void JUMPTABLE(int force_table)
       JumpTable[0x4C3A] = CAST_OP(0x4C3A);
       JumpTable[0x4C3B] = CAST_OP(0x4C3B);
       JumpTable[0x4C3C] = CAST_OP(0x4C3C);
-                              
-                               
+      /* End of MULS/MULU.L */
+      /* DIVS/DIVL.L, 68020+ */
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
          JumpTable[0x4C40 + i] = CAST_OP(0x4C40);
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
@@ -1964,7 +1964,7 @@ static void JUMPTABLE(int force_table)
       JumpTable[0x4C7A] = CAST_OP(0x4C7A);
       JumpTable[0x4C7B] = CAST_OP(0x4C7B);
       JumpTable[0x4C7C] = CAST_OP(0x4C7C);
-                              
+      /* End of DIVS/DIVL.L */
 #endif
 		for(i = 0x0000; i <= 0x0007; i += 0x0001)
 			JumpTable[0x4C90 + i] = CAST_OP(0x4C90);
@@ -1999,8 +1999,8 @@ static void JUMPTABLE(int force_table)
 		JumpTable[0x4E57] = CAST_OP(0x4E57);
 #ifdef OPCODES_M68020
       for(i = 0x0000; i <= 0x0006; i += 0x0001)
-         JumpTable[0x4808 + i] = CAST_OP(0x4808);                    
-      JumpTable[0x480F] = CAST_OP(0x480F);                           
+         JumpTable[0x4808 + i] = CAST_OP(0x4808);  // LINK32 - 68020+
+      JumpTable[0x480F] = CAST_OP(0x480F);         // LINK32 - 68020+
 #endif
 		for(i = 0x0000; i <= 0x0007; i += 0x0001)
 			JumpTable[0x4E58 + i] = CAST_OP(0x4E58);
@@ -2012,16 +2012,16 @@ static void JUMPTABLE(int force_table)
 		JumpTable[0x4E70] = CAST_OP(0x4E70);
 		JumpTable[0x4E71] = CAST_OP(0x4E71);
 		JumpTable[0x4E72] = CAST_OP(0x4E72);
-		JumpTable[0x4E73] = CAST_OP(0x4E73);                                   
+		JumpTable[0x4E73] = CAST_OP(0x4E73);      // RTE - different for 68010+
 #ifdef OPCODES_M68020
-      JumpTable[0x4E74] = CAST_OP(0x4E74);                     
+      JumpTable[0x4E74] = CAST_OP(0x4E74);      // RTD - 68010+
 #endif
 		JumpTable[0x4E75] = CAST_OP(0x4E75);
 		JumpTable[0x4E76] = CAST_OP(0x4E76);
 		JumpTable[0x4E77] = CAST_OP(0x4E77);
 #ifdef OPCODES_M68020
-      JumpTable[0x4E7A] = CAST_OP(0x4E7A);                              
-      JumpTable[0x4E7B] = CAST_OP(0x4E7B);                              
+      JumpTable[0x4E7A] = CAST_OP(0x4E7A);      // MOVEC Rc, Xn - 68020+
+      JumpTable[0x4E7B] = CAST_OP(0x4E7B);      // MOVEC Xn, Rc - 68020+
 #endif
 		for(i = 0x0000; i <= 0x0007; i += 0x0001)
 			JumpTable[0x4E90 + i] = CAST_OP(0x4E90);
@@ -2076,7 +2076,7 @@ static void JUMPTABLE(int force_table)
 		for(i = 0x0000; i <= 0x0E00; i += 0x0200)
 			JumpTable[0x41A7 + i] = CAST_OP(0x41A7);
 #ifdef OPCODES_M68020
-                          
+      /* CHK.L - 68020+ */
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
          for(j = 0x0000; j <= 0x0E00; j += 0x0200)
             JumpTable[0x4100 + i + j] = CAST_OP(0x4100);
@@ -2105,8 +2105,8 @@ static void JUMPTABLE(int force_table)
          JumpTable[0x413B + i] = CAST_OP(0x413B);
       for(i = 0x0000; i <= 0x0E00; i += 0x0200)
          JumpTable[0x413C + i] = CAST_OP(0x413C);
-                        
-                               
+      /* End of CHK.L */
+      /* CMP2/CHK2 - 68020 + */
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
          JumpTable[0x00D0 + i] = CAST_OP(0x00D0);
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
@@ -2137,7 +2137,7 @@ static void JUMPTABLE(int force_table)
       JumpTable[0x04F9] = CAST_OP(0x04F9);
       JumpTable[0x04FA] = CAST_OP(0x04FA);
       JumpTable[0x04FB] = CAST_OP(0x04FB);
-                            
+      /* End of CMP2/CHK2 */
 #endif
 		for(i = 0x0000; i <= 0x0007; i += 0x0001)
 			for(j = 0x0000; j <= 0x0E00; j += 0x0200)
@@ -2158,11 +2158,11 @@ static void JUMPTABLE(int force_table)
 			JumpTable[0x41FB + i] = CAST_OP(0x41FB);
 #ifdef OPCODES_M68020
   	  for(i = 0x0000; i <= 0x0F00; i+= 0x0100)
-		     JumpTable[0x50FA + i] = CAST_OP(0x50FA);                    
+		     JumpTable[0x50FA + i] = CAST_OP(0x50FA);  // TRAPcc - 68020+
       for(i = 0x0000; i <= 0x0F00; i+= 0x0100)
-         JumpTable[0x50FB + i] = CAST_OP(0x50FB);                    
+         JumpTable[0x50FB + i] = CAST_OP(0x50FB);  // TRAPcc - 68020+
       for(i = 0x0000; i <= 0x0F00; i+= 0x0100)
-         JumpTable[0x50FC + i] = CAST_OP(0x50FC);                    
+         JumpTable[0x50FC + i] = CAST_OP(0x50FC);  // TRAPcc - 68020+
 #endif
 		for(i = 0x0000; i <= 0x0007; i += 0x0001)
 			JumpTable[0x50C0 + i] = CAST_OP(0x50C0);
@@ -2663,7 +2663,7 @@ static void JUMPTABLE(int force_table)
 		JumpTable[0x6E00] = CAST_OP(0x6E00);
 		JumpTable[0x6F00] = CAST_OP(0x6F00);
 #ifdef OPCODES_M68020
-  		                    
+  		/* BCC32 - 68020+ */
       JumpTable[0x62FF] = CAST_OP(0x62FF);
       JumpTable[0x63FF] = CAST_OP(0x63FF);
       JumpTable[0x64FF] = CAST_OP(0x64FF);
@@ -2678,19 +2678,19 @@ static void JUMPTABLE(int force_table)
       JumpTable[0x6DFF] = CAST_OP(0x6DFF);
       JumpTable[0x6EFF] = CAST_OP(0x6EFF);
       JumpTable[0x6FFF] = CAST_OP(0x6FFF);
-                        
+      /* End of BCC32 */
 #endif
 		for(i = 0x0001; i <= 0x00FF; i += 0x0001)
 			JumpTable[0x6000 + i] = CAST_OP(0x6001);
 		JumpTable[0x6000] = CAST_OP(0x6000);
 #ifdef OPCODES_M68020
-      JumpTable[0x60FF] = CAST_OP(0x60FF);                          
+      JumpTable[0x60FF] = CAST_OP(0x60FF);         // BRA32 - 68020+
 #endif
 		for(i = 0x0001; i <= 0x00FF; i += 0x0001)
 			JumpTable[0x6100 + i] = CAST_OP(0x6101);
 		JumpTable[0x6100] = CAST_OP(0x6100);
 #ifdef OPCODES_M68020
-      JumpTable[0x61FF] = CAST_OP(0x61FF);                          
+      JumpTable[0x61FF] = CAST_OP(0x61FF);         // BSR32 - 68020+
 #endif
 		for(i = 0x0000; i <= 0x0E00; i += 0x0200)
 			for(j = 0x0000; j <= 0x00FF; j += 0x0001)
@@ -2811,7 +2811,7 @@ static void JUMPTABLE(int force_table)
 		for(i = 0x0000; i <= 0x0E00; i += 0x0200)
 			JumpTable[0x8139 + i] = CAST_OP(0x8139);
 #ifdef OPCODES_M68020
-                         
+      /* PACK - 68020+ */
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
          for(j = 0x0000; j <= 0x0E00; j += 0x0200)
                JumpTable[0x8140 + i + j] = CAST_OP(0x8140);
@@ -2823,8 +2823,8 @@ static void JUMPTABLE(int force_table)
       for(j = 0x0000; j <= 0x0C00; j += 0x0200)
          JumpTable[0x814F + j] = CAST_OP(0x814F);
       JumpTable[0x8F4F] = CAST_OP(0x8F4F);
-                       
-                         
+      /* End of PACK */
+      /* UNPK - 68020+ */
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
          for(j = 0x0000; j <= 0x0E00; j += 0x0200)
                JumpTable[0x8180 + i + j] = CAST_OP(0x8180);
@@ -2836,7 +2836,7 @@ static void JUMPTABLE(int force_table)
       for(j = 0x0000; j <= 0x0C00; j += 0x0200)
          JumpTable[0x818F + j] = CAST_OP(0x818F);
       JumpTable[0x8F8F] = CAST_OP(0x8F8F);
-                       
+      /* End of UNPK */
 #endif
 		for(i = 0x0000; i <= 0x0E00; i += 0x0200)
 			JumpTable[0x811F + i] = CAST_OP(0x811F);
@@ -4302,7 +4302,7 @@ static void JUMPTABLE(int force_table)
 		JumpTable[0xE7DF] = CAST_OP(0xE7DF);
 		JumpTable[0xE7E7] = CAST_OP(0xE7E7);
 #ifdef OPCODES_M68020
-                                           
+      /* Bit Field Instructions - 68020+ */
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
          JumpTable[0xE8C0 + i] = CAST_OP(0xE8C0);
       for(i = 0x0000; i <= 0x0007; i += 0x0001)
@@ -4391,7 +4391,7 @@ static void JUMPTABLE(int force_table)
          JumpTable[0xEFF0 + i] = CAST_OP(0xEFF0);
       JumpTable[0xEFF8] = CAST_OP(0xEFF8);
       JumpTable[0xEFF9] = CAST_OP(0xEFF9);
-                                         
+      /* End of Bit Field Instructions */
 #endif
 		for(i = 0x0000; i <= 0x0FFF; i += 0x0001)
 			JumpTable[0xF000 + i] = CAST_OP(0xF000);

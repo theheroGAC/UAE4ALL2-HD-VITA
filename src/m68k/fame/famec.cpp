@@ -1,11 +1,11 @@
-                                                                              
-                                                                              
-                                                                              
-                                                                              
-                                                                              
-                                                                              
-                                                                                 
-                                                                              
+/****************************************************************************/
+/* FAME (Fast and Accurate Motorola 68000 Emulation Library)                */
+/* Emulador de 68000 en C                                                   */
+/* Autor: Oscar Orallo Pelaez                                               */
+/* Fecha de comienzo: 03-10-2006                                            */
+/* Ultima actualizacion: 08-10-2006                                         */
+/* Based on the excellent FAMEC emulator by St�phane Dallongueville          */
+/****************************************************************************/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,13 +13,13 @@
 #include "fame.h"
 #include "config.h"
 
-                                                                           
+/* Just 0x0 and not 680x0, so that constants can fit in ARM instructions */
 #define M68000 000
 #define M68020 020
 
-             
-                            
-                      
+// Options //
+//#define FAMEC_EXTRA_INLINE
+// #define FAMEC_DEBUG
 #define FAMEC_ADR_BITS  24
 #define FAMEC_FETCHBITS 8
 #define FAMEC_DATABITS  8
@@ -31,7 +31,7 @@
 #endif
 
 #ifndef FAMEC_EXTRA_INLINE
-#define FAMEC_EXTRA_INLINE               
+#define FAMEC_EXTRA_INLINE /*__inline__*/
 #else
 #undef FAMEC_EXTRA_INLINE
 #define FAMEC_EXTRA_INLINE INLINE
@@ -41,7 +41,7 @@
 #define UVAL64(a) (a ## uLL)
 
 
-               
+// Return codes
 #define M68K_OK 0
 #define M68K_NO_SUP_ADDR_SPACE 2
 #define M68K_INV_REG -1
@@ -49,9 +49,9 @@
 extern int prefs_cpu_model;
 extern int mainMenu_CPU_speed;
 
-                                
-                                
-                                
+/******************************/
+/* 68K core types definitions */
+/******************************/
 
 #if FAMEC_ADR_BITS < 32
 #define M68K_ADR_MASK  ((1 << FAMEC_ADR_BITS)-1)
@@ -90,7 +90,7 @@ extern int mainMenu_CPU_speed;
 
 #define M68K_SR_MASK    (M68K_SR_T | M68K_SR_S | M68K_SR_M | 0x0700 | M68K_CCR_MASK)
 
-                                            
+// exception defines taken from musashi core
 #define M68K_RESET_EX                   1
 #define M68K_BUS_ERROR_EX               2
 #define M68K_ADDRESS_ERROR_EX           3
@@ -117,8 +117,8 @@ extern int mainMenu_CPU_speed;
 #define M68K_FAULTED    0x40
 
 
-                        
-                         
+// internals core macros
+/////////////////////////
 
 #define DREG(X)         (m68kcontext.dreg[(X)].D)
 #define DREGu32(X)      (m68kcontext.dreg[(X)].D)
@@ -139,7 +139,7 @@ extern int mainMenu_CPU_speed;
 #define ISP             (m68kcontext.isp)
 
 
-                      
+/* Main CPU context */
 M68K_CONTEXT m68kcontext;
 
 #define flag_C    m68kcontext.flag_c
@@ -229,10 +229,10 @@ M68K_CONTEXT m68kcontext;
     PC = (u16*)(((A) & M68K_ADR_MASK) + BasePC); 
 
 #define READ_BYTE_F(A, D)                    \
-  D = Read_Byte(A)           ;
+  D = Read_Byte(A) /*& 0xFF*/;
 
 #define READ_WORD_F(A, D)                    \
-  D = Read_Word(A)             ;
+  D = Read_Word(A) /*& 0xFFFF*/;
 
 #define READ_LONG_F(A, D)                    \
   D = Read_Long((A));
@@ -265,7 +265,7 @@ M68K_CONTEXT m68kcontext;
   (s32)(s16)(*PC)
 
 #define GET_SLONG                            \
-  (s32)(((u32)(*PC) << 16) | (*(PC + 1)             ));
+  (s32)(((u32)(*PC) << 16) | (*(PC + 1) /*& 0xFFFF*/));
 
 #ifndef USE_ARMV7
 #define FETCH_LONG(A)                    \
@@ -339,11 +339,11 @@ M68K_CONTEXT m68kcontext;
 #define BANKEND_TAG ((u32)-1)
 
 
-                             
+/* Custom function handler */
 typedef void (*icust_handler_func)(u32 vector);
 
-                  
-                   
+// global variable
+///////////////////
 
 void *mem_handlerRB[M68K_DATABANK];
 void *mem_handlerRW[M68K_DATABANK];
@@ -352,81 +352,81 @@ void *mem_handlerWW[M68K_DATABANK];
 void *mem_data[M68K_DATABANK];
 
 
-                             
+/* Custom function handler */
 typedef int (*opcode_func)(const u32 opcode, M68K_CONTEXT &m68kcontext);
 
 static opcode_func JumpTable[0x10000] UAE4ALL_ALIGN;
 
 static u32 initialised = 0;
 
-                                                  
+// exception cycle table (taken from musashi core)
 static const s32 exception_cycle_table[256] =
 {
-	  4,                                     
-	  4,                                       
-	 50,                 
-	 50,                     
-	 34,                           
-	 38,                      
-	 40,           
-	 34,             
-	 34,                           
-	 34,             
-	  4,       
-	  4,       
-	  4,                
-	  4,                                      
-	  4,                    
-	 44,                               
-	  4,                
-	  4,                
-	  4,                
-	  4,                
-	  4,                
-	  4,                
-	  4,                
-	  4,                
-	 44,                          
-	 44,                                    
-	 44,                                    
-	 44,                                    
-	 44,                                    
-	 44,                                    
-	 44,                                    
-	 44,                                    
-	 34,               
-	 34,               
-	 34,               
-	 34,               
-	 34,               
-	 34,               
-	 34,               
-	 34,               
-	 34,               
-	 34,               
-	 34,                
-	 34,                
-	 34,                
-	 34,                
-	 34,                
-	 34,                
-	  4,                                             
-	  4,                         
-	  4,                         
-	  4,                    
-	  4,                        
-	  4,                   
-	  4,                        
-	  4,                                  
-	  4,                               
-	  4,                                   
-	  4,                                        
-	  4,                
-	  4,                
-	  4,                
-	  4,                
-	  4,                
-	                            
+	  4, //  0: Reset - Initial Stack Pointer
+	  4, //  1: Reset - Initial Program Counter
+	 50, //  2: Bus Error
+	 50, //  3: Address Error
+	 34, //  4: Illegal Instruction
+	 38, //  5: Divide by Zero
+	 40, //  6: CHK
+	 34, //  7: TRAPV
+	 34, //  8: Privilege Violation
+	 34, //  9: Trace
+	  4, // 10:
+	  4, // 11:
+	  4, // 12: RESERVED
+	  4, // 13: Coprocessor Protocol Violation
+	  4, // 14: Format Error
+	 44, // 15: Uninitialized Interrupt
+	  4, // 16: RESERVED
+	  4, // 17: RESERVED
+	  4, // 18: RESERVED
+	  4, // 19: RESERVED
+	  4, // 20: RESERVED
+	  4, // 21: RESERVED
+	  4, // 22: RESERVED
+	  4, // 23: RESERVED
+	 44, // 24: Spurious Interrupt
+	 44, // 25: Level 1 Interrupt Autovector
+	 44, // 26: Level 2 Interrupt Autovector
+	 44, // 27: Level 3 Interrupt Autovector
+	 44, // 28: Level 4 Interrupt Autovector
+	 44, // 29: Level 5 Interrupt Autovector
+	 44, // 30: Level 6 Interrupt Autovector
+	 44, // 31: Level 7 Interrupt Autovector
+	 34, // 32: TRAP #0
+	 34, // 33: TRAP #1
+	 34, // 34: TRAP #2
+	 34, // 35: TRAP #3
+	 34, // 36: TRAP #4
+	 34, // 37: TRAP #5
+	 34, // 38: TRAP #6
+	 34, // 39: TRAP #7
+	 34, // 40: TRAP #8
+	 34, // 41: TRAP #9
+	 34, // 42: TRAP #10
+	 34, // 43: TRAP #11
+	 34, // 44: TRAP #12
+	 34, // 45: TRAP #13
+	 34, // 46: TRAP #14
+	 34, // 47: TRAP #15
+	  4, // 48: FP Branch or Set on Unknown Condition
+	  4, // 49: FP Inexact Result
+	  4, // 50: FP Divide by Zero
+	  4, // 51: FP Underflow
+	  4, // 52: FP Operand Error
+	  4, // 53: FP Overflow
+	  4, // 54: FP Signaling NAN
+	  4, // 55: FP Unimplemented Data Type
+	  4, // 56: MMU Configuration Error
+	  4, // 57: MMU Illegal Operation Error
+	  4, // 58: MMU Access Level Violation Error
+	  4, // 59: RESERVED
+	  4, // 60: RESERVED
+	  4, // 61: RESERVED
+	  4, // 62: RESERVED
+	  4, // 63: RESERVED
+	     // 64-255: User Defined
 	  4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,
 	  4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,
 	  4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,
@@ -436,9 +436,9 @@ static const s32 exception_cycle_table[256] =
 };
 
 
-                      
-                      
-                      
+/********************/
+/* helper functions */
+/********************/
 
 static void execute_exception_group_0(s32 vect, u16 inst_reg, s32 addr, u16 spec_info);
 
@@ -470,8 +470,8 @@ void famec_SetBank(u32 low_addr, u32 high_addr, hostptr fetch, void *rb, void *r
 }
 
 
-                         
-                                
+// Read / Write functions
+////////////////////////////////
 
 #ifdef USE_ARMNEON
 
@@ -522,22 +522,22 @@ static __attribute__ ((noinline)) u16 Read_Word(u32 addr)
 	
 	i=addr>>M68K_DATASFT;
 	
-                                                                        
+   /* ! 68020+ CPUs can read/write words and longs at odd addresses ! */
    if (mem_handlerRW[i]) {
       val = ((u16 (*)(s32))mem_handlerRW[i])(addr);
    }
    else {
       if (unlikely(addr & 1)) {
-                    
-                                                                           
-                                                                        
-            
+         /* Example:
+          *    - memory loc.    0x00000000 : 0xeeff0011 (word-swabbed data)
+          *    - read word from 0x00000001 : 0xee11     (unswabbed data)
+          */
          u32 b;
          b = *((u32 *)(((hostptr)mem_data[i]) + (addr ^ 1)));
          val = (b << 8) | (b >> 24);
-                                                          
-                                    
-                                
+//         u8 *pdata = (u8 *)((u32)DataWW[i].data + addr);
+//         val  = *(pdata - 1) << 8;
+//         val |= *(pdata + 2); 
       }
       else {
          val = *((u16 *)(((hostptr)mem_data[i]) + addr));
@@ -549,7 +549,7 @@ static __attribute__ ((noinline)) u16 Read_Word(u32 addr)
 
 static INLINE u32 Read_Long(u32 addr)
 {
-   return (Read_Word(addr) << 16) | (Read_Word(addr + 2)             );
+   return (Read_Word(addr) << 16) | (Read_Word(addr + 2) /*& 0xFFFF*/);
 }
 
 static __attribute__ ((noinline)) void Write_Byte(u32 addr, u8 data)
@@ -575,7 +575,7 @@ static __attribute__ ((noinline)) void Write_Word(u32 addr, u16 data)
 	
 	i=addr>>M68K_DATASFT;
 
-                                                                        
+   /* ! 68020+ CPUs can read/write words and longs at odd addresses ! */
    if (mem_handlerWW[i]) {
       ((void (*)(s32, s32))mem_handlerWW[i])(addr,data);
    }
@@ -583,10 +583,10 @@ static __attribute__ ((noinline)) void Write_Word(u32 addr, u16 data)
       if (unlikely(addr & 1)) {
          u8 *pdata = (u8 *)((hostptr)mem_data[i] + addr);
          
-                    
-                                                                            
-                                                        
-            
+         /* Example:
+          *    - memory loc.     0x00000000 : 0xeeff0011 (word-swabbed data)
+          *    - write 0x2233 to 0x00000001 : 0x22ff0033
+          */
          *(pdata - 1) = data >> 8;
          *(pdata + 2) = data;
       }
@@ -599,24 +599,24 @@ static __attribute__ ((noinline)) void Write_Word(u32 addr, u16 data)
 static INLINE void Write_Long(u32 addr, u32 data)
 {
    Write_Word(addr, data >> 16);
-   Write_Word(addr + 2, data             );
+   Write_Word(addr + 2, data /*& 0xFFFF*/);
 }
 
 
 #endif
 
 
-                         
-                         
-                         
+/***********************/
+/* core main functions */
+/***********************/
 static void m68k_jumptable000(int force_table);
 static void m68k_jumptable020(int force_table);
 
-                                                                             
-                                                                             
-                                                                             
-                                                                             
-                                                                             
+/***************************************************************************/
+/* m68k_init()                                                             */
+/* Debe ser llamado para inicializar la tabla de saltos de instruccion     */
+/* No recibe parametros y no devuelve nada                                 */
+/***************************************************************************/
 void m68k_init(int force_table)
 {
   if (!initialised || force_table)
@@ -628,15 +628,15 @@ void m68k_init(int force_table)
   }
 }
 
-                                                                                
-                                   
-                                        
-                                                                                
-                                                                                
-                                                                                
-                                                                                
-                                                                                
-                                                                                
+/******************************************************************************/
+/* m68k_reset()																  */
+/* Parametros: Ninguno														  */
+/* Retorno: Exito de la operacion                                             */
+/*     M68K_OK (0):  La funcion se ha ejecutado satisfactoriamente            */
+/*     M68K_RUNNING (1): No se puede resetear porque la CPU esta en ejecucion */
+/*     M68K_NO_SUP_ADDR_SPACE (2):  No se puede resetear porque no hay mapa   */
+/*             de memoria supervisor de extraccion de opcodes                 */
+/******************************************************************************/
 u32 m68k_reset(void)
 {
 	u32 i=0;
@@ -649,14 +649,14 @@ u32 m68k_reset(void)
     	m68k_jumptable000(0);
 	}
 
-	                                                      
+	// Si la CPU esta en ejecucion, salir con M68K_RUNNING
 	if (m68kcontext.execinfo & M68K_RUNNING)
 		return M68K_RUNNING;
 
-	                     
+	// Resetear registros
 	memset(&m68kcontext.dreg[0], 0, 16*4);
 	
-	                                      
+	// Resetear interrupts, execinfo y USP
 	m68kcontext.interrupts[0] = 0;
 	for(i=1;i<8;i++)
 		m68kcontext.interrupts[i]=i+0x18;
@@ -667,44 +667,44 @@ u32 m68k_reset(void)
    flag_S = 1;
    flag_M = 0;
 
-	                           
+	// Fijar registro de estado
 	m68kcontext.sr = 0x2700;
 	
-	                                       
-	AREG(7) = Read_Long(             0);
-	m68kcontext.pc = Read_Long(             4);
+	// Obtener puntero de pila inicial y PC
+	AREG(7) = Read_Long(/*0x00F8000*/0);
+	m68kcontext.pc = Read_Long(/*0x00F8000*/4);
 
     return M68K_OK;
 }
 
 
-                                                                             
-                                                                             
-                                                                             
-                                                                             
-                                                                             
+/***************************************************************************/
+/* address=m68k_get_context(address)                                       */
+/* Parametro: Direccion del contexto                                       */
+/* No retorna ningun valor                                                 */
+/***************************************************************************/
 M68K_CONTEXT *m68k_get_context(void)
 {
 	return &m68kcontext;
 }
 
-                                                                              
-                                                                              
-                                                                              
-                                                                              
-                                                                              
+/****************************************************************************/
+/* m68k_get_pc()                                                            */
+/* No recibe parametros                                                     */
+/* Retorna 68k PC                                                           */
+/****************************************************************************/
 u32 m68k_get_pc(void)
 {
 	return (m68kcontext.execinfo & M68K_RUNNING)?(hostptr)PC-BasePC:m68kcontext.pc;
 }
 
-                                                                         
-                                                                         
-                                                                         
-                                                                         
-                                                                         
-                                                                         
-                                                                         
+/***********************************************************************/
+/*  m68k_set_register(register,value)                                  */
+/*  Parametros: Registro (indice) y valor a asignar                    */
+/*  Retorno: Exito de la operacion                                     */
+/*           0  La operacion se ha realizado satisfactoriamente        */
+/*           1  El indice del registro no es valido (fuera de limites) */
+/***********************************************************************/
 s32 m68k_set_register(m68k_register reg, u32 value)
 {
 	switch(reg)
@@ -764,12 +764,12 @@ s32 m68k_set_register(m68k_register reg, u32 value)
 	return M68K_OK;
 }
 
-                                                           
-                                                           
-                                                           
-                                                           
-                                                           
-                                                           
+/*********************************************************/
+/*  m68k_fetch(address,access_type)                      */
+/*  Lee una palabra del espacio de memoria del 68k       */
+/*  Parametro: Direccion de la palabra y tipo de acceso  */
+/*  Retorno: La palabra o -1 en caso de dir. no valida   */
+/*********************************************************/
 s32 m68k_fetch(u32 addr)
 {
 	s32 val;
@@ -784,13 +784,13 @@ s32 m68k_fetch(u32 addr)
 }
 
 
-                                                        
-                                                        
-                                                        
-                                                        
-                                                        
-                                                        
-                                                        
+/******************************************************/
+/*  m68k_release_timeslice()                          */
+/*  Finaliza la ejecucion del micro                   */
+/*   los ciclos sin ejecutar quedan en cycles_counter */
+/*  Parametro: Ninguno                                */
+/*  Retorno: Ninguno                                  */
+/******************************************************/
 void m68k_release_timeslice(void)
 {
 	if (m68kcontext.execinfo & M68K_RUNNING)
@@ -801,8 +801,8 @@ void m68k_release_timeslice(void)
 }
 
 
-                          
-                                          
+//////////////////////////
+// Chequea las interrupciones y las inicia
 static FAMEC_EXTRA_INLINE s32 interrupt_chk__(M68K_CONTEXT &m68kcontext)
 {
 	if ((m68kcontext.interrupts[0]>>1))
@@ -853,14 +853,14 @@ static FAMEC_EXTRA_INLINE s32 interrupt_chk__(M68K_CONTEXT &m68kcontext)
 	return 0;
 }
 
-                                                                                      
+/* Called from execute_exception() *and* uae_chk_handler() to process stack and PC */ 
 void process_exception(unsigned int vect)
 {
    u32 newPC;
    u32 oldPC = (hostptr)(PC) - BasePC;
    u32 oldSR = GET_SR;
    
-                                                                                
+   // TomB 02.12.2013: 68000 reference manual says, trace-flag is always cleared
    flag_T = 0;
    
    if (!flag_S)
@@ -870,21 +870,21 @@ void process_exception(unsigned int vect)
          AREG(7) = flag_M ? MSP : ISP;
       else
          AREG(7) = ISP;
-                     
+      /* adjust SR */
       flag_S = M68K_SR_S;
    }
    
    if (prefs_cpu_model > M68000) {
-                                                                            
+      /* 68010, 68020 & 68030. 68040 code has not been ported from WinUAE */
       if ((vect == 2) || (vect == 3)) {
          int i;
-         u16 ssw = (flag_S ? 4 : 0) | (0                                           ? 2 : 1);
-         ssw |= 0                                     ? 0 : 0x40;
+         u16 ssw = (flag_S ? 4 : 0) | (0/*last_instructionaccess_for_exception_3*/ ? 2 : 1);
+         ssw |= 0/*last_writeaccess_for_exception_3*/ ? 0 : 0x40;
          ssw |= 0x20;
          for (i = 0 ; i < 36; i++) {
             PUSH_16_F(0);
          }
-         PUSH_32_F(0                              );
+         PUSH_32_F(0/*last_fault_for_exception_3*/);
          PUSH_16_F(0);
          PUSH_16_F(0);
          PUSH_16_F(0);
@@ -893,7 +893,7 @@ void process_exception(unsigned int vect)
       } else if ((vect == 5) || (vect == 6) || (vect == 7) || (vect == 9)) {
          PUSH_32_F(oldPC);
          PUSH_16_F(0x2000 + vect * 4);
-      } else if (flag_M && vect >= 24 && vect < 32) {                    
+      } else if (flag_M && vect >= 24 && vect < 32) { /* M + Interrupt */
          PUSH_16_F(vect * 4);
          PUSH_32_F(oldPC);
          PUSH_16_F(oldSR);
@@ -910,20 +910,20 @@ void process_exception(unsigned int vect)
       
       flag_M = 0;
    }
-                                           
-                                 
-                                                                                       
-                                                          
-                                  
-                      
-                                                 
-                                                                       
-                                                                    
-                                                     
-                                                                       
-      
+//   else if ((vect == 2) || (vect == 3)) {
+//      /* Bus / address error */
+//      uae_u16 mode = (sv ? 4 : 0) | (last_instructionaccess_for_exception_3 ? 2 : 1);
+//      mode |= last_writeaccess_for_exception_3 ? 0 : 16;
+//      m68k_areg (regs, 7) -= 14;
+//      /* bit3=I/N */
+//      put_word (m68k_areg (regs, 7) + 0, mode);
+//      put_long (m68k_areg (regs, 7) + 2, last_fault_for_exception_3);
+//      put_word (m68k_areg (regs, 7) + 6, last_op_for_exception_3);
+//      put_word (m68k_areg (regs, 7) + 8, regs->sr);
+//      put_long (m68k_areg (regs, 7) + 10, last_addr_for_exception_3);
+//   }
    else {
-                 
+      /* 68000 */
       PUSH_32_F(oldPC)
       PUSH_16_F(oldSR)
    }
@@ -938,7 +938,7 @@ static FAMEC_EXTRA_INLINE void execute_exception(s32 vect)
 {
 	m68kcontext.io_cycle_counter -= (exception_cycle_table[vect]);
 	
-	                                                  
+	/* comprobar si hay tabla funciones manejadoras */
 	if (m68kcontext.icust_handler[vect])
 	{
 		m68kcontext.sr = GET_SR;
@@ -955,10 +955,10 @@ static FAMEC_EXTRA_INLINE void execute_exception(s32 vect)
 
 static FAMEC_EXTRA_INLINE void interrupt_attend(s32 line)
 {
-	                                                      
+	/* al atender la IRQ, la CPU sale del estado parado */
 	m68kcontext.execinfo &= ~M68K_HALTED;
 
-	                             
+	/* Desactivar interrupcion */
 	m68kcontext.interrupts[0] &= ~(1 << ((u32)line));
 
 	execute_exception(m68kcontext.interrupts[(u32)line]);
@@ -979,7 +979,7 @@ static INLINE void execute_exception_group_0(s32 vect, u16 inst_reg, s32 addr, u
 }
 
 
-                                                              
+/* Performs the required actions to finish the emulate call */
 static INLINE void finish_emulate(const s32 cycles_to_add)
 {
     m68kcontext.sr = GET_SR;
@@ -987,7 +987,7 @@ static INLINE void finish_emulate(const s32 cycles_to_add)
 
     m68kcontext.execinfo &= ~M68K_RUNNING;
 
-                                       
+    /* Actualizar contador de ciclos */
     m68kcontext.cycles_counter += cycles_to_add;
 }
 
@@ -1031,11 +1031,11 @@ static void TRAPCC_EXECUTE (u32 Opcode)
 }
 
 
-                         
-   
-                                                                                       
-                                                             
-   
+/* Bit Field Instructions
+ * 
+ * NOTE: Offset is from the most-significant bit, *not* from the least-significant one.
+ *       http://www-scm.tees.ac.uk/users/a.clements/BF/BF.htm
+ */
 #define BF_MASK(MASK, OFFSET, WIDTH)      \
    MASK = 0xFFFFFFFF;                     \
    if ((OFFSET + WIDTH) < 32) {           \
@@ -1055,14 +1055,14 @@ static void TRAPCC_EXECUTE (u32 Opcode)
    DATA |= (((DATA >> (WIDTH - 1)) - 1) & ~MASK) ^ ~MASK;
 
 #define BF_SET_FLAGS(DATA, WIDTH)         \
-   flag_N = (DATA << (32 - WIDTH)) >> 24;                                         \
+   flag_N = (DATA << (32 - WIDTH)) >> 24; /*((DATA & (1 << (WIDTH - 1))) != 0);*/ \
    flag_NotZ = (DATA != 0);               \
    flag_C = 0;                            \
    flag_V = 0;
 
 #define BF_GET_PARM(EXTRA, OFFSET, WIDTH) \
    OFFSET = EXTRA & 0x800 ? DREG((EXTRA >> 6) & 7) : (EXTRA >> 6) & 0x1F; \
-                                          \
+   /* Width 0 -> 32 */                    \
    WIDTH = (((EXTRA & 0x20 ? DREG(EXTRA & 7) : EXTRA) - 1) & 0x1F) + 1; \
 
 #define BF_FFO(SRC, MASK, OFFSET, WIDTH, EXTRA)  \
@@ -1078,14 +1078,14 @@ static void TRAPCC_EXECUTE (u32 Opcode)
 }
 
 #define BF_REG_GET(EXTRA, DATA, OFFSET, WIDTH) \
-   DATA = DREG((Opcode         ) & 7);    \
+   DATA = DREG((Opcode /*>> 0*/) & 7);    \
    BF_GET_PARM(EXTRA, OFFSET, WIDTH)      \
    OFFSET &= 0x1F;                        \
    BF_SHIFT_DOWN(DATA, OFFSET, WIDTH)     \
    BF_SET_FLAGS(DATA, WIDTH)
 
 #define BF_REG_GET_BFFFO(EXTRA, DATA, OFFSET, OFFSET2, WIDTH) \
-   DATA = DREG((Opcode         ) & 7);    \
+   DATA = DREG((Opcode /*>> 0*/) & 7);    \
    BF_GET_PARM(EXTRA, OFFSET, WIDTH)      \
    OFFSET2 = OFFSET;                      \
    OFFSET &= 0x1F;                        \
@@ -1094,21 +1094,21 @@ static void TRAPCC_EXECUTE (u32 Opcode)
 
 static __inline__ void BF_MEM_GET(u32 *adr, u32 *dst, s32 *offset, u32 width, u32 *bf0, u32 *bf1)
 {
-                             
-                         
-                                                                
-                                                         
-      
+   /* adr = base byte address
+    * dst = DATA (result)
+    * bf0 = lower long (starting with the first *affected* byte)
+    * bf1 = upper byte (bit field crosses into next byte)
+    */
    
-                                                                                                
+   /* Locate the first *affected* byte (*not* the base byte), and read 4(+1) bytes from there */
    if (*offset >= 0) {
       *adr += *offset >> 3;
-                                                     
+      /* New offset from the first *affected* byte */
       *offset &= 7;
    } else {
-                                                                                        
+      /* With negative offset, address of the first *affected* byte is one byte below */
       *adr += *offset / 8 - 1;
-                                                     
+      /* New offset from the first *affected* byte */
       *offset = 8 - (u32)(*offset & 7);
    }
    
@@ -1124,25 +1124,25 @@ static __inline__ void BF_MEM_GET(u32 *adr, u32 *dst, s32 *offset, u32 width, u3
 
 static __inline__ void BF_MEM_PUT(u32 adr, u32 dst, u32 mask, u32 offset, u32 width, u32 bf0, u32 bf1)
 {
-                                                
-                                
-                                                                
-                                                          
-      
-                                                                
-                                 
-                     
-                                           
-      
+   /* adr = address of the first *affected* byte
+    * dst = DATA (to be written)
+    * bf0 = lower long (starting with the first *affected* byte)
+    * bf1 = upper byte (bit field crosses into upper byte)
+    */
+   /* Example: 00[F(FF0FF 0f][f)0]0fff => offset=12->4, width=32
+    *                bf0      bf1
+    *                
+    *          DATA=FF0FF0ff, MASK=FFFFFFFF
+    */
    u32 dst_tmp = dst;
    u32 mask_tmp = mask;
    
-                                
+   /* WRITE long @A: xFF0FF0f */
    BF_SHIFT_UP(mask_tmp, offset, width)
    BF_SHIFT_UP(dst_tmp, offset, width)
    WRITE_LONG_F(adr, (bf0 & ~mask_tmp) | dst_tmp);
    
-                            
+   /* WRITE byte @A+4: fx */
    if ((offset + width) > 32) {
       offset = 8 - offset;
       mask_tmp = mask << offset;
@@ -1153,18 +1153,18 @@ static __inline__ void BF_MEM_PUT(u32 adr, u32 dst, u32 mask, u32 offset, u32 wi
 
 #define CAS_EXECUTE(SHIFT, WRITE_OP)             \
 {                                         \
-                                              \
+/*   s8 flgs, flgo, flgn;*/                   \
                                           \
    src = DREG(res & 7);                   \
                                           \
-                                              \
-                                              \
+/*   flgs = (src < 0);*/                      \
+/*   flgo = (tmp < 0);*/                      \
    dst = tmp - src;                       \
-                                              \
+/*   flgn = (dst < 0);*/                      \
                                           \
-   flag_V = ((src ^ tmp) & (dst ^ tmp)) >> SHIFT;                                         \
-   flag_C = dst;                                   \
-   flag_N = dst >> SHIFT;                                        \
+   flag_V = ((src ^ tmp) & (dst ^ tmp)) >> SHIFT; /*((flgs != flgo) && (flgn != flgo));*/ \
+   flag_C = dst; /*(src > tmp);*/                  \
+   flag_N = dst >> SHIFT; /*flgn << 7;*/                         \
    flag_NotZ = (dst != 0);                \
                                           \
    if (flag_NotZ)                         \
@@ -1176,44 +1176,44 @@ static __inline__ void BF_MEM_PUT(u32 adr, u32 dst, u32 mask, u32 offset, u32 wi
 
 #define CAS2_EXECUTE(SHIFT, WRITE_OP1, WRITE_OP2) \
 {                                         \
-                                              \
+/*   s8 flgs, flgo, flgn;*/                   \
                                           \
-                                          \
+   /* 1st compare */                      \
    src = DREG(res1 & 7);                  \
-                                              \
-                                              \
+/*   flgs = (src < 0);*/                      \
+/*   flgo = (tmp1 < 0);*/                     \
    dst = tmp1 - src;                      \
-                                              \
+/*   flgn = (dst < 0);*/                      \
                                           \
    flag_NotZ = (dst != 0);                \
                                           \
    if (flag_NotZ) {                       \
-                                          \
-      flag_V = ((src ^ tmp1) & (dst ^ tmp1)) >> SHIFT;                                          \
-      flag_C = dst;                                \
-      flag_N = dst >> SHIFT;                                \
+      /* Difference */                    \
+      flag_V = ((src ^ tmp1) & (dst ^ tmp1)) >> SHIFT; /* ((flgs != flgo) && (flgn != flgo));*/ \
+      flag_C = dst; /*(src > tmp1);*/              \
+      flag_N = dst >> SHIFT; /*flgn;*/                      \
       DREGs32(res1 & 7) = tmp1;           \
       DREGs32(res2 & 7) = tmp2;           \
    }                                      \
    else {                                 \
-                                          \
+      /* 2nd compare */                   \
       src = DREG(res2 & 7);               \
-                                              \
-                                              \
+/*      flgs = (src < 0);*/                   \
+/*      flgo = (tmp2 < 0);*/                  \
       dst = tmp2 - src;                   \
-                                              \
+/*      flgn = (dst < 0);*/                   \
                                           \
-      flag_V = ((src ^ tmp2) & (dst ^ tmp2)) >> SHIFT;                                         \
-      flag_C = dst;                                \
-      flag_N = dst >> SHIFT;                                \
+      flag_V = ((src ^ tmp2) & (dst ^ tmp2)) >> SHIFT; /*((flgs != flgo) && (flgn != flgo));*/ \
+      flag_C = dst; /*(src > tmp2);*/              \
+      flag_N = dst >> SHIFT; /*flgn;*/                      \
       flag_NotZ = (dst != 0);             \
                                           \
       if (flag_NotZ) {                    \
-                                          \
+         /* Difference */                 \
          DREGs32(res1 & 7) = tmp1;        \
          DREGs32(res2 & 7) = tmp2;        \
       } else {                            \
-                                          \
+         /* Both compares passed */       \
          WRITE_OP1;                       \
          WRITE_OP2;                       \
       }                                   \
@@ -1249,7 +1249,7 @@ static void MULL(u32 src, u16 extra)
 {
    if (extra & 0x800)
    {
-                          
+      /* signed variant */
       s64 a;
       
       a = (s64)(s32)DREG((extra >> 12) & 7);
@@ -1260,7 +1260,7 @@ static void MULL(u32 src, u16 extra)
       flag_NotZ = (a != 0);
       flag_N = (a < 0);
       if (extra & 0x400) {
-                            
+         /* 32 x 32 -> 64 */
          DREG(extra & 7) = (u32)(a >> 32);
       }
       else if ((a & UVAL64 (0xffffffff80000000)) != 0
@@ -1270,7 +1270,7 @@ static void MULL(u32 src, u16 extra)
    }
    else
    {
-                    
+      /* unsigned */
       u64 a;
       
       a = (u64)(u32)src * (u64)(u32)DREG((extra >> 12) & 7);
@@ -1286,13 +1286,13 @@ static void MULL(u32 src, u16 extra)
    }
 }
 
-                                               
+// returns extra cycles if we have a signed DIV
 static int DIVL(u32 src, u16 extra) 
 {
-                                              
+   /* NOTE: Valid result is *always* 32-bit */
    if (extra & 0x800)
    {
-                          
+      /* signed variant */
       s64 a = (s64)(s32)DREG((extra >> 12) & 7);
       s64 quot, rem;
       
@@ -1321,7 +1321,7 @@ static int DIVL(u32 src, u16 extra)
    }
    else
    {
-                    
+      /* unsigned */
       u64 a = (u64)(u32)DREG((extra >> 12) & 7);
       u64 quot, rem;
       
@@ -1362,7 +1362,7 @@ static __inline__ void MOVEC2(int XN, int RC)
         case 1: *reg = m68kcontext.dfc; break;
         case 2:
         {
-            *reg = m68kcontext.cacr & 0x00000003;                 
+            *reg = m68kcontext.cacr & 0x00000003; /* 68020 mask */
             break;
         }
         
@@ -1389,7 +1389,7 @@ static __inline__ void MOVE2C(int XN, int RC)
         case 1: m68kcontext.dfc = *reg & 7; break;
         case 2:
         {
-            m68kcontext.cacr = *reg & 0x0000000F;                 
+            m68kcontext.cacr = *reg & 0x0000000F; /* 68020 mask */
             break;
         }
         
@@ -1409,14 +1409,14 @@ static __attribute__ ((noinline)) void DECODE_EXT_WORD_020 (u32 *adr)
    FETCH_WORD(ext);
    
    if (ext & 0x0100) {
-                                      
+      /* 68020+ Full Extension Word */
       s32 disp = 0, outer = 0;
       
-                                    
+      /* Base Register Suppressed */
       if (ext & 0x80)
          *adr = 0;
       
-                             
+      /* Base Displacement */
       if ((ext & 0x0030) == 0x20) {
          FETCH_SWORD(disp);
       }
@@ -1425,9 +1425,9 @@ static __attribute__ ((noinline)) void DECODE_EXT_WORD_020 (u32 *adr)
       }
       *adr += disp;
       
-                              
+      /* Index Suppressed ? */
       if ((ext & 0x0040) == 0) {
-                                   
+         /* Index not suppressed */
          if (ext & 0x8000) {
             if (ext & 0x0800)
                index = AREGs32((ext >> 12) & 7);
@@ -1439,24 +1439,24 @@ static __attribute__ ((noinline)) void DECODE_EXT_WORD_020 (u32 *adr)
             else
                index = DREGs16(ext >> 12);
          }
-                             
+         /* Index *= SCALE */
          index <<= (ext >> 9) & 3;
       }
       
-                      
+      /* Preindexed */
       if ((ext & 0x0004) == 0)
          *adr += index;
-                           
+      /* Memory Indirect */
       if (ext & 0x0003) {
          u32 res;
          READ_LONG_F(*adr, res);
          *adr = res;
       }
-                       
+      /* Postindexed */
       if (ext & 0x0004)
          *adr += index;
       
-                              
+      /* Outer Displacement */
       if ((ext & 0x0003) == 0x0002) {
          FETCH_SWORD(outer);
       }
@@ -1466,9 +1466,9 @@ static __attribute__ ((noinline)) void DECODE_EXT_WORD_020 (u32 *adr)
       
       *adr += outer;
    } else {
-                                       
+      /* 68000+ Brief Extension Word */
       
-                 
+      /* Index */
       if (ext & 0x8000) {
          if (ext & 0x0800)
             index = AREGs32((ext >> 12) & 7);
@@ -1480,7 +1480,7 @@ static __attribute__ ((noinline)) void DECODE_EXT_WORD_020 (u32 *adr)
          else
             index = DREGs16((ext >> 12));
       }
-                                         
+      /* Index *= SCALE (only M68020+) */
       index <<= (ext >> 9) & 3;
       
       *adr += (s8)(ext) + index;
@@ -1495,7 +1495,7 @@ static __inline__ void DECODE_EXT_WORD_000 (u32 *adr)
    
    FETCH_WORD(ext);
    
-               
+    /* Index */
     if (ext & 0x8000) {
        if (ext & 0x0800)
           index = AREGs32((ext >> 12) & 7);
@@ -1528,10 +1528,10 @@ static FAMEC_EXTRA_INLINE u8 bitset_count(u32 data)
 }
 
 
-  
-     
-                  
-  
+/*
+ DIVU
+ Unsigned division
+*/
 static u32 getDivu68kCycles(u32 dividend, u16 divisor)
 {
     u32 mcycles;
@@ -1541,7 +1541,7 @@ static u32 getDivu68kCycles(u32 dividend, u16 divisor)
     if ( (u16) divisor == 0)
         return 0;
 
-                  
+    /* Overflow */
     if ( (dividend >> 16) >= divisor)
         return 10;
 
@@ -1555,7 +1555,7 @@ static u32 getDivu68kCycles(u32 dividend, u16 divisor)
 
         dividend <<= 1;
 
-                                 
+        /* If carry from shift */
         if ( (int) temp < 0)
         {
             dividend -= hdivisor;
@@ -1575,10 +1575,10 @@ static u32 getDivu68kCycles(u32 dividend, u16 divisor)
     return mcycles * 2;
 }
 
-  
-     
-                
-  
+/*
+ DIVS
+ Signed division
+*/
 static u32 getDivs68kCycles(s32 dividend, s16 divisor)
 {
     u32 mcycles;
@@ -1593,13 +1593,13 @@ static u32 getDivs68kCycles(s32 dividend, s16 divisor)
     if ( dividend < 0)
         mcycles++;
 
-                                      
+    /*  Check for absolute overflow */
     if ( ((u32) abs( dividend) >> 16) >= (u16) abs( divisor))
     {
         return (mcycles + 2) * 2;
     }
 
-                           
+    /* Absolute quotient */
     aquot = (u32) abs( dividend) / (u16) abs( divisor);
 
     mcycles += 55;
@@ -1612,7 +1612,7 @@ static u32 getDivs68kCycles(s32 dividend, s16 divisor)
             mcycles++;
     }
 
-                                                 
+    /* Count 15 msbits in absolute of quotient */
 
     for ( i = 0; i < 15; i++)
     {
@@ -1657,67 +1657,67 @@ static u32 getDivs68kCycles(s32 dividend, s16 divisor)
 #undef DECODE_EXT_WORD
 
 
-                     
-                      
+// main exec function
+//////////////////////
 
-                                                                             
-                                                                             
-                                                                             
-                                                                             
+/***************************************************************************/
+/* m68k_emulate()                                                          */
+/* Parametros: Numero de ciclos a ejecutar                                 */
+/***************************************************************************/
 void m68k_emulate(s32 cycles)
 {
   M68K_CONTEXT *pm68kcontext = &m68kcontext;
   
 #if 0
-	                                                                      
+	/* Comprobar si la CPU esta detenida debido a un doble error de bus */
 	if (m68kcontext.execinfo & M68K_FAULTED) return;
 #endif
 	
-	                                         
+	/* Poner la CPU en estado de ejecucion */
 	pm68kcontext->execinfo |= M68K_RUNNING;
 
-	           
+	// Cache SR
 	SET_SR(pm68kcontext->sr)
 
-	            
+	// Cache PPL
 	flag_I = M68K_PPL;
 
-	           
+	// Fijar PC
 	SET_PC(pm68kcontext->pc)
 
-	                                             
+	/* guardar ciclos de ejecucion solicitados */
 	pm68kcontext->io_cycle_counter = cycles << mainMenu_CPU_speed;
   pm68kcontext->more_cycles_to_do = 0;
   pm68kcontext->cycles_not_done = 0;
   
-                                     
+  // Check for new pending interrupts
   s32 line = interrupt_chk__(*pm68kcontext);
 
 	if (pm68kcontext->execinfo & M68K_HALTED && line <= 0)
 	{
-                                            
+    // CPU is HALTED -> no cycles to emulate
     finish_emulate(cycles);
     return;
 	} 
 
   if(line > 0)
   {
-                                             
-                                                             
-                                                        
-                                                                              
-                                                                                                          
-                                                                                               
-      
-                                   
-       
-                               
-       
-          
-       
+   /* Different behavior for 68000 and 68020.
+    * First requires interrupts to be handled after the first
+    * emulated instruction (Cruise for a Corpse, 68000),
+    * second requires handling them before (All New World of Lemmings, 68020).
+    * TomB (2014-01-10): All New World of Lemmings works also if IRQ is handled after first instruction...
+    *                    Alien Breed 3D requires IRQ handling after first emulated instruction.
+    */
+//    if(prefs_cpu_model >= M68020)
+//    {
+//      interrupt_attend(line);
+//    }
+//    else
+//    {
       pm68kcontext->more_cycles_to_do = pm68kcontext->io_cycle_counter;
       pm68kcontext->io_cycle_counter = 0;
-       
+//    }
   }
     
   do
@@ -1726,7 +1726,7 @@ void m68k_emulate(s32 cycles)
     {
       u32 Opcode;
       FETCH_WORD(Opcode);
-      if(flag_T)                                                                              
+      if(flag_T) // This flag may be changed in execution of opcode, so we have to check first
       {
         int op_cycles = JumpTable[Opcode](Opcode, *pm68kcontext);
         pm68kcontext->io_cycle_counter = pm68kcontext->io_cycle_counter - op_cycles;
@@ -1746,7 +1746,7 @@ void m68k_emulate(s32 cycles)
       line = interrupt_chk__(*pm68kcontext);
       if (line > 0)
       {
-                                                        
+        // New IRQ with higher priority as current state
         interrupt_attend(line);
       }
     }
