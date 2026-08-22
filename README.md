@@ -1,4 +1,4 @@
-# UAE4LL2 HD — PlayStation Vita 1.03
+# UAE4LL2 HD — PlayStation Vita 1.04
 
 A cleaned PlayStation Vita build of UAE4ALL2 HD, an Amiga emulator based on the UAE4ALL2 project.
 
@@ -26,7 +26,7 @@ uae4all2hd.vpk
 - Virtual keyboard, touch controls and analog mouse
 - Vita shaders and aspect-ratio scaling
 - Vita menu with floppy, hard disk, WHDLoad, presets, hardware, display, controls, savestates and system tabs
-- About screen with version 1.03 and automatic scrolling credits
+- About screen with version 1.04 and automatic scrolling credits
 - CD32 Akiko CD controller with ISO, raw BIN and multi-track CUE images
 - CD32 data tracks, CD audio playback, subcode data, DMA and controller state
 - CD32-aware savestates including the mounted image and playback position
@@ -187,7 +187,7 @@ The packaged copies are `psp2data/data/sounds/floppy_drive.ogg` and `psp2data/da
 - **Restore Default Settings**: resets CPU, chipset, memory, Kickstart, floppies, HDFs, CD, display, audio and controls to factory defaults in memory (does not write any file).
 - **Reboot Amiga Emulation**: hard resets the Amiga with the current settings.
 - **Take Screenshot**: captures the next emulated frame as a PNG.
-- **About**: version 1.03 with scrolling credits.
+- **About**: version 1.04 with scrolling credits.
 
 ## Building for Vita
 
