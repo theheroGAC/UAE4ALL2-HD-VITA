@@ -27,6 +27,7 @@
 #include "keybuf.h"
 #include "gui.h"
 #include "savestate.h"
+#include "midi_synth.h"
 
 
 #define DIV10 (5*CYCLE_UNIT) /* Yes, a bad identifier. */
@@ -656,6 +657,9 @@ static void WriteCIAA (uae_u16 addr,uae_u8 val)
         kback = 1;
     } else {
         ciaasdr_cnt = 0;
+        /* Serial port output: capture MIDI bytes (serial mode bit 0). */
+        if (ciaacra & 0x01)
+            midi_synth_feed_byte((uae_u8)val);
     }
     if ((ciaacra & 0x41) == 0x41)
       ciaasdr_cnt = 8 * 2;
@@ -758,6 +762,8 @@ static void WriteCIAB (uae_u16 addr,uae_u8 val)
 	break;
     case 12:
    	ciabsdr = val;
+   	if (ciabcra & 0x01)
+   	    midi_synth_feed_byte((uae_u8)val);
    	break;
     case 13:
 	setclr(&ciabimask,val);

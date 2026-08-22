@@ -94,30 +94,27 @@ char * make_hard_file_cfg_line (char *dst) {
 
 /*static*/ void parse_filesys_spec (int readonly, char *spec)
 {
-	/* spec example (<UAE name>:<dir>):
-	 * rw,AmigaHD:AmigaHD
-	 */
-    char buf[256];
-    char *s2;
+    if (!spec || !spec[0]) return;
+    char volname[64] = "DH0";
+    char path[256];
+    strncpy(path, spec, sizeof(path) - 1);
+    path[sizeof(path) - 1] = '\0';
 
-    strncpy (buf, spec, 255); buf[255] = 0;
-    s2 = strchr (buf, ':');
-    if (s2) {
-	*s2++ = '\0';
-#ifdef __DOS__
-	{
-	    char *tmp;
- 
-	    while ((tmp = strchr (s2, '\\')))
-		*tmp = '/';
-	}
-#endif
-	s2 = add_filesys_unit (currprefs.mountinfo, buf, s2, readonly, 0, 0, 0, 0);
-	if (s2)
-	    fprintf (stderr, "%s\n", s2);
-    } else {
-	fprintf (stderr, "Usage: [-m | -M] VOLNAME:mount_point\n");
+    char *colon = strchr(path, ':');
+    if (colon) {
+        if ((colon == path + 3 && (strncasecmp(path, "ux0", 3) == 0 || strncasecmp(path, "uma", 3) == 0 || strncasecmp(path, "app", 3) == 0)) ||
+            colon[1] == '/' || colon[1] == '\\') {
+            strcpy(volname, "DH0");
+        } else {
+            size_t vlen = (size_t)(colon - path);
+            if (vlen >= sizeof(volname)) vlen = sizeof(volname) - 1;
+            strncpy(volname, path, vlen);
+            volname[vlen] = '\0';
+            memmove(path, colon + 1, strlen(colon + 1) + 1);
+        }
     }
+
+    add_filesys_unit (currprefs.mountinfo, volname, path, readonly, 0, 0, 0, 0);
 }
 
 /*static*/ void parse_hardfile_spec (int readonly, char *spec)

@@ -156,7 +156,8 @@ int rAnalogXCenter[MAX_NUM_CONTROLLERS]={};
 int rAnalogYCenter[MAX_NUM_CONTROLLERS]={};
 int haveJoysticksBeenCentered=0;
 extern int mainMenu_leftStickMouse;
-#endif // __PSP2__
+extern int mainMenu_pinballMode;
+#endif
 
 #ifdef USE_UAE4ALL_VKBD
 extern int keycode2amiga(SDL_keysym *prKeySym);
@@ -1702,7 +1703,143 @@ if(!vkbd_mode)
 			if(triggerL[0] && dpadRight[0])
 				stylusAdjustX+=2;
 		}
-		//R-trigger in joystick mode
+		if (mainMenu_pinballMode)
+		{
+			static int justPressedPinL = 0;
+			static int justPressedPinR = 0;
+			static int justPressedPinDown = 0;
+			static int justPressedPinLeft = 0;
+			static int justPressedPinRight = 0;
+			static int justPressedPinUp = 0;
+
+			if (triggerL[0] || (dpadLeft[0] && mainMenu_pinballMode == 2))
+			{
+				if (!justPressedPinL)
+				{
+					uae4all_keystate[AK_LSH] = 1;
+					record_key(AK_LSH << 1);
+					uae4all_keystate[AK_LALT] = 1;
+					record_key(AK_LALT << 1);
+					uae4all_keystate[AK_LF] = 1;
+					record_key(AK_LF << 1);
+					justPressedPinL = 1;
+				}
+			}
+			else if (justPressedPinL)
+			{
+				uae4all_keystate[AK_LSH] = 0;
+				record_key((AK_LSH << 1) | 1);
+				uae4all_keystate[AK_LALT] = 0;
+				record_key((AK_LALT << 1) | 1);
+				uae4all_keystate[AK_LF] = 0;
+				record_key((AK_LF << 1) | 1);
+				justPressedPinL = 0;
+			}
+
+			if (triggerR[0] || (buttonB[0] && mainMenu_pinballMode == 2))
+			{
+				if (!justPressedPinR)
+				{
+					uae4all_keystate[AK_RSH] = 1;
+					record_key(AK_RSH << 1);
+					uae4all_keystate[AK_RALT] = 1;
+					record_key(AK_RALT << 1);
+					uae4all_keystate[AK_RT] = 1;
+					record_key(AK_RT << 1);
+					justPressedPinR = 1;
+				}
+			}
+			else if (justPressedPinR)
+			{
+				uae4all_keystate[AK_RSH] = 0;
+				record_key((AK_RSH << 1) | 1);
+				uae4all_keystate[AK_RALT] = 0;
+				record_key((AK_RALT << 1) | 1);
+				uae4all_keystate[AK_RT] = 0;
+				record_key((AK_RT << 1) | 1);
+				justPressedPinR = 0;
+			}
+
+			if (buttonX[0] || dpadDown[0])
+			{
+				if (!justPressedPinDown)
+				{
+					uae4all_keystate[AK_DN] = 1;
+					record_key(AK_DN << 1);
+					uae4all_keystate[AK_SPC] = 1;
+					record_key(AK_SPC << 1);
+					justPressedPinDown = 1;
+				}
+			}
+			else if (justPressedPinDown)
+			{
+				uae4all_keystate[AK_DN] = 0;
+				record_key((AK_DN << 1) | 1);
+				uae4all_keystate[AK_SPC] = 0;
+				record_key((AK_SPC << 1) | 1);
+				justPressedPinDown = 0;
+			}
+
+			if (buttonA[0] || (dpadLeft[0] && mainMenu_pinballMode != 2))
+			{
+				if (!justPressedPinLeft)
+				{
+					uae4all_keystate[AK_SPC] = 1;
+					record_key(AK_SPC << 1);
+					uae4all_keystate[AK_LF] = 1;
+					record_key(AK_LF << 1);
+					justPressedPinLeft = 1;
+				}
+			}
+			else if (justPressedPinLeft)
+			{
+				uae4all_keystate[AK_SPC] = 0;
+				record_key((AK_SPC << 1) | 1);
+				uae4all_keystate[AK_LF] = 0;
+				record_key((AK_LF << 1) | 1);
+				justPressedPinLeft = 0;
+			}
+
+			if (buttonB[0] && mainMenu_pinballMode != 2)
+			{
+				if (!justPressedPinRight)
+				{
+					uae4all_keystate[AK_SPC] = 1;
+					record_key(AK_SPC << 1);
+					uae4all_keystate[AK_RT] = 1;
+					record_key(AK_RT << 1);
+					justPressedPinRight = 1;
+				}
+			}
+			else if (justPressedPinRight)
+			{
+				uae4all_keystate[AK_SPC] = 0;
+				record_key((AK_SPC << 1) | 1);
+				uae4all_keystate[AK_RT] = 0;
+				record_key((AK_RT << 1) | 1);
+				justPressedPinRight = 0;
+			}
+
+			if (buttonY[0] || dpadUp[0])
+			{
+				if (!justPressedPinUp)
+				{
+					uae4all_keystate[AK_UP] = 1;
+					record_key(AK_UP << 1);
+					uae4all_keystate[AK_SPC] = 1;
+					record_key(AK_SPC << 1);
+					justPressedPinUp = 1;
+				}
+			}
+			else if (justPressedPinUp)
+			{
+				uae4all_keystate[AK_UP] = 0;
+				record_key((AK_UP << 1) | 1);
+				uae4all_keystate[AK_SPC] = 0;
+				record_key((AK_SPC << 1) | 1);
+				justPressedPinUp = 0;
+			}
+		}
 		else if(triggerR[0])
 		{
 			//(A) button

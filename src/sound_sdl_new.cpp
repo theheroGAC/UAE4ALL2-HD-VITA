@@ -27,6 +27,7 @@
 #include "menu_config.h"
 #include "cdrom.h"
 #include "disk_sound.h"
+#include "midi_synth.h"
 
 #include "thread.h"
 #include <SDL.h>
@@ -132,6 +133,7 @@ static void sound_thread_mixer(void *ud, Uint8 *stream, int len)
 #endif
 	cdrom_mix_audio((uae_s16 *)stream, copied / (channels * 2), channels, sound_rate);
 	disk_sound_mix((uae_s16 *)stream, copied / (channels * 2), channels, sound_rate);
+	midi_synth_mix((int16_t *)stream, copied / (channels * 2), channels, (int)sound_rate);
 }
 
 static int gp2x_start_sound(int rate, int bits, int stereo)
@@ -279,6 +281,7 @@ static int open_sound (void)
         return 0;
 
     disk_sound_init();
+    midi_synth_init();
     sound_default_evtime();
 
 

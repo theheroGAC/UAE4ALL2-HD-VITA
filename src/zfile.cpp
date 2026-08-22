@@ -31,6 +31,7 @@
 #ifdef __PSP2__
 #include <archive.h>
 #include <archive_entry.h>
+#include <psp2/io/fcntl.h>
 #endif
 
 
@@ -219,6 +220,41 @@ static int bunzip (const char *decompress, const char *src, const char *dst)
 /*
  * lha decompression
  */
+#ifdef __PSP2__
+struct ZArchiveContext {
+    SceUID fd;
+    char buffer[64 * 1024];
+};
+
+static int z_custom_open(struct archive *a, void *client_data)
+{
+    return ARCHIVE_OK;
+}
+
+static la_ssize_t z_custom_read(struct archive *a, void *client_data, const void **buff)
+{
+    ZArchiveContext *ctx = (ZArchiveContext *)client_data;
+    if (!ctx || ctx->fd < 0) return -1;
+    *buff = ctx->buffer;
+    int bytes = sceIoRead(ctx->fd, ctx->buffer, sizeof(ctx->buffer));
+    if (bytes < 0) return -1;
+    return (la_ssize_t)bytes;
+}
+
+static int z_custom_close(struct archive *a, void *client_data)
+{
+    ZArchiveContext *ctx = (ZArchiveContext *)client_data;
+    if (ctx) {
+        if (ctx->fd >= 0) {
+            sceIoClose(ctx->fd);
+            ctx->fd = -1;
+        }
+        free(ctx);
+    }
+    return ARCHIVE_OK;
+}
+#endif
+
 static int lha (const char *src, const char *dst)
 {
 #ifdef __PSP2__
@@ -230,9 +266,30 @@ static int lha (const char *src, const char *dst)
     if (!input)
         return 0;
 
+    ZArchiveContext *ctx = (ZArchiveContext *)malloc(sizeof(ZArchiveContext));
+    if (!ctx) {
+        archive_read_free(input);
+        return 0;
+    }
+
+    ctx->fd = sceIoOpen(src, SCE_O_RDONLY, 0);
+    if (ctx->fd < 0) {
+        free(ctx);
+        archive_read_free(input);
+        return 0;
+    }
+
     archive_read_support_filter_all(input);
     archive_read_support_format_lha(input);
-    if (archive_read_open_filename(input, src, 64 * 1024) != ARCHIVE_OK) {
+    archive_read_support_format_zip(input);
+    archive_read_support_format_7zip(input);
+    archive_read_support_format_all(input);
+    archive_read_set_open_callback(input, z_custom_open);
+    archive_read_set_read_callback(input, z_custom_read);
+    archive_read_set_close_callback(input, z_custom_close);
+    archive_read_set_callback_data(input, ctx);
+
+    if (archive_read_open1(input) != ARCHIVE_OK) {
         archive_read_free(input);
         return 0;
     }
@@ -244,9 +301,18 @@ static int lha (const char *src, const char *dst)
             (strcasecmp(ext, ".adf") == 0 ||
              strcasecmp(ext, ".adz") == 0 ||
              strcasecmp(ext, ".dms") == 0 ||
-             strcasecmp(ext, ".ipf") == 0);
+             strcasecmp(ext, ".ipf") == 0 ||
+             strcasecmp(ext, ".fdi") == 0 ||
+             strcasecmp(ext, ".hdf") == 0);
 
-        if (!disk_entry || archive_entry_filetype(entry) != AE_IFREG) {
+        mode_t file_type = archive_entry_filetype(entry);
+        size_t name_len = name ? strlen(name) : 0;
+        if (file_type == AE_IFDIR || (name_len > 0 && name[name_len - 1] == '/')) {
+            archive_read_data_skip(input);
+            continue;
+        }
+
+        if (!disk_entry) {
             archive_read_data_skip(input);
             continue;
         }
@@ -255,22 +321,22 @@ static int lha (const char *src, const char *dst)
         if (!dst)
             break;
 
-        FILE *output = fopen(dst, "wb");
-        if (!output)
+        SceUID out_fd = sceIoOpen(dst, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
+        if (out_fd < 0)
             break;
 
         char buffer[64 * 1024];
         la_ssize_t bytes;
         result = 1;
         while ((bytes = archive_read_data(input, buffer, sizeof(buffer))) > 0) {
-            if (fwrite(buffer, 1, (size_t)bytes, output) != (size_t)bytes) {
+            if (sceIoWrite(out_fd, buffer, bytes) != bytes) {
                 result = 0;
                 break;
             }
         }
         if (bytes < 0)
             result = 0;
-        fclose(output);
+        sceIoClose(out_fd);
         break;
     }
 
@@ -285,12 +351,11 @@ static int lha (const char *src, const char *dst)
 #endif
 }
 
-/*
- * (pk)unzip decompression
- */
 static int unzip (const char *src, const char *dst)
 {
-#if defined(__PSP2__) || defined(__SWITCH__)
+#if defined(__PSP2__)
+    return lha (src, dst);
+#elif defined(__SWITCH__)
     if (!dst)
         return 1;
     int success = 0;
@@ -307,7 +372,6 @@ static int unzip (const char *src, const char *dst)
                 FILE *output = fopen(dst,"wb");
                 if (output) {
                     char *buf = (char *) malloc(size);
-                    //buf contains len bytes of decompressed data
                     int len = unzReadCurrentFile(input, buf, size);
                     if (len == size) {
                         int written = fwrite(buf, sizeof(char), len, output);
@@ -333,9 +397,6 @@ static int unzip (const char *src, const char *dst)
 #endif
 }
 
-/*
- * decompresses the file (or check if dest is null)
- */
 static int uncompress (const char *name, char *dest)
 {
     const char *ext = strrchr (name, '.');
@@ -354,7 +415,9 @@ static int uncompress (const char *name, char *dest)
 	    return bunzip ("bzip2", name, dest);
 
 	if (strcasecmp (ext, "lha") == 0
-	    || strcasecmp (ext, "lzh") == 0)
+	    || strcasecmp (ext, "lzh") == 0
+	    || strcasecmp (ext, "7z") == 0
+	    || strcasecmp (ext, "xz") == 0)
 	    return lha (name, dest);
 	if (strcasecmp (ext, "zip") == 0)
 	     return unzip (name, dest);
@@ -381,7 +444,9 @@ static int uncompress (const char *name, char *dest)
     if (access (strcat (strcpy (nam, name), ".lha"), 0) >= 0
 	|| access (strcat (strcpy (nam, name), ".LHA"), 0) >= 0
 	|| access (strcat (strcpy (nam, name), ".lzh"), 0) >= 0
-	|| access (strcat (strcpy (nam, name), ".LZH"), 0) >= 0)
+	|| access (strcat (strcpy (nam, name), ".LZH"), 0) >= 0
+	|| access (strcat (strcpy (nam, name), ".7z"), 0) >= 0
+	|| access (strcat (strcpy (nam, name), ".7Z"), 0) >= 0)
 	return lha (nam, dest);
 
     if (access (strcat (strcpy (nam, name),".zip"),0) >= 0
