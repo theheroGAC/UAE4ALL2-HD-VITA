@@ -61,6 +61,10 @@ static bool is_supported_ext(const char *name)
         strcasecmp(ext, ".ipf") == 0 ||
         strcasecmp(ext, ".hdf") == 0 ||
         strcasecmp(ext, ".zip") == 0 ||
+        strcasecmp(ext, ".7z") == 0 ||
+        strcasecmp(ext, ".gz") == 0 ||
+        strcasecmp(ext, ".xz") == 0 ||
+        strcasecmp(ext, ".bz2") == 0 ||
         strcasecmp(ext, ".iso") == 0 ||
         strcasecmp(ext, ".cue") == 0 ||
         strcasecmp(ext, ".fdi") == 0) {

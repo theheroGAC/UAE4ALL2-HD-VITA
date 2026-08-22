@@ -117,6 +117,7 @@ void vita_draw_badge(float x, float y, const char *label, unsigned int bg_col, u
 void vita_draw_boing_ball_icon(float cx, float cy, float radius, float rot_angle);
 void vita_draw_led(float x, float y, const char *label, bool state, unsigned int led_col);
 void vita_draw_button_item(float x, float y, float w, float h, const char *title, const char *subtitle, const char *badge, bool focused, bool active);
+void vita_draw_button_item_custom(float x, float y, float w, float h, const char *title, const char *subtitle, const char *badge, unsigned int badge_col, bool focused, bool active);
 void vita_draw_selector_item(float x, float y, float w, float h, const char *title, const char *current_value, bool focused);
 void vita_draw_switch_item(float x, float y, float w, float h, const char *title, bool enabled, bool focused);
 void vita_draw_slider_item(float x, float y, float w, float h, const char *title, int val, int min, int max, const char *suffix, bool focused);
@@ -124,6 +125,7 @@ void vita_draw_slider_item(float x, float y, float w, float h, const char *title
 void vita_show_message_box(const char *title, const char *message, const char *btn_label);
 void vita_show_about_box(void);
 bool vita_show_confirm_box(const char *title, const char *message, const char *yes_label, const char *no_label);
+void vita_gui_draw_progress(const char *title, const char *subtitle, float fraction, const char *item_name);
 
 void vita_view_floppy(VitaInputState *input, int *selected_item);
 void vita_view_hard_disk(VitaInputState *input, int *selected_item);

@@ -47,6 +47,11 @@ int hdf_analyze(const char *path, HdfInfo *info);
  * Refuses to overwrite an existing file. */
 int hdf_backup(const char *path, const char *dest_dir, char *err, size_t errsz);
 
+/* Create a blank (zero-filled) raw hard disk image of the given size.
+ * Refuses to overwrite an existing file. Returns 0 on success, a negative
+ * error code on failure and fills err. */
+int hdf_create_blank(const char *path, unsigned long megabytes, char *err, size_t errsz);
+
 #ifdef __cplusplus
 }
 #endif

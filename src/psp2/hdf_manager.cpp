@@ -288,3 +288,81 @@ int hdf_backup(const char *path, const char *dest_dir, char *err, size_t errsz)
 
     return 0;
 }
+
+extern "C" void vita_gui_draw_progress(const char *title, const char *subtitle, float fraction, const char *item_name);
+
+/* Create a blank (zero-filled) raw HDF image. The Amiga side formats it
+ * later (e.g. with Workbench/HDToolbox); a zeroed file is a valid empty
+ * hard disk for UAE4ALL2's raw image mounting. */
+int hdf_create_blank(const char *path, unsigned long megabytes, char *err, size_t errsz)
+{
+    struct stat st;
+    FILE *dst;
+    unsigned char *buf;
+    unsigned long long total;
+    unsigned long long written = 0;
+    int last_percent = -1;
+
+    if (!path || path[0] == '\0' || megabytes == 0 || megabytes > 65536) {
+        hdf_set_error(err, errsz, "Invalid size or path");
+        return -1;
+    }
+
+    if (stat(path, &st) == 0) {
+        hdf_set_error(err, errsz, "File already exists: %s", path);
+        return -2;
+    }
+
+    dst = fopen(path, "wb");
+    if (dst == NULL) {
+        hdf_set_error(err, errsz, "Unable to create HDF file (free space on ux0?)");
+        return -1;
+    }
+
+    total = (unsigned long long)megabytes * 1024ULL * 1024ULL;
+    buf = (unsigned char *)malloc(1024 * 1024);
+    if (!buf) {
+        fclose(dst);
+        remove(path);
+        hdf_set_error(err, errsz, "Out of memory");
+        return -1;
+    }
+    memset(buf, 0, 1024 * 1024);
+
+    while (written < total) {
+        size_t chunk = 1024 * 1024;
+        if (total - written < chunk)
+            chunk = (size_t)(total - written);
+        if (fwrite(buf, 1, chunk, dst) != chunk) {
+            free(buf);
+            fclose(dst);
+            remove(path);
+            hdf_set_error(err, errsz, "Write error (not enough free space on ux0?)");
+            return -1;
+        }
+        written += chunk;
+        {
+            int percent = (int)(written * 100 / total);
+            if (percent != last_percent) {
+                last_percent = percent;
+                {
+                    char sub[64];
+                    snprintf(sub, sizeof(sub), "%llu MB / %lu MB (%d%%)",
+                             (unsigned long long)(written / (1024ULL * 1024ULL)),
+                             megabytes, percent);
+                    vita_gui_draw_progress("Creating Blank HDF", sub,
+                        (float)percent / 100.0f, path);
+                }
+            }
+        }
+    }
+
+    free(buf);
+    if (fflush(dst) != 0 || fclose(dst) != 0) {
+        remove(path);
+        hdf_set_error(err, errsz, "Write error during final flush");
+        return -1;
+    }
+
+    return 0;
+}

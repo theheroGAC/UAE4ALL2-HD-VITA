@@ -22,6 +22,7 @@
 #include "gp2x.h"
 #include <SDL_ttf.h>
 #include "savestate.h"
+#include "menu_config.h"
 
 #ifdef __SWITCH__
 #include "switch_kbd.h"
@@ -529,6 +530,25 @@ static void append_state_suffix(char *path, const char *suffix)
 	path[254] = '\0';
 }
 
+static const char *state_slot_suffix(int slot)
+{
+	switch (slot)
+	{
+		case 1: return "-1.asf";
+		case 2: return "-2.asf";
+		case 3: return "-3.asf";
+		case 4: return "-4.asf";
+		case 5: return "-5.asf";
+		case 6: return "-6.asf";
+		case 7: return "-7.asf";
+		case 8: return "-8.asf";
+		case 9: return "-9.asf";
+		case 10: return "-10.asf";
+		case 11: return "-auto.asf";
+		default: return ".asf";
+	}
+}
+
 void make_savestate_filenames(char *save, char *thumb)
 {
 	if (!save) return;
@@ -537,6 +557,32 @@ void make_savestate_filenames(char *save, char *thumb)
 		thumb[0]='\0';
 	int i=0;
 	char *hd_name=NULL;
+#if defined(__PSP2__) || defined(__SWITCH__)
+	/* Per-game WHDLoad savestates: when a game context is active, states are
+	 * stored in SAVE_PREFIX/<game>/<game>-<slot>.asf instead of being shared
+	 * by the WHDLoad library directory. */
+	if (mainMenu_whdload_game[0] != '\0')
+	{
+		char game[128];
+		size_t src_len = strlen(mainMenu_whdload_game);
+		if (src_len > 120) src_len = 120;
+		strncpy(game, mainMenu_whdload_game, src_len);
+		game[src_len] = '\0';
+		for (char *p = game; *p; p++) {
+			if (*p == '/' || *p == '\\' || *p == ':' || *p == ' ')
+				*p = '_';
+		}
+		snprintf(save, 255, "%s%s/%s%s", SAVE_PREFIX, game, game, state_slot_suffix(saveMenu_n_savestate));
+		if (thumb != NULL) {
+			strncpy(thumb, save, 254);
+			thumb[254] = '\0';
+			char *dot = strstr(thumb, ".asf");
+			if (dot)
+				strcpy(dot, ".png");
+		}
+		return;
+	}
+#endif
 	// savestate is named by boot unit
 	// use first floppy as filename, if empty, use boot hdf/hd dir
 	if (uae4all_image_file0[0]!='\0')

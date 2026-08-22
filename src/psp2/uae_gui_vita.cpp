@@ -758,17 +758,25 @@ void vita_draw_footer(const char *left_hint, const char *right_hint)
     float btn_y = VITA_SCREEN_H - 32.0f;
 
     /* Fixed columns with enough separation for the proportional font. */
-    vita_draw_hint_item(20.0f, btn_y, VITA_BTN_CROSS, "SELECT");
+    if (s_active_tab == VITA_TAB_WHDLOAD) {
+        /* Dedicated WHDLoad footer keys: (X) LAUNCH, ([]) INSTALL LHA, (/\\) REBOOT.
+         * Columns are spaced so labels never touch the neighbouring glyph. */
+        vita_draw_hint_item(20.0f, btn_y, VITA_BTN_CROSS, "LAUNCH");
+        vita_draw_hint_item(175.0f, btn_y, VITA_BTN_SQUARE, "INSTALL LHA");
+        vita_draw_hint_item(360.0f, btn_y, VITA_BTN_TRIANGLE, "REBOOT");
+    } else {
+        vita_draw_hint_item(20.0f, btn_y, VITA_BTN_CROSS, "SELECT");
 
-    /* Only show actions that are handled by the active tab. */
-    if (s_active_tab == VITA_TAB_FLOPPY) {
-        vita_draw_hint_item(145.0f, btn_y, VITA_BTN_TRIANGLE, "EJECT");
-        vita_draw_hint_item(275.0f, btn_y, VITA_BTN_SQUARE, "REBOOT");
-    } else if (s_active_tab == VITA_TAB_HARD_DISK) {
-        vita_draw_hint_item(145.0f, btn_y, VITA_BTN_TRIANGLE, "EJECT");
-        vita_draw_hint_item(275.0f, btn_y, VITA_BTN_SQUARE, "MANAGER");
-    } else if (s_active_tab == VITA_TAB_SAVESTATES) {
-        vita_draw_hint_item(145.0f, btn_y, VITA_BTN_SQUARE, "LOAD");
+        /* Only show actions that are handled by the active tab. */
+        if (s_active_tab == VITA_TAB_FLOPPY) {
+            vita_draw_hint_item(145.0f, btn_y, VITA_BTN_TRIANGLE, "EJECT");
+            vita_draw_hint_item(275.0f, btn_y, VITA_BTN_SQUARE, "REBOOT");
+        } else if (s_active_tab == VITA_TAB_HARD_DISK) {
+            vita_draw_hint_item(145.0f, btn_y, VITA_BTN_TRIANGLE, "EJECT");
+            vita_draw_hint_item(275.0f, btn_y, VITA_BTN_SQUARE, "MANAGER");
+        } else if (s_active_tab == VITA_TAB_SAVESTATES) {
+            vita_draw_hint_item(145.0f, btn_y, VITA_BTN_SQUARE, "LOAD");
+        }
     }
 
     /* Right navigation hints */
@@ -779,7 +787,7 @@ void vita_draw_footer(const char *left_hint, const char *right_hint)
     vita_draw_hint_item(start_x, btn_y, VITA_BTN_START, start_label);
 }
 
-void vita_draw_button_item(float x, float y, float w, float h, const char *title, const char *subtitle, const char *badge, bool focused, bool active)
+void vita_draw_button_item_custom(float x, float y, float w, float h, const char *title, const char *subtitle, const char *badge, unsigned int badge_col, bool focused, bool active)
 {
     vita_draw_card(x, y, w, h, focused, active);
 
@@ -787,46 +795,64 @@ void vita_draw_button_item(float x, float y, float w, float h, const char *title
     float max_title_w = badge ? (w - 180.0f) : (w - 40.0f);
     vita_truncate_text(title, max_title_w, 0.95f, title_buf, sizeof(title_buf));
 
-    float text_y = subtitle ? (y + 10.0f) : (y + 16.0f);
+    bool has_sub = (subtitle != NULL && subtitle[0] != '\0');
+    float text_y = has_sub ? (y + (h * 0.5f) - 13.0f) : (y + (h - 14.0f) * 0.5f);
     unsigned int title_col = focused ? VITA_COLOR_TEXT_WHITE : RGBA8(220, 230, 245, 255);
     vita_draw_text(x + 16.0f, text_y, title_col, 0.95f, title_buf);
 
-    if (subtitle) {
+    if (has_sub) {
         char sub_buf[256];
-        vita_truncate_text(subtitle, w - 40.0f, 0.78f, sub_buf, sizeof(sub_buf));
-        vita_draw_text(x + 16.0f, y + 32.0f, VITA_COLOR_TEXT_MUTED, 0.78f, sub_buf);
+        float sub_max_w = badge ? (w - 40.0f - 140.0f) : (w - 40.0f);
+        vita_truncate_text(subtitle, sub_max_w, 0.72f, sub_buf, sizeof(sub_buf));
+        float sub_y = y + (h * 0.5f) + 5.0f;
+        vita_draw_text(x + 16.0f, sub_y, VITA_COLOR_TEXT_MUTED, 0.72f, sub_buf);
     }
 
     if (badge) {
-        unsigned int badge_col = focused ? VITA_COLOR_AMIGA_BLUE : RGBA8(40, 52, 75, 255);
         int bw = vita_get_text_width(0.80f, badge) + 14;
-        vita_draw_badge(x + w - (float)bw - 16.0f, y + 14.0f, badge, badge_col, VITA_COLOR_TEXT_WHITE);
+        float badge_y = y + (h - 22.0f) * 0.5f;
+        vita_draw_badge(x + w - (float)bw - 16.0f, badge_y, badge, badge_col, VITA_COLOR_TEXT_WHITE);
     }
+}
+
+void vita_draw_button_item(float x, float y, float w, float h, const char *title, const char *subtitle, const char *badge, bool focused, bool active)
+{
+    unsigned int badge_col = focused ? VITA_COLOR_AMIGA_BLUE : RGBA8(40, 52, 75, 255);
+    vita_draw_button_item_custom(x, y, w, h, title, subtitle, badge, badge_col, focused, active);
 }
 
 void vita_draw_selector_item(float x, float y, float w, float h, const char *title, const char *current_value, bool focused)
 {
     vita_draw_card(x, y, w, h, focused, false);
-    vita_draw_text(x + 16.0f, y + 16.0f, focused ? VITA_COLOR_TEXT_WHITE : RGBA8(220, 230, 245, 255), 0.95f, title);
+    float text_y = y + (h - 14.0f) * 0.5f;
+
+    char title_buf[128];
+    vita_truncate_text(title, w * 0.50f, 0.95f, title_buf, sizeof(title_buf));
+    int title_w = vita_get_text_width(0.95f, title_buf);
+    vita_draw_text(x + 16.0f, text_y, focused ? VITA_COLOR_TEXT_WHITE : RGBA8(220, 230, 245, 255), 0.95f, title_buf);
 
     char value_buf[128];
     char val_str[128];
     const char *value = current_value ? current_value : "None";
-    /* Keep long scaling descriptions away from the selector title. */
-    vita_truncate_text(value, w - 350.0f, focused ? 0.95f : 0.90f, value_buf, sizeof(value_buf));
+    float max_val_w = w - (float)title_w - (focused ? 80.0f : 50.0f);
+    if (max_val_w < 120.0f) max_val_w = 120.0f;
+    vita_truncate_text(value, max_val_w, focused ? 0.95f : 0.90f, value_buf, sizeof(value_buf));
+
     if (focused) {
         snprintf(val_str, sizeof(val_str), "<  %s  >", value_buf);
-        vita_draw_text_right(x + w - 16.0f, y + 16.0f, VITA_COLOR_FOCUS_BORDER, 0.95f, val_str);
+        vita_draw_text_right(x + w - 16.0f, text_y, VITA_COLOR_FOCUS_BORDER, 0.95f, val_str);
     } else {
         snprintf(val_str, sizeof(val_str), "%s", value_buf);
-        vita_draw_text_right(x + w - 16.0f, y + 16.0f, VITA_COLOR_TEXT_MUTED, 0.90f, val_str);
+        vita_draw_text_right(x + w - 16.0f, text_y, VITA_COLOR_TEXT_MUTED, 0.90f, val_str);
     }
 }
 
 void vita_draw_switch_item(float x, float y, float w, float h, const char *title, bool enabled, bool focused)
 {
     vita_draw_card(x, y, w, h, focused, false);
-    vita_draw_text(x + 16.0f, y + 16.0f, focused ? VITA_COLOR_TEXT_WHITE : RGBA8(220, 230, 245, 255), 0.95f, title);
+    /* Dynamic vertical centering (see vita_draw_selector_item). */
+    float text_y = y + (h - 14.0f) * 0.5f;
+    vita_draw_text(x + 16.0f, text_y, focused ? VITA_COLOR_TEXT_WHITE : RGBA8(220, 230, 245, 255), 0.95f, title);
 
     float sw_w = 48.0f;
     float sw_h = 24.0f;
@@ -863,46 +889,206 @@ void vita_draw_slider_item(float x, float y, float w, float h, const char *title
     vita_draw_rounded_rect(bar_x, bar_y, bar_w * progress, bar_h, 4.0f, fill_col);
 }
 
+/* Fractional-Y text renderer used by the credits scroller: rows are placed
+ * at (int)(y + row*factor), so a fractional y produces true sub-pixel
+ * vertical motion (60 fps smooth scrolling). */
+static void vita_draw_text_f(float x, float y, unsigned int color, float scale, const char *text)
+{
+    if (!prSDLScreen || !text || text[0] == '\0') return;
+
+    Uint32 sdl_col = to_sdl_color(color);
+    float factor = scale * 2.0f;
+    int dot_w = (int)ceilf(factor);
+    int dot_h = dot_w;
+    if (dot_w < 2) dot_w = 2;
+    if (dot_h < 2) dot_h = 2;
+
+    float cur_x = x;
+    for (int idx = 0; text[idx] != '\0'; idx++) {
+        unsigned char c = (unsigned char)text[idx];
+        if (c == '\n') {
+            cur_x = x;
+            y += 10.0f * factor + 4.0f;
+            continue;
+        }
+        if (c >= 32 && c <= 126) {
+            const unsigned char *glyph = s_font_8x8[c - 32];
+            int char_w = s_char_widths[c - 32];
+            for (int r = 0; r < 8; r++) {
+                unsigned char row = glyph[r];
+                if (!row) continue;
+                int row_y = (int)(y + (float)r * factor);
+                for (int col = 0; col < 8; col++) {
+                    if (row & (0x80 >> col)) {
+                        SDL_Rect p = {
+                            (Sint16)(int)(cur_x + (float)col * factor),
+                            (Sint16)row_y,
+                            (Uint16)dot_w,
+                            (Uint16)dot_h
+                        };
+                        SDL_FillRect(prSDLScreen, &p, sdl_col);
+                    }
+                }
+            }
+            cur_x += ceilf((float)(char_w + 1) * factor);
+        } else {
+            cur_x += ceilf(7.0f * factor);
+        }
+    }
+}
+
+/* Offscreen surface used by the 3D Boing Ball renderer. */
+static SDL_Surface *s_boing3d_surf = NULL;
+
+/* Rotating 3D Boing Ball: a checkered sphere with per-pixel shading,
+ * rendered into an offscreen surface and blitted in one pass. */
+static void vita_draw_boing_ball_3d(float cx, float cy, float radius, float rot_x, float rot_y)
+{
+    if (!prSDLScreen || radius < 2.0f) return;
+
+    int size = (int)(radius * 2.0f) + 4;
+    if (!s_boing3d_surf || s_boing3d_surf->w != size || s_boing3d_surf->h != size) {
+        if (s_boing3d_surf)
+            SDL_FreeSurface(s_boing3d_surf);
+        s_boing3d_surf = SDL_CreateRGBSurface(0, size, size, 32,
+            0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+        if (s_boing3d_surf)
+            SDL_SetColorKey(s_boing3d_surf, SDL_SRCCOLORKEY, 0xFF000000);
+    }
+    if (!s_boing3d_surf)
+        return;
+
+    SDL_Surface *surf = s_boing3d_surf;
+    SDL_LockSurface(surf);
+    int pitch = surf->pitch / 4;
+    Uint32 *pix = (Uint32 *)surf->pixels;
+
+    float r = radius;
+    float r2 = r * r;
+    float center = (float)size * 0.5f;
+    float cosx = cosf(rot_x), sinx = sinf(rot_x);
+    float cosy = cosf(rot_y), siny = sinf(rot_y);
+
+    for (int row = 0; row < size; row++) {
+        for (int col = 0; col < size; col++) {
+            float nx = ((float)col - center) / r;
+            float ny = ((float)row - center) / r;
+            float nz2 = 1.0f - nx * nx - ny * ny;
+            if (nz2 < 0.0f) {
+                pix[row * pitch + col] = 0xFF000000; /* color-keyed away */
+                continue;
+            }
+            float nz = sqrtf(nz2);
+
+            /* Rotate the sphere point around Y then X. */
+            float x1 = nx * cosy + nz * siny;
+            float z1 = -nx * siny + nz * cosy;
+            float y1 = ny;
+            float y2 = y1 * cosx - z1 * sinx;
+            float z2 = y1 * sinx + z1 * cosx;
+            float x2 = x1;
+
+            /* Checkerboard pattern mapped on the rotated sphere. */
+            float u = atan2f(z2, x2) / 6.2831853f + 0.5f;
+            float v = asinf(y2) / 3.14159265f + 0.5f;
+            int cu = (int)(u * 4.0f) & 1;
+            int cv = (int)(v * 4.0f) & 1;
+            bool is_red = ((cu + cv) & 1) != 0;
+
+            /* Directional light from the upper left. */
+            float shade = nx * -0.35f + ny * -0.45f + nz * 0.82f;
+            if (shade < 0.15f) shade = 0.15f;
+            if (shade > 1.0f) shade = 1.0f;
+
+            if (is_red)
+                pix[row * pitch + col] = RGBA8((int)(229 * shade), (int)(37 * shade), (int)(33 * shade), 255);
+            else
+                pix[row * pitch + col] = RGBA8((int)(238 * shade), (int)(238 * shade), (int)(240 * shade), 255);
+        }
+    }
+
+    SDL_UnlockSurface(surf);
+
+    SDL_Rect dst = {
+        (Sint16)(int)(cx - center),
+        (Sint16)(int)(cy - center),
+        (Uint16)size,
+        (Uint16)size
+    };
+    SDL_BlitSurface(surf, NULL, prSDLScreen, &dst);
+}
+
+typedef enum {
+    CR_EMPTY = 0,
+    CR_TITLE,      /* big red title */
+    CR_SUBTITLE,   /* orange subtitle */
+    CR_TEXT,       /* plain white */
+    CR_DIM,        /* muted */
+    CR_LINK,       /* Amiga blue link */
+    CR_SECTION,    /* orange section header */
+    CR_RED         /* red highlight */
+} CreditStyle;
+
+typedef struct {
+    const char *text;
+    CreditStyle style;
+} CreditLine;
+
 void vita_show_about_box(void)
 {
-    static const char *credits[] = {
-        "UAE4ALL2 HD Vita",
-        "Version 1.03",
-        "by theheroGAC",
-        "https://github.com/theheroGAC/UAE4ALL2-HD-VITA",
-        "",
-        "This project is a derivative work and would not exist without the",
-        "original UAE4ALL and Vita ports.",
-        "Full credit and thanks go to the original authors and contributors:",
-        "Chui",
-        "john4p",
-        "TomB",
-        "notaz",
-        "Bernd Schneider",
-        "Toni Wilen",
-        "Pickle",
-        "smoku",
-        "AnotherGuest",
-        "Anonymous engineer",
-        "finkel",
-        "Lubomyr",
-        "pelya",
-        "Cpasjuste for the original Vita port, SDL-Vita work,",
-        "shader support and performance improvements",
-        "rsn8887 for the Vita/Switch work and UAE4ALL2 improvements",
-        "https://github.com/rsn8887/uae4all2",
-        "ScHlAuChi for testing, ideas and virtual-keyboard contributions",
-        "wronghands for the menu font, keyboard styles and design ideas",
-        "CrashMidnick for the French virtual keyboard",
-        "Xerpi and frangarCJ for Vita2D and shader-library work",
-        "The VitaSDK Team"
+    static const CreditLine credits[] = {
+        { "UAE4ALL2 HD Vita", CR_TITLE },
+        { "Version 1.04 - Amiga Emulator for PS Vita", CR_SUBTITLE },
+        { "", CR_EMPTY },
+        { "A high-definition port of the classic UAE4ALL Amiga emulator,", CR_TEXT },
+        { "now with WHDLoad, HDF, IPF and CD32 support on the Vita.", CR_TEXT },
+        { "github.com/theheroGAC/UAE4ALL2-HD-VITA", CR_LINK },
+        { "", CR_EMPTY },
+        { "=====  WHDLoad Support  =====", CR_SECTION },
+        { "WHDLoad by Bert Jahn (Wepl)", CR_TEXT },
+        { "The legendary hard-disk loader system for Amiga games.", CR_DIM },
+        { "Official website: www.whdload.de", CR_LINK },
+        { "Game packages & patches: aminet.net", CR_LINK },
+        { "Thanks to the WHDLoad team and every slave author.", CR_DIM },
+        { "", CR_EMPTY },
+        { "=====  Hardware Tribute  =====", CR_SECTION },
+        { "In memory of the engineers who made the Amiga possible:", CR_TEXT },
+        { "Jay Miner - father of the Amiga chipset", CR_RED },
+        { "Dave Needle - Amiga chipset co-designer", CR_RED },
+        { "RJ Mical - system software & creator of the Boing Ball demo", CR_RED },
+        { "And to every Amiga user, past and present.", CR_DIM },
+        { "", CR_EMPTY },
+        { "=====  Original Authors & Credits  =====", CR_SECTION },
+        { "This project is a derivative work of UAE4All and would not", CR_DIM },
+        { "exist without the original authors and contributors:", CR_DIM },
+        { "Chui, john4p, TomB, notaz, Bernd Schneider, Toni Wilen,", CR_TEXT },
+        { "Pickle, smoku, AnotherGuest, Anonymous engineer, finkel,", CR_TEXT },
+        { "Lubomyr, pelya", CR_TEXT },
+        { "", CR_EMPTY },
+        { "Cpasjuste - original Vita port, SDL-Vita, shader support", CR_TEXT },
+        { "rsn8887 - Vita/Switch work and UAE4ALL2 improvements", CR_TEXT },
+        { "github.com/rsn8887/uae4all2", CR_LINK },
+        { "ScHlAuChi - testing, ideas, virtual keyboard", CR_TEXT },
+        { "wronghands - menu font, keyboard styles and design", CR_TEXT },
+        { "CrashMidnick - French virtual keyboard", CR_TEXT },
+        { "Xerpi & frangarCJ - Vita2D and shader library", CR_TEXT },
+        { "The VitaSDK Team and all beta testers", CR_TEXT },
+        { "", CR_EMPTY },
+        { "Thank you for playing!", CR_RED },
     };
     const int total_lines = (int)(sizeof(credits) / sizeof(credits[0]));
-    const int visible_lines = 17;
-    const int max_scroll = total_lines - visible_lines;
-    int scroll = 0;
+    const float line_h = 27.0f;
+    const float content_h = (float)total_lines * line_h;
+
+    /* 60 fps demoscene scroller: fractional scroll offset accumulated every
+     * frame and rendered through the sub-pixel text path -> smooth motion. */
+    float scroll = 0.0f;
+    float speed = 1.0f;
+    int paused = 0;
     int frame_count = 0;
-    int auto_scroll_frames = 0;
+    int hold_counter = 0;
+    float rot_x = 0.0f, rot_y = 0.0f;
+
     VitaInputState input;
     memset(&input, 0, sizeof(input));
     vita_gui_init();
@@ -910,50 +1096,99 @@ void vita_show_about_box(void)
     while (1) {
         vita_gui_update_input(&input);
         frame_count++;
+
         if (frame_count > 6 && (input.pressed & (SCE_CTRL_CIRCLE | SCE_CTRL_CROSS | SCE_CTRL_START)))
             break;
-        if (input.pressed & SCE_CTRL_UP) {
-            scroll--;
-            if (scroll < 0) scroll = 0;
-            auto_scroll_frames = 0;
-        }
-        if (input.pressed & SCE_CTRL_DOWN) {
-            scroll++;
-            if (scroll > max_scroll) scroll = max_scroll;
-            auto_scroll_frames = 0;
-        }
-        if (frame_count > 20) {
-            auto_scroll_frames++;
-            if (auto_scroll_frames >= 28) {
-                scroll++;
-                if (scroll > max_scroll) scroll = 0;
-                auto_scroll_frames = 0;
+
+        /* ([]) toggles pause / resume. */
+        if (input.pressed & SCE_CTRL_SQUARE)
+            paused = !paused;
+
+        /* D-Pad UP: rewind / slow down. D-Pad DOWN: accelerate. */
+        bool up_held = (input.held & SCE_CTRL_UP) != 0;
+        bool down_held = (input.held & SCE_CTRL_DOWN) != 0;
+        if (input.pressed & SCE_CTRL_UP)
+            speed -= 0.5f;
+        if (input.pressed & SCE_CTRL_DOWN)
+            speed += 0.5f;
+        if (up_held || down_held) {
+            hold_counter++;
+            if ((hold_counter & 3) == 0) {
+                if (up_held) speed -= 0.25f;
+                if (down_held) speed += 0.25f;
             }
+        } else {
+            hold_counter = 0;
+            /* Drift back to the normal scroll speed when no key is held. */
+            if (speed < 1.0f) speed += 0.25f;
+            else if (speed > 1.0f) speed -= 0.25f;
+        }
+        if (speed < -5.0f) speed = -5.0f;
+        if (speed > 8.0f) speed = 8.0f;
+
+        if (!paused && speed != 0.0f) {
+            scroll += speed;
+            if (scroll >= content_h) scroll -= content_h;
+            if (scroll < 0.0f) scroll += content_h;
         }
 
+        /* --- Rendering --- */
         SDL_FillRect(prSDLScreen, NULL, to_sdl_color(VITA_COLOR_OVERLAY_BG));
         float dx = 24.0f;
         float dy = 14.0f;
         float dw = VITA_SCREEN_W - 48.0f;
         float dh = VITA_SCREEN_H - 28.0f;
         vita_draw_card_custom(dx, dy, dw, dh, VITA_COLOR_HEADER, VITA_COLOR_FOCUS_BORDER);
-        vita_draw_text_centered(VITA_SCREEN_W * 0.5f, dy + 18.0f,
-            VITA_COLOR_AMIGA_RED, 1.05f, "UAE4ALL2 HD Vita - About");
 
-        for (int i = 0; i < visible_lines; i++) {
-            int line = scroll + i;
-            if (line >= total_lines) break;
-            unsigned int color = (line < 3) ? VITA_COLOR_AMIGA_ORANGE : ((line == 3 || line == 23) ? VITA_COLOR_TEXT_DIM : VITA_COLOR_TEXT_WHITE);
-            vita_draw_text_centered(VITA_SCREEN_W * 0.5f, dy + 58.0f + (float)i * 23.0f,
-                color, 0.75f, credits[line]);
+        /* Header with rotating 3D Boing Ball (demoscene style). */
+        rot_x += 0.045f;
+        rot_y += 0.065f;
+        vita_draw_boing_ball_3d(dx + 46.0f, dy + 40.0f, 24.0f, rot_x, rot_y);
+        vita_draw_text(dx + 92.0f, dy + 20.0f, VITA_COLOR_AMIGA_RED, 1.15f, "UAE4ALL2 HD Vita");
+        vita_draw_text(dx + 92.0f, dy + 44.0f, VITA_COLOR_AMIGA_ORANGE, 0.85f, "About & Credits - WHDLoad Edition");
+
+        vita_draw_rounded_rect_outline(dx + 16.0f, dy + 76.0f, dw - 32.0f, 1.0f, 0.0f, 1.0f, VITA_COLOR_CARD_BORDER);
+
+        /* Scrolling credits (sub-pixel Y via vita_draw_text_f). */
+        float area_top = dy + 90.0f;
+        float area_bottom = dy + dh - 44.0f;
+        for (int i = 0; i < total_lines; i++) {
+            float y = area_top + (float)i * line_h - scroll;
+            if (y < area_top - line_h || y > area_bottom)
+                continue;
+
+            const CreditLine *line = &credits[i];
+            if (line->style == CR_EMPTY)
+                continue;
+
+            float scale;
+            unsigned int color;
+            switch (line->style) {
+                case CR_TITLE:    scale = 1.00f; color = VITA_COLOR_AMIGA_RED; break;
+                case CR_SUBTITLE: scale = 0.80f; color = VITA_COLOR_AMIGA_ORANGE; break;
+                case CR_SECTION:  scale = 0.85f; color = VITA_COLOR_AMIGA_ORANGE; break;
+                case CR_LINK:     scale = 0.75f; color = VITA_COLOR_AMIGA_BLUE; break;
+                case CR_DIM:      scale = 0.75f; color = VITA_COLOR_TEXT_MUTED; break;
+                case CR_RED:      scale = 0.78f; color = VITA_COLOR_AMIGA_RED; break;
+                default:          scale = 0.78f; color = VITA_COLOR_TEXT_WHITE; break;
+            }
+
+            float cx = VITA_SCREEN_W * 0.5f;
+            float x = cx - (float)vita_get_text_width(scale, line->text) * 0.5f;
+            vita_draw_text_f(x, y, color, scale, line->text);
         }
 
-        char footer[64];
-        snprintf(footer, sizeof(footer), "UP/DOWN Scroll   AUTO   %d/%d   CIRCLE Close", scroll + 1, max_scroll + 1);
+        /* Footer controls hint. */
+        char footer[96];
+        if (paused)
+            snprintf(footer, sizeof(footer), "[] RESUME   %d%%   O/X/START CLOSE", (int)(speed * 100.0f));
+        else
+            snprintf(footer, sizeof(footer), "UP REWIND  DOWN ACCELERATE  [] PAUSE  O/X/START CLOSE");
         vita_draw_text_centered(VITA_SCREEN_W * 0.5f, VITA_SCREEN_H - 32.0f,
-            VITA_COLOR_TEXT_MUTED, 0.72f, footer);
+            paused ? VITA_COLOR_AMIGA_ORANGE : VITA_COLOR_TEXT_MUTED, 0.72f, footer);
+
         SDL_Flip(prSDLScreen);
-        SDL_Delay(20);
+        SDL_Delay(16);
     }
 }
 
@@ -1005,6 +1240,45 @@ void vita_show_message_box(const char *title, const char *message, const char *b
         SDL_Flip(prSDLScreen);
         SDL_Delay(20);
     }
+}
+
+void vita_gui_draw_progress(const char *title, const char *subtitle, float fraction, const char *item_name)
+{
+    vita_gui_init();
+    if (fraction < 0.0f) fraction = 0.0f;
+    if (fraction > 1.0f) fraction = 1.0f;
+
+    SDL_FillRect(prSDLScreen, NULL, to_sdl_color(VITA_COLOR_OVERLAY_BG));
+
+    float dw = 640.0f, dh = 240.0f;
+    float dx = (VITA_SCREEN_W - dw) * 0.5f;
+    float dy = (VITA_SCREEN_H - dh) * 0.5f;
+    vita_draw_card_custom(dx, dy, dw, dh, VITA_COLOR_HEADER, VITA_COLOR_FOCUS_BORDER);
+
+    vita_draw_text_centered(dx + (dw * 0.5f), dy + 22.0f, VITA_COLOR_AMIGA_RED, 1.10f, title ? title : "Processing...");
+    vita_draw_text(dx + 30.0f, dy + 66.0f, VITA_COLOR_TEXT_WHITE, 0.95f, subtitle ? subtitle : "");
+
+    float bar_x = dx + 30.0f;
+    float bar_y = dy + 105.0f;
+    float bar_w = dw - 60.0f;
+    float bar_h = 24.0f;
+
+    vita_draw_rounded_rect(bar_x, bar_y, bar_w, bar_h, 4.0f, VITA_COLOR_CARD_BORDER);
+    vita_draw_rounded_rect(bar_x + 1.0f, bar_y + 1.0f, bar_w - 2.0f, bar_h - 2.0f, 3.0f, VITA_COLOR_BG);
+
+    float fill_w = (bar_w - 4.0f) * fraction;
+    if (fill_w > 0.0f) {
+        vita_draw_rounded_rect(bar_x + 2.0f, bar_y + 2.0f, fill_w, bar_h - 4.0f, 2.0f, VITA_COLOR_AMIGA_RED);
+    }
+
+    if (item_name && item_name[0]) {
+        char item_buf[80];
+        strncpy(item_buf, item_name, sizeof(item_buf) - 1);
+        item_buf[sizeof(item_buf) - 1] = '\0';
+        vita_draw_text(dx + 30.0f, dy + 145.0f, VITA_COLOR_TEXT_DIM, 0.80f, item_buf);
+    }
+
+    SDL_Flip(prSDLScreen);
 }
 
 bool vita_show_confirm_box(const char *title, const char *message, const char *yes_label, const char *no_label)

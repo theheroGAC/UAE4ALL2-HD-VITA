@@ -16,6 +16,9 @@
 #ifdef __PSP2__
 #include "cdrom.h"
 #endif
+#if defined(__PSP2__) || defined(__SWITCH__)
+#include "midi_synth.h"
+#endif
 
 extern int kickstart;
 extern int bReloadKickstart;
@@ -162,6 +165,10 @@ int mainMenu_shader = 5;
 int mainMenu_leftStickMouse = 0;
 int mainMenu_touchControls = 1;
 int mainMenu_deadZone = 1000;
+int mainMenu_autoEjectFloppy = 1;
+int mainMenu_midiSynth = 0;
+int mainMenu_pinballMode = 0;
+char mainMenu_whdload_game[128] = "";
 #endif
 #ifdef __SWITCH__
 int mainMenu_swapAB = DEFAULT_SWAPAB;
@@ -557,6 +564,10 @@ void SetDefaultMenuSettings(int general)
     mainMenu_leftStickMouse = 0;
     mainMenu_touchControls = 1;
     mainMenu_deadZone = 1000;
+    mainMenu_autoEjectFloppy = 1;
+    mainMenu_midiSynth = 0;
+    mainMenu_pinballMode = 0;
+    mainMenu_whdload_game[0] = '\0';
 #endif
 #ifdef __SWITCH__
     mainMenu_swapAB = DEFAULT_SWAPAB;
@@ -1574,6 +1585,12 @@ int saveconfig(int general)
     fputs(buffer,f);
     snprintf((char*)buffer, 255, "diskSoundVolumeConfigured=1\n");
     fputs(buffer,f);
+    snprintf((char*)buffer, 255, "autoEjectFloppy=%d\n", mainMenu_autoEjectFloppy);
+    fputs(buffer,f);
+    snprintf((char*)buffer, 255, "midiSynth=%d\n", mainMenu_midiSynth);
+    fputs(buffer,f);
+    snprintf((char*)buffer, 255, "pinballMode=%d\n", mainMenu_pinballMode);
+    fputs(buffer,f);
 #endif
     fclose(f);
     return 1;
@@ -2026,6 +2043,13 @@ void loadconfig(int general)
         if (mainMenu_diskSoundVolume < 0) mainMenu_diskSoundVolume = 0;
         if (mainMenu_diskSoundVolume > 100) mainMenu_diskSoundVolume = 100;
         disk_sound_set_volume(mainMenu_diskSoundVolume);
+        if (fscanf(f,"autoEjectFloppy=%d\n", &mainMenu_autoEjectFloppy) != 1)
+            mainMenu_autoEjectFloppy = 1;
+        if (fscanf(f,"midiSynth=%d\n", &mainMenu_midiSynth) != 1)
+            mainMenu_midiSynth = 0;
+        midi_synth_set_enabled(mainMenu_midiSynth);
+        if (fscanf(f,"pinballMode=%d\n", &mainMenu_pinballMode) != 1)
+            mainMenu_pinballMode = 0;
 #endif
         fclose(f);
     }

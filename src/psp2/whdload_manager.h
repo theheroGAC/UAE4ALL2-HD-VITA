@@ -15,6 +15,7 @@ int vita_whdload_install_lha(const char *archive_path, char *installed_path, siz
 int vita_whdload_list(char names[][128], int max_names);
 int vita_whdload_prepare_launch(const char *game_name);
 const char *vita_whdload_root(void);
+const char *vita_whdload_get_last_error(void);
 
 #ifdef __cplusplus
 }

@@ -23,6 +23,10 @@
 #include "cdrom.h"
 #include "whdload_manager.h"
 #include "hdf_manager.h"
+#include "midi_synth.h"
+#include "cover_downloader.h"
+#include <SDL_image.h>
+#include <psp2/io/stat.h>
 
 #include "uae_gui_vita.h"
 
@@ -59,6 +63,7 @@ extern int mainMenu_showStatus;
 extern int mainMenu_leftStickMouse;
 extern int mainMenu_touchControls;
 extern int mainMenu_autofire;
+extern int mainMenu_pinballMode;
 extern int moveY;
 extern int mainMenu_soundStereo;
 extern int mainMenu_soundStereoSep;
@@ -275,25 +280,130 @@ static int s_hdf_mgr_slot = -1;
 static int s_hdf_mgr_item = 0;
 static int s_hdf_mgr_analyzed = 0;
 static HdfInfo s_hdf_mgr_info;
+static int s_hdf_mgr_creating = 0;     /* size picker active */
+static int s_hdf_mgr_create_idx = 3;   /* index into the size table */
+
+static const int s_hdf_create_sizes[] = { 32, 64, 128, 256, 512, 1024, 2048 };
+#define HDF_CREATE_SIZE_COUNT ((int)(sizeof(s_hdf_create_sizes) / sizeof(s_hdf_create_sizes[0])))
+
+static void hdf_create_blank_into_slot(int slot)
+{
+    char path[512];
+    int size_mb = s_hdf_create_sizes[s_hdf_mgr_create_idx];
+
+    /* Pick a unique file name. */
+    int n = 1;
+    for (;;) {
+        if (n == 1)
+            snprintf(path, sizeof(path), "ux0:/data/uae4all/blank_%dMB.hdf", size_mb);
+        else
+            snprintf(path, sizeof(path), "ux0:/data/uae4all/blank_%dMB_%d.hdf", size_mb, n);
+        FILE *test = fopen(path, "rb");
+        if (!test)
+            break;
+        fclose(test);
+        n++;
+    }
+
+    char err[256];
+    err[0] = '\0';
+    if (hdf_create_blank(path, (unsigned long)size_mb, err, sizeof(err)) != 0) {
+        vita_show_message_box("HDF Creation Failed", err[0] ? err : "Unknown error", "OK (X)");
+        return;
+    }
+
+    /* Mount the new image in the current slot. */
+    char *hdf_files[4] = { uae4all_hard_file0, uae4all_hard_file1, uae4all_hard_file2, uae4all_hard_file3 };
+    strncpy(hdf_files[slot], path, 255);
+    hdf_files[slot][255] = '\0';
+    uae4all_hard_file_ro[slot] = 0;
+    make_hard_file_cfg_line(hdf_files[slot]);
+    mainMenu_bootHD = 2;
+    reset_hdConf();
+    bReloadKickstart = 1;
+    gui_update();
+
+    char msg[320];
+    snprintf(msg, sizeof(msg),
+        "Blank %d MB HDF created and mounted in slot %d.\nFormat it from Workbench (e.g. via HD Toolbox) before use.",
+        size_mb, slot + 1);
+    vita_show_message_box("Blank HDF Created", msg, "OK (X)");
+}
 
 void vita_view_hdf_manager(VitaInputState *input, int *selected_item)
 {
     const int slot = s_hdf_mgr_slot;
-    const int total_items = 4;
+    const int total_items = 5;
 
     char *hdf_files[4] = {
         uae4all_hard_file0, uae4all_hard_file1,
         uae4all_hard_file2, uae4all_hard_file3
     };
 
-    if (slot < 0 || slot >= 4 || hdf_files[slot][0] == '\0') {
+    if (slot < 0 || slot >= 4) {
         s_hdf_mgr_slot = -1;
         return;
     }
 
     if (!s_hdf_mgr_analyzed) {
-        hdf_analyze(hdf_files[slot], &s_hdf_mgr_info);
+        if (hdf_files[slot][0] == '\0') {
+            memset(&s_hdf_mgr_info, 0, sizeof(s_hdf_mgr_info));
+            s_hdf_mgr_info.valid = 0;
+            strcpy(s_hdf_mgr_info.error, "No HDF mounted in this slot");
+        } else {
+            hdf_analyze(hdf_files[slot], &s_hdf_mgr_info);
+        }
         s_hdf_mgr_analyzed = 1;
+    }
+
+    /* --- Blank HDF size picker sub-modal --- */
+    if (s_hdf_mgr_creating) {
+        if (s_hdf_mgr_create_idx < 0) s_hdf_mgr_create_idx = 0;
+        if (s_hdf_mgr_create_idx >= HDF_CREATE_SIZE_COUNT) s_hdf_mgr_create_idx = HDF_CREATE_SIZE_COUNT - 1;
+
+        if (input->pressed & SCE_CTRL_UP) {
+            s_hdf_mgr_create_idx -= 2;
+            if (s_hdf_mgr_create_idx < 0) s_hdf_mgr_create_idx = (s_hdf_mgr_create_idx + HDF_CREATE_SIZE_COUNT + 1) % HDF_CREATE_SIZE_COUNT;
+        }
+        if (input->pressed & SCE_CTRL_DOWN) {
+            s_hdf_mgr_create_idx += 2;
+            if (s_hdf_mgr_create_idx >= HDF_CREATE_SIZE_COUNT) s_hdf_mgr_create_idx = (s_hdf_mgr_create_idx % 2 == 0) ? 0 : 1;
+        }
+        if (input->pressed & (SCE_CTRL_LEFT | SCE_CTRL_RIGHT)) {
+            if (s_hdf_mgr_create_idx % 2 == 0) {
+                if (s_hdf_mgr_create_idx + 1 < HDF_CREATE_SIZE_COUNT) s_hdf_mgr_create_idx++;
+            } else {
+                s_hdf_mgr_create_idx--;
+            }
+        }
+        if (input->pressed & SCE_CTRL_CIRCLE) {
+            s_hdf_mgr_creating = 0;
+            return;
+        }
+        if (input->pressed & SCE_CTRL_CROSS) {
+            s_hdf_mgr_creating = 0;
+            hdf_create_blank_into_slot(slot);
+            return;
+        }
+
+        float bx = 220.0f, by = 100.0f, bw = 520.0f, bh = 280.0f;
+        vita_draw_rounded_rect(0.0f, 0.0f, (float)VITA_SCREEN_W, (float)VITA_SCREEN_H, 0.0f, VITA_COLOR_OVERLAY_BG);
+        vita_draw_card_custom(bx, by, bw, bh, VITA_COLOR_HEADER, VITA_COLOR_FOCUS_BORDER);
+        vita_draw_text_centered(bx + bw * 0.5f, by + 14.0f, VITA_COLOR_AMIGA_RED, 1.0f, "Create Blank HDF");
+        vita_draw_text_centered(bx + bw * 0.5f, by + 38.0f, VITA_COLOR_TEXT_MUTED, 0.75f, "Select image capacity (format from Workbench later)");
+
+        float col_w = (bw - 60.0f) * 0.5f;
+        for (int i = 0; i < HDF_CREATE_SIZE_COUNT; i++) {
+            int row = i / 2;
+            int col = i % 2;
+            float ix = bx + 22.0f + (float)col * (col_w + 16.0f);
+            float iy = by + 60.0f + (float)row * 44.0f;
+            char size_str[32];
+            snprintf(size_str, sizeof(size_str), "%d MB", s_hdf_create_sizes[i]);
+            vita_draw_button_item(ix, iy, col_w, 38.0f, size_str, NULL, NULL, s_hdf_mgr_create_idx == i, false);
+        }
+        vita_draw_text_centered(bx + bw * 0.5f, by + bh - 24.0f, VITA_COLOR_TEXT_MUTED, 0.75f, "X Create   O Cancel");
+        return;
     }
 
     if (s_hdf_mgr_item < 0) s_hdf_mgr_item = 0;
@@ -314,14 +424,18 @@ void vita_view_hdf_manager(VitaInputState *input, int *selected_item)
 
     if (input->pressed & SCE_CTRL_CROSS) {
         if (s_hdf_mgr_item == 0) {
-            /* Toggle read-only mount for this slot. */
-            uae4all_hard_file_ro[slot] = uae4all_hard_file_ro[slot] ? 0 : 1;
-            reset_hdConf();
-            bReloadKickstart = 1;
-            gui_update();
+            if (hdf_files[slot][0] == '\0') {
+                vita_show_message_box("HDF Manager", "Mount an HDF first.", "OK (X)");
+            } else {
+                uae4all_hard_file_ro[slot] = uae4all_hard_file_ro[slot] ? 0 : 1;
+                reset_hdConf();
+                bReloadKickstart = 1;
+                gui_update();
+            }
         } else if (s_hdf_mgr_item == 1) {
-            /* Backup. */
-            if (vita_show_confirm_box("Backup HDF",
+            if (hdf_files[slot][0] == '\0') {
+                vita_show_message_box("HDF Manager", "Mount an HDF first.", "OK (X)");
+            } else if (vita_show_confirm_box("Backup HDF",
                     "Create a backup copy in ux0:/data/uae4all/backups/?",
                     "Backup (X)", "Cancel (O)")) {
                 char err[256];
@@ -332,8 +446,9 @@ void vita_view_hdf_manager(VitaInputState *input, int *selected_item)
                     vita_show_message_box("Backup Failed", err, "OK (X)");
             }
         } else if (s_hdf_mgr_item == 2) {
-            /* Unmount. */
-            if (vita_show_confirm_box("Unmount HDF",
+            if (hdf_files[slot][0] == '\0') {
+                vita_show_message_box("HDF Manager", "Nothing mounted in this slot.", "OK (X)");
+            } else if (vita_show_confirm_box("Unmount HDF",
                     "Remove this hard-disk image from the slot?",
                     "Unmount (X)", "Cancel (O)")) {
                 hdf_files[slot][0] = 0;
@@ -345,69 +460,71 @@ void vita_view_hdf_manager(VitaInputState *input, int *selected_item)
                 return;
             }
         } else if (s_hdf_mgr_item == 3) {
+            s_hdf_mgr_create_idx = 3;
+            s_hdf_mgr_creating = 1;
+        } else if (s_hdf_mgr_item == 4) {
             s_hdf_mgr_slot = -1;
             return;
         }
     }
 
-    /* --- Drawing --- */
-    /* Content area starts below the tab bar (y=48..84) and ends above the
-     * footer (y=502). Keep everything inside that band. */
     float card_x = 20.0f;
     float card_w = VITA_SCREEN_W - 40.0f;
-    float start_y = 90.0f;
+    float start_y = 86.0f;
 
     char title[64];
     snprintf(title, sizeof(title), "HDF Manager - Slot %d", slot + 1);
     vita_draw_text(card_x, start_y, VITA_COLOR_TEXT_WHITE, 1.05f, title);
-    vita_draw_text_right(VITA_SCREEN_W - 20.0f, start_y + 4.0f, VITA_COLOR_TEXT_MUTED, 0.75f,
-        "X Select   O Back");
+    vita_draw_text_right(VITA_SCREEN_W - 20.0f, start_y + 4.0f, VITA_COLOR_TEXT_MUTED, 0.75f, "X Select   O Back");
 
-    /* Info card */
-    float info_y = start_y + 34.0f;
-    float info_h = 170.0f;
+    float info_y = start_y + 24.0f;
+    float info_h = 92.0f;
     vita_draw_card_custom(card_x, info_y, card_w, info_h, VITA_COLOR_CARD, VITA_COLOR_CARD_BORDER);
 
     const HdfInfo *inf = &s_hdf_mgr_info;
     char line[128];
-    float ly = info_y + 12.0f;
-    float lh = 22.0f;
+    float ly = info_y + 10.0f;
+    float lh = 19.0f;
 
-    snprintf(line, sizeof(line), "File: %s", get_filename_only(hdf_files[slot]));
-    vita_draw_text(card_x + 16.0f, ly, VITA_COLOR_TEXT_WHITE, 0.80f, line);
-    ly += lh;
+    if (hdf_files[slot][0] == '\0') {
+        snprintf(line, sizeof(line), "File: (none)");
+        vita_draw_text(card_x + 16.0f, ly, VITA_COLOR_TEXT_WHITE, 0.82f, line);
+        ly += lh;
+        snprintf(line, sizeof(line), "Create a blank HDF below and it will be mounted in this slot.");
+        vita_draw_text(card_x + 16.0f, ly, VITA_COLOR_TEXT_MUTED, 0.78f, line);
+        ly += lh;
+        snprintf(line, sizeof(line), "Status: Empty slot");
+        vita_draw_text(card_x + 16.0f, ly, VITA_COLOR_AMIGA_ORANGE, 0.80f, line);
+    } else {
+        snprintf(line, sizeof(line), "File: %s", get_filename_only(hdf_files[slot]));
+        vita_draw_text(card_x + 16.0f, ly, VITA_COLOR_TEXT_WHITE, 0.85f, line);
+        ly += lh;
 
-    if (inf->size >= 1048576UL)
-        snprintf(line, sizeof(line), "Size: %.2f MB  (%lu bytes)", (double)inf->size / 1048576.0, inf->size);
-    else
-        snprintf(line, sizeof(line), "Size: %lu bytes", inf->size);
-    vita_draw_text(card_x + 16.0f, ly, VITA_COLOR_TEXT_MUTED, 0.80f, line);
-    ly += lh;
+        if (inf->size >= 1048576UL)
+            snprintf(line, sizeof(line), "Size: %.2f MB (%lu bytes)  |  Mounted: %s  |  Writable: %s",
+                     (double)inf->size / 1048576.0, inf->size,
+                     uae4all_hard_file_ro[slot] ? "Read-Only" : "Read/Write",
+                     inf->is_readonly ? "No" : "Yes");
+        else
+            snprintf(line, sizeof(line), "Size: %lu bytes  |  Mounted: %s",
+                     inf->size, uae4all_hard_file_ro[slot] ? "Read-Only" : "Read/Write");
+        vita_draw_text(card_x + 16.0f, ly, VITA_COLOR_TEXT_MUTED, 0.76f, line);
+        ly += lh;
 
-    snprintf(line, sizeof(line), "Sectors: %d  Surfaces: %d  Reserved: %d  Block Size: %d",
-             inf->sectors_per_track, inf->surfaces, inf->reserved, inf->blocksize);
-    vita_draw_text(card_x + 16.0f, ly, VITA_COLOR_TEXT_MUTED, 0.80f, line);
-    ly += lh;
+        snprintf(line, sizeof(line), "Geometry: Sectors %d | Surfaces %d | Cylinders %d | Filesystem: %s",
+                 inf->sectors_per_track, inf->surfaces, inf->cylinders, inf->filesystem);
+        vita_draw_text(card_x + 16.0f, ly, VITA_COLOR_TEXT_MUTED, 0.76f, line);
+        ly += lh;
 
-    snprintf(line, sizeof(line), "Cylinders: %d  Filesystem: %s", inf->cylinders, inf->filesystem);
-    vita_draw_text(card_x + 16.0f, ly, VITA_COLOR_TEXT_MUTED, 0.80f, line);
-    ly += lh;
+        if (inf->valid)
+            snprintf(line, sizeof(line), "Status: %s", inf->is_rdb ? "RDB image (partitions not bootable on this core)" : "Valid hard disk image");
+        else
+            snprintf(line, sizeof(line), "Status: %s", inf->error);
+        vita_draw_text(card_x + 16.0f, ly, inf->valid ? VITA_COLOR_AMIGA_GREEN : VITA_COLOR_DANGER, 0.80f, line);
+    }
 
-    snprintf(line, sizeof(line), "File Writable: %s    Mounted: %s",
-             inf->is_readonly ? "No" : "Yes",
-             uae4all_hard_file_ro[slot] ? "Read-Only" : "Read/Write");
-    vita_draw_text(card_x + 16.0f, ly, VITA_COLOR_TEXT_MUTED, 0.80f, line);
-    ly += lh;
-
-    if (inf->valid)
-        snprintf(line, sizeof(line), "Status: %s", inf->is_rdb ? "RDB image (partitions not bootable on this core)" : "Valid hard disk image");
-    else
-        snprintf(line, sizeof(line), "Status: %s", inf->error);
-    vita_draw_text(card_x + 16.0f, ly, inf->valid ? VITA_COLOR_AMIGA_GREEN : VITA_COLOR_DANGER, 0.80f, line);
-
-    /* Action items */
-    float ay = info_y + info_h + 10.0f;
-    float item_h = 40.0f;
+    float ay = info_y + info_h + 8.0f;
+    float item_h = 42.0f;
 
     vita_draw_switch_item(card_x, ay, card_w, item_h, "Read-Only Mode",
         uae4all_hard_file_ro[slot] != 0, s_hdf_mgr_item == 0);
@@ -421,8 +538,12 @@ void vita_view_hdf_manager(VitaInputState *input, int *selected_item)
         "Remove this image from the slot", "UNMOUNT", s_hdf_mgr_item == 2, false);
     ay += item_h + 6.0f;
 
+    vita_draw_button_item(card_x, ay, card_w, item_h, "Create Blank HDF",
+        "Make a new empty image and mount it in this slot", "CREATE", s_hdf_mgr_item == 3, false);
+    ay += item_h + 6.0f;
+
     vita_draw_button_item(card_x, ay, card_w, item_h, "Back",
-        "Return to hard disk slots", "BACK", s_hdf_mgr_item == 3, false);
+        "Return to hard disk slots", "BACK", s_hdf_mgr_item == 4, false);
 }
 
 
@@ -491,12 +612,12 @@ void vita_view_hard_disk(VitaInputState *input, int *selected_item)
         gui_update();
     }
 
-    /* Open the HDF Manager for a loaded slot. */
-    if ((input->pressed & SCE_CTRL_SQUARE) && *selected_item >= 0 && *selected_item < 4
-        && hdf_files[*selected_item][0] != '\0') {
+    /* Open the HDF Manager for a slot (also empty ones, to create new HDFs). */
+    if ((input->pressed & SCE_CTRL_SQUARE) && *selected_item >= 0 && *selected_item < 4) {
         s_hdf_mgr_slot = *selected_item;
         s_hdf_mgr_item = 0;
         s_hdf_mgr_analyzed = 0;
+        s_hdf_mgr_creating = 0;
     }
 
     float card_x = 20.0f;
@@ -533,13 +654,216 @@ void vita_view_hard_disk(VitaInputState *input, int *selected_item)
         *selected_item == 5, false);
 }
 
+/* --- WHDLoad cover art cache (ux0:/data/uae4all/covers/<Game>.png|jpg) --- */
+static SDL_Surface *s_whdload_cover = NULL;
+static char s_whdload_cover_game[128] = "";
+static float s_whdload_cover_angle = 0.0f;
+
+static void whdload_cover_unload(void)
+{
+    if (s_whdload_cover) {
+        SDL_FreeSurface(s_whdload_cover);
+        s_whdload_cover = NULL;
+    }
+    s_whdload_cover_game[0] = '\0';
+}
+
+static void whdload_cover_load(const char *game_name)
+{
+    if (!game_name || game_name[0] == '\0') {
+        whdload_cover_unload();
+        return;
+    }
+    if (s_whdload_cover && strcmp(s_whdload_cover_game, game_name) == 0)
+        return;
+
+    whdload_cover_unload();
+
+    char path[512];
+    snprintf(path, sizeof(path), "ux0:/data/uae4all/covers/%s.png", game_name);
+    FILE *test = fopen(path, "rb");
+    if (test) {
+        fclose(test);
+        s_whdload_cover = IMG_Load(path);
+    }
+    if (!s_whdload_cover) {
+        snprintf(path, sizeof(path), "ux0:/data/uae4all/covers/%s.jpg", game_name);
+        test = fopen(path, "rb");
+        if (test) {
+            fclose(test);
+            s_whdload_cover = IMG_Load(path);
+        }
+    }
+    if (s_whdload_cover)
+        strncpy(s_whdload_cover_game, game_name, sizeof(s_whdload_cover_game) - 1);
+}
+
+/* Install an LHA archive into the WHDLoad library (X on the install item, SQUARE shortcut). */
+static void whdload_install_flow(void)
+{
+    char archive_path[512];
+    char installed_path[512];
+    archive_path[0] = '\0';
+    installed_path[0] = '\0';
+    int result = vita_gui_run_browser(archive_path, currentDir, 9);
+    if (result == 1) {
+        if (vita_whdload_install_lha(archive_path, installed_path, sizeof(installed_path))) {
+            vita_show_message_box("WHDLoad Installed", "The LHA archive was extracted to the WHDLoad library.", "OK (X)");
+        } else {
+            char err_buf[300];
+            snprintf(err_buf, sizeof(err_buf), "The LHA archive could not be extracted.\n%s", vita_whdload_get_last_error());
+            vita_show_message_box("Installation Failed", err_buf, "OK (X)");
+        }
+    }
+}
+
+/* --- Favorites & recently played (ux0:/data/uae4all/*.txt) --- */
+#define WHDLOAD_FAVORITES_FILE "ux0:/data/uae4all/favorites.txt"
+#define WHDLOAD_RECENT_FILE    "ux0:/data/uae4all/recent.txt"
+
+static int s_whdload_filter = 0; /* 0 = All, 1 = Favorites, 2 = Recent */
+static char s_whdload_last_game[128] = "";
+
+/* In-memory copies of favorites/recent, refreshed once per frame (avoids
+ * opening the files for every game on every frame). */
+static char s_favs[256][128];
+static int s_fav_count = 0;
+static char s_recents[20][128];
+static int s_recent_count = 0;
+
+static void whdload_read_name_list(const char *path, char names[][128], int max_names, int *count)
+{
+    *count = 0;
+    FILE *f = fopen(path, "rb");
+    if (!f) return;
+    char line[160];
+    while (*count < max_names && fgets(line, sizeof(line), f)) {
+        line[strcspn(line, "\r\n")] = '\0';
+        if (line[0] == '\0') continue;
+        strncpy(names[*count], line, 127);
+        names[*count][127] = '\0';
+        (*count)++;
+    }
+    fclose(f);
+}
+
+static void whdload_refresh_meta(void)
+{
+    whdload_read_name_list(WHDLOAD_FAVORITES_FILE, s_favs, 256, &s_fav_count);
+    whdload_read_name_list(WHDLOAD_RECENT_FILE, s_recents, 20, &s_recent_count);
+}
+
+static bool whdload_is_favorite(const char *game)
+{
+    for (int i = 0; i < s_fav_count; i++) {
+        if (strcmp(s_favs[i], game) == 0) return true;
+    }
+    return false;
+}
+
+static bool whdload_is_recent(const char *game)
+{
+    for (int i = 0; i < s_recent_count; i++) {
+        if (strcmp(s_recents[i], game) == 0) return true;
+    }
+    return false;
+}
+
+static void whdload_toggle_favorite(const char *game)
+{
+    char lines[256][128];
+    int count = 0;
+    bool was_favorite = false;
+    FILE *f = fopen(WHDLOAD_FAVORITES_FILE, "rb");
+    if (f) {
+        char line[160];
+        while (count < 256 && fgets(line, sizeof(line), f)) {
+            line[strcspn(line, "\r\n")] = '\0';
+            if (line[0] == '\0') continue;
+            if (strcmp(line, game) == 0) {
+                was_favorite = true;
+                continue;
+            }
+            strncpy(lines[count], line, 127);
+            lines[count][127] = '\0';
+            count++;
+        }
+        fclose(f);
+    }
+    if (!was_favorite && count < 256) {
+        strncpy(lines[count], game, 127);
+        lines[count][127] = '\0';
+        count++;
+    }
+    f = fopen(WHDLOAD_FAVORITES_FILE, "wb");
+    if (f) {
+        for (int i = 0; i < count; i++)
+            fprintf(f, "%s\n", lines[i]);
+        fclose(f);
+    }
+}
+
+static void whdload_mark_recent(const char *game)
+{
+    char lines[20][128];
+    int count = 0;
+    FILE *f = fopen(WHDLOAD_RECENT_FILE, "rb");
+    if (f) {
+        char line[160];
+        while (count < 20 && fgets(line, sizeof(line), f)) {
+            line[strcspn(line, "\r\n")] = '\0';
+            if (line[0] && strcmp(line, game) != 0) {
+                strncpy(lines[count], line, 127);
+                lines[count][127] = '\0';
+                count++;
+            }
+        }
+        fclose(f);
+    }
+    f = fopen(WHDLOAD_RECENT_FILE, "wb");
+    if (f) {
+        fprintf(f, "%s\n", game);
+        for (int i = 0; i < count; i++)
+            fprintf(f, "%s\n", lines[i]);
+        fclose(f);
+    }
+}
+
+/* Per-game savestate folder: ux0:/data/uae4all/saves/<game>/ */
+static void whdload_ensure_game_dir(const char *game)
+{
+    sceIoMkdir("ux0:/data/uae4all/saves", 0777);
+    char dir[256];
+    snprintf(dir, sizeof(dir), "ux0:/data/uae4all/saves/%s", game);
+    sceIoMkdir(dir, 0777);
+}
+
 void vita_view_whdload(VitaInputState *input, int *selected_item)
 {
     char games[64][128];
     int game_count = vita_whdload_list(games, 64);
-    int total_items = game_count + 2;
+
+    whdload_refresh_meta();
+
+    /* Build the visible (filtered) game list. */
+    int vis_index[64];
+    int vis_count = 0;
+    for (int k = 0; k < game_count; k++) {
+        bool keep;
+        if (s_whdload_filter == 1)
+            keep = whdload_is_favorite(games[k]);
+        else if (s_whdload_filter == 2)
+            keep = whdload_is_recent(games[k]);
+        else
+            keep = true;
+        if (keep)
+            vis_index[vis_count++] = k;
+    }
+
+    const int total_items = 4 + vis_count; /* 0 web, 1 install, 2 dir, 3 filter, 4+ games */
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
+    if (total_items <= 0) return;
 
     if (input->pressed & SCE_CTRL_UP) {
         (*selected_item)--;
@@ -550,36 +874,95 @@ void vita_view_whdload(VitaInputState *input, int *selected_item)
         if (*selected_item >= total_items) *selected_item = 0;
     }
 
+    /* Keep the preview card and the per-game savestate context in sync. */
+    if (*selected_item >= 4) {
+        const char *game = games[vis_index[*selected_item - 4]];
+        strncpy(s_whdload_last_game, game, sizeof(s_whdload_last_game) - 1);
+        s_whdload_last_game[sizeof(s_whdload_last_game) - 1] = '\0';
+        strncpy(mainMenu_whdload_game, game, sizeof(mainMenu_whdload_game) - 1);
+        mainMenu_whdload_game[sizeof(mainMenu_whdload_game) - 1] = '\0';
+        whdload_ensure_game_dir(game);
+        whdload_cover_load(game);
+    } else {
+        whdload_cover_unload();
+    }
+
+    /* LEFT/RIGHT cycles the library filter. */
+    if ((input->pressed & (SCE_CTRL_LEFT | SCE_CTRL_RIGHT)) && *selected_item == 3) {
+        s_whdload_filter = (s_whdload_filter + ((input->pressed & SCE_CTRL_RIGHT) ? 1 : -1) + 3) % 3;
+    }
+
+    /* (X) LAUNCH / download / install / select HD dir. */
     if (input->pressed & SCE_CTRL_CROSS) {
         if (*selected_item == 0) {
-            char archive_path[512];
-            char installed_path[512];
-            archive_path[0] = '\0';
-            installed_path[0] = '\0';
-            int result = vita_gui_run_browser(archive_path, currentDir, 9);
-            if (result == 1) {
-                if (vita_whdload_install_lha(archive_path, installed_path, sizeof(installed_path))) {
-                    vita_show_message_box("WHDLoad Installed", "The LHA archive was extracted to the WHDLoad library.", "OK (X)");
+            /* Download cover for the last selected game. */
+            if (s_whdload_last_game[0] == '\0') {
+                vita_show_message_box("Download Cover", "Select a game first, then choose Download Cover Art.", "OK (X)");
+            } else {
+                char out_path[512];
+                out_path[0] = '\0';
+                int rc = vita_cover_download(s_whdload_last_game, out_path, sizeof(out_path));
+                if (rc == 0) {
+                    whdload_cover_load(s_whdload_last_game);
+                    vita_show_message_box("Cover Downloaded", "Boxart saved to:\nux0:/data/uae4all/covers/", "OK (X)");
+                } else if (rc == -6) {
+                    vita_show_message_box("Cover Not Found", "No boxart for this game on the cover server.", "OK (X)");
                 } else {
-                    vita_show_message_box("Installation Failed", "The LHA archive could not be extracted.", "OK (X)");
+                    vita_show_message_box("Download Failed", "Network error or no internet connection.\nServer: ux0:/data/uae4all/covers/source.txt", "OK (X)");
                 }
             }
         } else if (*selected_item == 1) {
+            whdload_install_flow();
+        } else if (*selected_item == 2) {
             strncpy(uae4all_hard_dir, vita_whdload_root(), 255);
             uae4all_hard_dir[255] = '\0';
             mainMenu_bootHD = 1;
             reset_hdConf();
             gui_update();
+            mainMenu_whdload_game[0] = '\0';
             vita_show_message_box("WHDLoad Directory", "The WHDLoad library is selected as the HD directory. A Workbench environment is required.", "OK (X)");
+        } else if (*selected_item == 3) {
+            s_whdload_filter = (s_whdload_filter + 1) % 3;
         } else {
-            const char *game_name = games[*selected_item - 2];
+            const char *game_name = games[vis_index[*selected_item - 4]];
             if (vita_whdload_prepare_launch(game_name)) {
+                /* Per-game savestate context + recently played. */
+                strncpy(mainMenu_whdload_game, game_name, sizeof(mainMenu_whdload_game) - 1);
+                mainMenu_whdload_game[sizeof(mainMenu_whdload_game) - 1] = '\0';
+                whdload_ensure_game_dir(game_name);
+                whdload_mark_recent(game_name);
+
+                /* Auto-Eject Floppy: eject any ADF in DF0..DF3 so the Amiga
+                 * boots straight from the WHDLoad hard disk. */
+                if (mainMenu_autoEjectFloppy) {
+                    uae4all_image_file0[0] = '\0';
+                    uae4all_image_file1[0] = '\0';
+                    uae4all_image_file2[0] = '\0';
+                    uae4all_image_file3[0] = '\0';
+                    gui_update();
+                    write_log("[VITA] whdload: auto-ejected all floppies\n");
+                }
+
                 strncpy(uae4all_hard_dir, vita_whdload_root(), 255);
                 uae4all_hard_dir[255] = '\0';
                 mainMenu_bootHD = 1;
                 reset_hdConf();
+
+                if (mainMenu_CPU_model == 0 || kickstart == 0 || mainMenu_chipMemory < 2 || mainMenu_fastMemory == 0) {
+                    kickstart = 3;
+                    mainMenu_CPU_model = 1;
+                    mainMenu_chipset = 2 | 0x100;
+                    mainMenu_chipMemory = 2;
+                    mainMenu_slowMemory = 0;
+                    mainMenu_fastMemory = 3;
+                    UpdateCPUModelSettings();
+                    UpdateMemorySettings();
+                    UpdateChipsetSettings();
+                    vita_set_kickstart(kickstart, 0);
+                    bReloadKickstart = 1;
+                }
+
                 gui_update();
-                vita_show_message_box("WHDLoad", "The game startup script is ready. Press OK to start the Amiga HD directory.", "Start (X)");
                 mainMenu_case = MAIN_MENU_CASE_RUN;
             } else {
                 vita_show_message_box("WHDLoad Error", "No .slave file was found or the startup script could not be prepared.", "OK (X)");
@@ -587,8 +970,24 @@ void vita_view_whdload(VitaInputState *input, int *selected_item)
         }
     }
 
+    /* ([]) INSTALL LHA: open the archive browser directly. */
+    if (input->pressed & SCE_CTRL_SQUARE) {
+        whdload_install_flow();
+    }
+
+    /* (/\\) REBOOT: warm reset the Amiga. */
+    if (input->pressed & SCE_CTRL_TRIANGLE) {
+        mainMenu_case = MAIN_MENU_CASE_RESET;
+    }
+
+    /* SELECT toggles the favorite mark on the selected game. */
+    if ((input->pressed & SCE_CTRL_SELECT) && *selected_item >= 4) {
+        whdload_toggle_favorite(games[vis_index[*selected_item - 4]]);
+    }
+
+    /* --- Layout: left list + right cover preview card --- */
     float card_x = 20.0f;
-    float card_w = VITA_SCREEN_W - 40.0f;
+    float card_w = 560.0f;
     float start_y = 90.0f;
     float item_h = 56.0f;
     int visible_items = 6;
@@ -597,28 +996,123 @@ void vita_view_whdload(VitaInputState *input, int *selected_item)
     for (int i = 0; i < visible_items; i++) {
         int item = first_item + i;
         if (item >= total_items) break;
-        float y = start_y + (float)i * (item_h + 10.0f);
+        float y = start_y + (float)i * (item_h + 8.0f);
         const char *title;
         const char *subtitle;
         const char *badge;
+        unsigned int badge_col = VITA_COLOR_AMIGA_BLUE;
+
         if (item == 0) {
+            title = "Download Cover Art";
+            subtitle = s_whdload_last_game[0] ? s_whdload_last_game : "Select a game first, then fetch its boxart";
+            badge = "WEB";
+            badge_col = VITA_COLOR_AMIGA_ORANGE;
+        } else if (item == 1) {
             title = "Install Game from LHA";
             subtitle = "Extract a WHDLoad archive into the Vita game library";
             badge = "INSTALL";
-        } else if (item == 1) {
+        } else if (item == 2) {
             title = "Use WHDLoad Directory";
             subtitle = "Select the library as the Amiga HD directory";
             badge = "HD DIR";
+        } else if (item == 3) {
+            title = "Library Filter";
+            subtitle = "All games / favorites only / recently played";
+            badge = (s_whdload_filter == 1) ? "FAVORITES" : (s_whdload_filter == 2) ? "RECENT" : "ALL GAMES";
+            badge_col = VITA_COLOR_AMIGA_ORANGE;
         } else {
-            title = games[item - 2];
-            subtitle = "Installed WHDLoad game";
-            badge = "READY";
+            int orig = vis_index[item - 4];
+            bool fav = whdload_is_favorite(games[orig]);
+            bool rec = whdload_is_recent(games[orig]);
+            title = games[orig];
+            subtitle = fav ? "Favorite - installed WHDLoad game" : "Installed WHDLoad game";
+            badge = fav ? "* FAV" : (rec ? "RECENT" : "READY");
+            if (fav) badge_col = VITA_COLOR_AMIGA_RED;
+            else if (rec) badge_col = VITA_COLOR_AMIGA_GREEN;
         }
-        vita_draw_button_item(card_x, y, card_w, item_h, title, subtitle, badge, *selected_item == item, false);
+        vita_draw_button_item_custom(card_x, y, card_w, item_h, title, subtitle, badge, badge_col, *selected_item == item, false);
     }
 
     if (game_count == 0) {
-        vita_draw_text(card_x + 16.0f, 472.0f, VITA_COLOR_TEXT_MUTED, 0.85f, "No LHA games installed");
+        vita_draw_text(card_x + 16.0f, 470.0f, VITA_COLOR_TEXT_MUTED, 0.85f, "No LHA games installed");
+    } else if (vis_count == 0) {
+        vita_draw_text(card_x + 16.0f, 470.0f, VITA_COLOR_TEXT_MUTED, 0.85f, "No games match the current filter");
+    }
+
+    /* --- Right: cover preview card --- */
+    float preview_x = 596.0f;
+    float preview_w = VITA_SCREEN_W - 20.0f - preview_x;
+    float preview_y = 90.0f;
+    float preview_h = 392.0f;
+    vita_draw_card_custom(preview_x, preview_y, preview_w, preview_h, VITA_COLOR_CARD, VITA_COLOR_CARD_BORDER);
+
+    bool is_game = (*selected_item >= 4);
+    const char *preview_title = is_game ? games[vis_index[*selected_item - 4]]
+                              : (*selected_item == 0 ? "Download Cover Art"
+                                  : (*selected_item == 1 ? "Install Game from LHA"
+                                      : (*selected_item == 2 ? "Use WHDLoad Directory" : "Library Filter")));
+    bool preview_fav = is_game && whdload_is_favorite(games[vis_index[*selected_item - 4]]);
+
+    vita_draw_badge(preview_x + 14.0f, preview_y + 12.0f,
+        is_game ? "WHDLOAD GAME" : "WHDLOAD LIBRARY",
+        is_game ? VITA_COLOR_AMIGA_RED : RGBA8(40, 50, 70, 255), VITA_COLOR_TEXT_WHITE);
+
+    /* Cover art area */
+    float art_x = preview_x + 16.0f;
+    float art_y = preview_y + 46.0f;
+    float art_w = preview_w - 32.0f;
+    float art_h = 230.0f;
+
+    if (s_whdload_cover) {
+        float surf_w = (float)s_whdload_cover->w;
+        float surf_h = (float)s_whdload_cover->h;
+        float scale_x = art_w / surf_w;
+        float scale_y = art_h / surf_h;
+        float final_scale = (scale_x < scale_y) ? scale_x : scale_y;
+        if (final_scale > 1.0f) final_scale = 1.0f;
+        if (final_scale < 0.05f) final_scale = 0.05f;
+
+        int draw_w = (int)(surf_w * final_scale);
+        int draw_h = (int)(surf_h * final_scale);
+        int draw_x = (int)(art_x + (art_w - draw_w) * 0.5f);
+        int draw_y = (int)(art_y + (art_h - draw_h) * 0.5f);
+
+        vita_draw_rounded_rect(art_x - 3.0f, art_y - 3.0f, art_w + 6.0f, art_h + 6.0f, 6.0f, RGBA8(10, 13, 20, 255));
+        SDL_Rect dst_r = { (Sint16)draw_x, (Sint16)draw_y, (Uint16)draw_w, (Uint16)draw_h };
+        SDL_SoftStretch(s_whdload_cover, NULL, prSDLScreen, &dst_r);
+    } else {
+        /* Animated Boing Ball placeholder. */
+        s_whdload_cover_angle += 0.08f;
+        vita_draw_rounded_rect(art_x, art_y, art_w, art_h, 6.0f, RGBA8(18, 22, 32, 255));
+        vita_draw_boing_ball_icon(art_x + (art_w * 0.5f), art_y + (art_h * 0.5f) - 10.0f, 34.0f, s_whdload_cover_angle);
+        vita_draw_text_centered(art_x + (art_w * 0.5f), art_y + art_h - 28.0f,
+            is_game ? VITA_COLOR_TEXT_MUTED : VITA_COLOR_AMIGA_ORANGE, 0.85f,
+            is_game ? "No cover found" : "Cover: <GameName>.png");
+    }
+
+    /* Title (+ favorite mark) */
+    vita_draw_text(preview_x + 16.0f, preview_y + 290.0f, VITA_COLOR_TEXT_DIM, 0.75f, "GAME TITLE");
+    char title_buf[128];
+    float title_max_w = preview_w - 32.0f - (preview_fav ? 78.0f : 0.0f);
+    vita_truncate_text(preview_title, title_max_w, 0.95f, title_buf, sizeof(title_buf));
+    vita_draw_text(preview_x + 16.0f, preview_y + 310.0f, VITA_COLOR_TEXT_WHITE, 0.95f, title_buf);
+    if (preview_fav) {
+        vita_draw_badge(preview_x + preview_w - 86.0f, preview_y + 306.0f, "* FAV", VITA_COLOR_AMIGA_RED, VITA_COLOR_TEXT_WHITE);
+    }
+
+    /* Recommended hardware */
+    vita_draw_text(preview_x + 16.0f, preview_y + 336.0f, VITA_COLOR_TEXT_DIM, 0.75f, "RECOMMENDED HARDWARE");
+    if (is_game) {
+        vita_draw_badge(preview_x + 16.0f, preview_y + 352.0f, "A1200 AGA", VITA_COLOR_AMIGA_ORANGE, RGBA8(20, 24, 34, 255));
+        vita_draw_hint_item(preview_x + preview_w - 150.0f, preview_y + 352.0f, VITA_BTN_CROSS, "LAUNCH");
+        char hw_buf[128];
+        vita_truncate_text("68020 14MHz | Kickstart 3.1 | 2MB Chip + 4MB Fast", preview_w - 32.0f, 0.78f, hw_buf, sizeof(hw_buf));
+        vita_draw_text(preview_x + 16.0f, preview_y + 378.0f, VITA_COLOR_TEXT_MUTED, 0.78f, hw_buf);
+    } else {
+        char hw_buf[128];
+        vita_truncate_text("WHDLoad slave games run best on an A1200 AGA setup", preview_w - 32.0f, 0.80f, hw_buf, sizeof(hw_buf));
+        vita_draw_text(preview_x + 16.0f, preview_y + 354.0f, VITA_COLOR_TEXT_MUTED, 0.80f, hw_buf);
+        vita_draw_hint_item(preview_x + preview_w - 150.0f, preview_y + 352.0f, VITA_BTN_CROSS, "SELECT");
     }
 }
 
@@ -777,7 +1271,7 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
 
 void vita_view_hardware(VitaInputState *input, int *selected_item)
 {
-    const int total_items = 7;
+    const int total_items = 8;
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
 
@@ -845,13 +1339,19 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
                 bReloadKickstart = 1;
                 UpdateMemorySettings();
                 break;
+            case 7:
+                mainMenu_midiSynth = 1 - mainMenu_midiSynth;
+                midi_synth_set_enabled(mainMenu_midiSynth);
+                if (mainMenu_midiSynth)
+                    vita_show_message_box("MIDI Synth", "Serial MIDI capture enabled. Games writing to SERDAT / serial port will play through the built-in synthesizer.", "OK (X)");
+                break;
         }
     }
 
     float card_x = 20.0f;
     float card_w = VITA_SCREEN_W - 40.0f;
     float start_y = 90.0f;
-    float item_h = 50.0f;
+    float item_h = 44.0f;
 
     const char *ks_names[KICKSTART_ROM_COUNT] = {
         "Kickstart 1.2 (A500/A2000)", "Kickstart 1.3 (A500/A2000)", "Kickstart 2.04 (A500+)",
@@ -868,13 +1368,14 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
     const char *slow_ram_names[4] = { "None", "512 KB (Trapdoor)", "1 MB", "1.5 MB" };
     const char *cd_image_name = current_cd_image[0] ? get_filename_only(current_cd_image) : "No image selected";
 
-    vita_draw_selector_item(card_x, start_y + 0.0f * (item_h + 8.0f), card_w, item_h, "Kickstart ROM", ks_names[kickstart % KICKSTART_ROM_COUNT], *selected_item == 0);
-    vita_draw_selector_item(card_x, start_y + 1.0f * (item_h + 8.0f), card_w, item_h, "CPU Architecture", cpu_names[mainMenu_CPU_model % 2], *selected_item == 1);
-    vita_draw_selector_item(card_x, start_y + 2.0f * (item_h + 8.0f), card_w, item_h, "Amiga Chipset", chipset_names[mainMenu_chipset % 3], *selected_item == 2);
-    vita_draw_selector_item(card_x, start_y + 3.0f * (item_h + 8.0f), card_w, item_h, "Chip RAM", chip_ram_names[mainMenu_chipMemory % 4], *selected_item == 3);
-    vita_draw_selector_item(card_x, start_y + 4.0f * (item_h + 8.0f), card_w, item_h, "Fast RAM", fast_ram_names[mainMenu_fastMemory % 5], *selected_item == 4);
-    vita_draw_selector_item(card_x, start_y + 5.0f * (item_h + 8.0f), card_w, item_h, "Slow / Trapdoor RAM", slow_ram_names[mainMenu_slowMemory % 4], *selected_item == 5);
-    vita_draw_selector_item(card_x, start_y + 6.0f * (item_h + 8.0f), card_w, item_h, "CD32 CD Image", cd_image_name, *selected_item == 6);
+    vita_draw_selector_item(card_x, start_y + 0.0f * (item_h + 6.0f), card_w, item_h, "Kickstart ROM", ks_names[kickstart % KICKSTART_ROM_COUNT], *selected_item == 0);
+    vita_draw_selector_item(card_x, start_y + 1.0f * (item_h + 6.0f), card_w, item_h, "CPU Architecture", cpu_names[mainMenu_CPU_model % 2], *selected_item == 1);
+    vita_draw_selector_item(card_x, start_y + 2.0f * (item_h + 6.0f), card_w, item_h, "Amiga Chipset", chipset_names[mainMenu_chipset % 3], *selected_item == 2);
+    vita_draw_selector_item(card_x, start_y + 3.0f * (item_h + 6.0f), card_w, item_h, "Chip RAM", chip_ram_names[mainMenu_chipMemory % 4], *selected_item == 3);
+    vita_draw_selector_item(card_x, start_y + 4.0f * (item_h + 6.0f), card_w, item_h, "Fast RAM", fast_ram_names[mainMenu_fastMemory % 5], *selected_item == 4);
+    vita_draw_selector_item(card_x, start_y + 5.0f * (item_h + 6.0f), card_w, item_h, "Slow / Trapdoor RAM", slow_ram_names[mainMenu_slowMemory % 4], *selected_item == 5);
+    vita_draw_selector_item(card_x, start_y + 6.0f * (item_h + 6.0f), card_w, item_h, "CD32 CD Image", cd_image_name, *selected_item == 6);
+    vita_draw_switch_item(card_x, start_y + 7.0f * (item_h + 6.0f), card_w, item_h, "MIDI / MT-32 Synth Emulation", mainMenu_midiSynth == 1, *selected_item == 7);
 }
 
 void vita_view_display(VitaInputState *input, int *selected_item)
@@ -977,7 +1478,7 @@ void vita_view_display(VitaInputState *input, int *selected_item)
 
 void vita_view_controls(VitaInputState *input, int *selected_item)
 {
-    const int total_items = 5;
+    const int total_items = 7;
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
 
@@ -1006,12 +1507,18 @@ void vita_view_controls(VitaInputState *input, int *selected_item)
                 mainMenu_autofire = (mainMenu_autofire + dir + 4) % 4;
                 break;
             case 3:
+                mainMenu_pinballMode = (mainMenu_pinballMode + dir + 3) % 3;
                 break;
             case 4:
+                break;
+            case 5:
                 mainMenu_diskSoundVolume += dir * 10;
                 if (mainMenu_diskSoundVolume < 0) mainMenu_diskSoundVolume = 0;
                 if (mainMenu_diskSoundVolume > 100) mainMenu_diskSoundVolume = 100;
                 disk_sound_set_volume(mainMenu_diskSoundVolume);
+                break;
+            case 6:
+                mainMenu_autoEjectFloppy = 1 - mainMenu_autoEjectFloppy;
                 break;
         }
     }
@@ -1019,16 +1526,23 @@ void vita_view_controls(VitaInputState *input, int *selected_item)
     float card_x = 20.0f;
     float card_w = VITA_SCREEN_W - 40.0f;
     float start_y = 90.0f;
-    float item_h = 56.0f;
+    float item_h = 48.0f;
 
     const char *touch_modes[3] = { "Direct Touchscreen (Finger)", "Relative Trackpad Cursor", "Disabled" };
     const char *autofire_names[4] = { "Off", "Slow (1)", "Medium (2)", "Turbo (3)" };
+    const char *pinball_names[3] = { "Disabled", "L1 / R1 Flippers", "Dual (L1/Left + R1/Circle)" };
 
-    vita_draw_switch_item(card_x, start_y + 0.0f * (item_h + 10.0f), card_w, item_h, "Right Analog Stick as Amiga Mouse", mainMenu_leftStickMouse == 1, *selected_item == 0);
-    vita_draw_selector_item(card_x, start_y + 1.0f * (item_h + 10.0f), card_w, item_h, "PS Vita Touchscreen Mode", touch_modes[mainMenu_touchControls % 3], *selected_item == 1);
-    vita_draw_selector_item(card_x, start_y + 2.0f * (item_h + 10.0f), card_w, item_h, "Autofire Rate", autofire_names[mainMenu_autofire % 4], *selected_item == 2);
-    vita_draw_button_item(card_x, start_y + 3.0f * (item_h + 10.0f), card_w, item_h, "Physical Controller Layout", "Cross = Fire 1 | Circle = Fire 2 | Square = Space | Triangle = Virtual Keyboard", "LAYOUT", *selected_item == 3, false);
-    vita_draw_slider_item(card_x, start_y + 4.0f * (item_h + 10.0f), card_w, item_h, "Floppy / HDF Sound Volume", mainMenu_diskSoundVolume, 0, 100, "%", *selected_item == 4);
+    const char *layout_desc = (mainMenu_pinballMode != 0)
+        ? "Pinball: L1 = Left Flipper | R1 = Right Flipper | Cross = Plunger | []/O/D-Pad = Tilt"
+        : "Cross = Fire 1 | Circle = Fire 2 | Square = Space | Triangle = Virtual Keyboard";
+
+    vita_draw_switch_item(card_x, start_y + 0.0f * (item_h + 6.0f), card_w, item_h, "Right Analog Stick as Amiga Mouse", mainMenu_leftStickMouse == 1, *selected_item == 0);
+    vita_draw_selector_item(card_x, start_y + 1.0f * (item_h + 6.0f), card_w, item_h, "PS Vita Touchscreen Mode", touch_modes[mainMenu_touchControls % 3], *selected_item == 1);
+    vita_draw_selector_item(card_x, start_y + 2.0f * (item_h + 6.0f), card_w, item_h, "Autofire Rate", autofire_names[mainMenu_autofire % 4], *selected_item == 2);
+    vita_draw_selector_item(card_x, start_y + 3.0f * (item_h + 6.0f), card_w, item_h, "Pinball Flippers (L1/R1)", pinball_names[mainMenu_pinballMode % 3], *selected_item == 3);
+    vita_draw_button_item(card_x, start_y + 4.0f * (item_h + 6.0f), card_w, item_h, "Physical Controller Layout", layout_desc, "LAYOUT", *selected_item == 4, false);
+    vita_draw_slider_item(card_x, start_y + 5.0f * (item_h + 6.0f), card_w, item_h, "Floppy / HDF Sound Volume", mainMenu_diskSoundVolume, 0, 100, "%", *selected_item == 5);
+    vita_draw_switch_item(card_x, start_y + 6.0f * (item_h + 6.0f), card_w, item_h, "WHDLoad Auto-Eject Floppy on Launch", mainMenu_autoEjectFloppy == 1, *selected_item == 6);
 }
 
 static bool vita_savestate_file_exists(const char *path)
@@ -1123,7 +1637,16 @@ void vita_view_savestates(VitaInputState *input, int *selected_item)
     }
 
     char game_label[128];
-    vita_get_game_label(game_label, sizeof(game_label));
+    if (mainMenu_whdload_game[0] != '\0') {
+        strncpy(game_label, mainMenu_whdload_game, sizeof(game_label) - 1);
+        game_label[sizeof(game_label) - 1] = '\0';
+    } else {
+        vita_get_game_label(game_label, sizeof(game_label));
+    }
+
+    /* Thumbnail cache: one surface per slot, reloaded when the path changes. */
+    static SDL_Surface *s_slot_thumbs[4] = { NULL, NULL, NULL, NULL };
+    static char s_slot_thumb_paths[4][256] = { {0}, {0}, {0}, {0} };
 
     float slot_w = (VITA_SCREEN_W - 40.0f - 36.0f) / 4.0f;
     float slot_h = 320.0f;
@@ -1155,10 +1678,52 @@ void vita_view_savestates(VitaInputState *input, int *selected_item)
         float thumb_h = 148.0f;
 
         vita_draw_rounded_rect(thumb_x, thumb_y, thumb_w, thumb_h, 6.0f, RGBA8(12, 15, 22, 255));
-        vita_draw_boing_ball_icon(thumb_x + (thumb_w * 0.5f), thumb_y + 58.0f, 26.0f, 0.0f);
-        vita_draw_text_centered(thumb_x + (thumb_w * 0.5f), thumb_y + 105.0f,
-            saved ? VITA_COLOR_SUCCESS : VITA_COLOR_TEXT_MUTED, 0.90f,
-            saved ? "SAVED" : "EMPTY");
+
+        /* Load the real screenshot thumbnail when available. */
+        if (saved && thumb_path[0] != '\0' &&
+            (s_slot_thumb_paths[i][0] == '\0' || strcmp(s_slot_thumb_paths[i], thumb_path) != 0)) {
+            if (s_slot_thumbs[i]) {
+                SDL_FreeSurface(s_slot_thumbs[i]);
+                s_slot_thumbs[i] = NULL;
+            }
+            strncpy(s_slot_thumb_paths[i], thumb_path, 255);
+            s_slot_thumb_paths[i][255] = '\0';
+            FILE *tf = fopen(thumb_path, "rb");
+            if (tf) {
+                fclose(tf);
+                s_slot_thumbs[i] = IMG_Load(thumb_path);
+            }
+        }
+        if (!saved) {
+            if (s_slot_thumbs[i]) {
+                SDL_FreeSurface(s_slot_thumbs[i]);
+                s_slot_thumbs[i] = NULL;
+            }
+            s_slot_thumb_paths[i][0] = '\0';
+        }
+
+        if (s_slot_thumbs[i]) {
+            float surf_w = (float)s_slot_thumbs[i]->w;
+            float surf_h = (float)s_slot_thumbs[i]->h;
+            float scale_x = thumb_w / surf_w;
+            float scale_y = thumb_h / surf_h;
+            float final_scale = (scale_x < scale_y) ? scale_x : scale_y;
+            if (final_scale > 1.0f) final_scale = 1.0f;
+            if (final_scale < 0.05f) final_scale = 0.05f;
+
+            int draw_w = (int)(surf_w * final_scale);
+            int draw_h = (int)(surf_h * final_scale);
+            int draw_x = (int)(thumb_x + (thumb_w - draw_w) * 0.5f);
+            int draw_y = (int)(thumb_y + (thumb_h - draw_h) * 0.5f);
+
+            SDL_Rect dst_r = { (Sint16)draw_x, (Sint16)draw_y, (Uint16)draw_w, (Uint16)draw_h };
+            SDL_SoftStretch(s_slot_thumbs[i], NULL, prSDLScreen, &dst_r);
+        } else {
+            vita_draw_boing_ball_icon(thumb_x + (thumb_w * 0.5f), thumb_y + 58.0f, 26.0f, 0.0f);
+            vita_draw_text_centered(thumb_x + (thumb_w * 0.5f), thumb_y + 105.0f,
+                saved ? VITA_COLOR_SUCCESS : VITA_COLOR_TEXT_MUTED, 0.90f,
+                saved ? "SAVED" : "EMPTY");
+        }
 
         float action_x = sx + 10.0f;
         float action_w = slot_w - 20.0f;
