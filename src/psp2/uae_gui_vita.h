@@ -74,6 +74,8 @@ typedef struct {
     char date_str[32];
 } VitaSystemInfo;
 
+int  vita_set_kickstart(int index, int load_rom);
+int  vita_confirm_eject_for_hard_disk_launch(void);
 int  vita_gui_init(void);
 void vita_gui_shutdown(void);
 void vita_gui_shutdown_final(void);

@@ -1,12 +1,3 @@
-/*
- * cover_downloader.cpp - WHDLoad boxart downloader for UAE4ALL2-HD-VITA
- *
- * Fetches cover art from the libretro-thumbnails repository (raw GitHub)
- * into ux0:/data/uae4all/covers/<GameName>.png using the Vita's SceHttp
- * stack (HTTP + HTTPS). The base URL can be overridden with a single line
- * in ux0:/data/uae4all/covers/source.txt.
- */
-
 #ifdef __PSP2__
 
 #include <stdio.h>
@@ -39,7 +30,6 @@ static int cover_net_init(void)
     if (s_net_inited)
         return 0;
 
-    /* Loading an already-loaded module returns an error; ignore it. */
     sceSysmoduleLoadModule(SCE_SYSMODULE_NET);
     sceSysmoduleLoadModule(SCE_SYSMODULE_HTTP);
     sceSysmoduleLoadModule(SCE_SYSMODULE_SSL);
@@ -75,7 +65,6 @@ static void cover_ensure_dir(void)
     sceIoMkdir(COVER_DIR, 0777);
 }
 
-/* Percent-encode a game name for use in a URL path. */
 static void cover_url_encode(const char *src, char *dst, size_t dst_size)
 {
     static const char hex[] = "0123456789ABCDEF";
@@ -93,7 +82,6 @@ static void cover_url_encode(const char *src, char *dst, size_t dst_size)
     dst[out] = '\0';
 }
 
-/* Read the optional server override (single line, no trailing slash). */
 static void cover_read_base_url(char *base, size_t base_size)
 {
     strncpy(base, DEFAULT_COVER_BASE, base_size - 1);
@@ -104,7 +92,6 @@ static void cover_read_base_url(char *base, size_t base_size)
         return;
     char line[768];
     if (fgets(line, sizeof(line), f)) {
-        /* Trim whitespace / CR / LF. */
         size_t len = strlen(line);
         while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r' || line[len - 1] == ' ')) {
             line[len - 1] = '\0';
@@ -159,7 +146,7 @@ int vita_cover_download(const char *game_name, char *out_path, size_t out_path_s
     {
         int status = 0;
         if (sceHttpGetStatusCode(req, &status) < 0 || status != 200) {
-            result = -6; /* cover not found (404 etc.) */
+            result = -6;
             goto cleanup;
         }
     }
@@ -194,7 +181,7 @@ int vita_cover_download(const char *game_name, char *out_path, size_t out_path_s
                 vita_gui_draw_progress("Downloading Cover...", sub, 0.5f, game_name);
             }
         }
-        if (total < 100) { /* not a real image */
+        if (total < 100) {
             result = -6;
             goto cleanup;
         }
@@ -216,4 +203,4 @@ cleanup:
     return result;
 }
 
-#endif /* __PSP2__ */
+#endif

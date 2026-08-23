@@ -1,10 +1,3 @@
-/*
- * HDF Manager helper implementation for UAE4ALL2-HD-VITA
- *
- * Validation, information extraction and backup for hard disk images.
- * All I/O is streaming / sector based; the image is never loaded into RAM.
- */
-
 #include "sysconfig.h"
 #include "sysdeps.h"
 
@@ -17,7 +10,6 @@
 
 #include "hdf_manager.h"
 
-/* Default geometry used by UAE4ALL2 for non-RDB images. */
 #define HDF_DEFAULT_SECTORS 32
 #define HDF_DEFAULT_RESERVED 2
 #define HDF_DEFAULT_BLOCKSIZE 512
@@ -46,16 +38,12 @@ static int hdf_read_block(FILE *f, unsigned long block, int blocksize, unsigned 
     return (int)fread(buf, 1, (size_t)blocksize, f) == blocksize;
 }
 
-/* Extract a big-endian 32-bit value from a buffer. */
 static unsigned int hdf_get_u32(const unsigned char *b)
 {
     return ((unsigned int)b[0] << 24) | ((unsigned int)b[1] << 16) |
            ((unsigned int)b[2] << 8) | (unsigned int)b[3];
 }
 
-/* UAE4ALL2 stores HDF paths in the slots with a geometry prefix, e.g.
- * "32:1:2:512:ux0:/data/foo.hdf". Strip everything up to the 4th ':' so
- * the remaining string is a plain filesystem path we can fopen(). */
 static void hdf_strip_geometry_prefix(const char *src, char *dst, size_t dstsz)
 {
     const char *p = src;
@@ -118,8 +106,6 @@ int hdf_analyze(const char *path, HdfInfo *info)
                       "Invalid HDF size: %lu bytes is not a multiple of %d", size, HDF_DEFAULT_BLOCKSIZE);
         return 0;
     }
-    /* Keep the historic ~2 GB soft limit: sector/geometry math below uses
-     * 32-bit values. Files above it are reported but flagged as unsupported. */
     if (size >= 0x80000000UL) {
         fclose(f);
         hdf_set_error(info->error, sizeof(info->error),
@@ -130,7 +116,6 @@ int hdf_analyze(const char *path, HdfInfo *info)
     info->size = size;
     info->total_blocks = size / HDF_DEFAULT_BLOCKSIZE;
 
-    /* Check writability: can we open read/write? */
     {
         FILE *rw = fopen(path, "r+b");
         if (rw != NULL) {
@@ -141,7 +126,6 @@ int hdf_analyze(const char *path, HdfInfo *info)
         }
     }
 
-    /* Read first block: RDB detection. */
     if (!hdf_read_block(f, 0, HDF_DEFAULT_BLOCKSIZE, hdr)) {
         fclose(f);
         hdf_set_error(info->error, sizeof(info->error), "Read error while inspecting HDF");
@@ -157,8 +141,6 @@ int hdf_analyze(const char *path, HdfInfo *info)
         return 1;
     }
 
-    /* Non-RDB image: detect reserved blocks by looking for the root block
-     * (type T_HEADER=2, secondary ST_ROOT=1) near the middle of the disk. */
     if (info->total_blocks > 0) {
         unsigned long mid = info->total_blocks / 2;
         unsigned char root_buf[HDF_DEFAULT_BLOCKSIZE];
@@ -179,7 +161,6 @@ int hdf_analyze(const char *path, HdfInfo *info)
         }
     }
 
-    /* Read the boot block at its real offset to get the Dostype. */
     {
         unsigned long boot_off = (unsigned long)info->reserved * HDF_DEFAULT_BLOCKSIZE;
         unsigned char boot[HDF_DEFAULT_BLOCKSIZE];
@@ -199,7 +180,6 @@ int hdf_analyze(const char *path, HdfInfo *info)
     else
         snprintf(info->filesystem, sizeof(info->filesystem), "Unknown");
 
-    /* Geometry: 32 sectors/track, 1 surface for small images, 2 for >1 GB. */
     if (info->size >= 1073741824UL && info->size < 2147483648UL)
         info->surfaces = 2;
     info->cylinders = (int)((info->total_blocks / info->sectors_per_track) / info->surfaces);
@@ -215,7 +195,7 @@ int hdf_backup(const char *path, const char *dest_dir, char *err, size_t errsz)
     struct stat st;
     char dest[512];
     char clean[512];
-    unsigned char buf[262144]; /* 256 KB streaming buffer */
+    unsigned char buf[262144];
     size_t n;
     const char *name;
 
@@ -231,7 +211,6 @@ int hdf_backup(const char *path, const char *dest_dir, char *err, size_t errsz)
         return -1;
     }
 
-    /* Create destination directory if missing. */
     if (mkdir(dest_dir, 0777) != 0 && errno != EEXIST) {
         hdf_set_error(err, errsz, "Unable to create backup directory: %s", dest_dir);
         return -1;
@@ -291,9 +270,6 @@ int hdf_backup(const char *path, const char *dest_dir, char *err, size_t errsz)
 
 extern "C" void vita_gui_draw_progress(const char *title, const char *subtitle, float fraction, const char *item_name);
 
-/* Create a blank (zero-filled) raw HDF image. The Amiga side formats it
- * later (e.g. with Workbench/HDToolbox); a zeroed file is a valid empty
- * hard disk for UAE4ALL2's raw image mounting. */
 int hdf_create_blank(const char *path, unsigned long megabytes, char *err, size_t errsz)
 {
     struct stat st;

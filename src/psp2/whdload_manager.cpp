@@ -131,6 +131,8 @@ static void make_unique_folder(const char *base, char *folder, size_t folder_siz
 #define LHA_TBIT 5
 #define LHA_NPT (LHA_NT > LHA_NP ? LHA_NT : LHA_NP)
 
+#define LHA_IN_BUF_SIZE (64 * 1024)
+
 typedef struct {
     SceUID in_fd;
     SceUID out_fd;
@@ -141,6 +143,10 @@ typedef struct {
     uint8_t *dtext;
     int dpos;
 
+    uint8_t in_buf[LHA_IN_BUF_SIZE];
+    SceOff in_pos;
+    SceOff in_len;
+
     uint16_t left[2 * LHA_NC + 1];
     uint16_t right[2 * LHA_NC + 1];
     uint8_t pt_len[LHA_NPT];
@@ -150,18 +156,28 @@ typedef struct {
     uint16_t blocksize;
 } LhaNativeDecoder;
 
+static int lha_read1(LhaNativeDecoder *dec)
+{
+    if (dec->comp_size == 0)
+        return -1;
+    if (dec->in_pos >= dec->in_len) {
+        int want = (dec->comp_size < LHA_IN_BUF_SIZE) ? (int)dec->comp_size : LHA_IN_BUF_SIZE;
+        int got = (int)sceIoRead(dec->in_fd, dec->in_buf, want);
+        if (got <= 0)
+            return -1;
+        dec->in_pos = 0;
+        dec->in_len = got;
+    }
+    int b = dec->in_buf[dec->in_pos++];
+    dec->comp_size--;
+    return b;
+}
+
 static void lha_fillbuf(LhaNativeDecoder *dec, int n)
 {
     while (dec->bitcount < n) {
-        int c = -1;
-        if (dec->comp_size > 0) {
-            uint8_t b = 0;
-            if (sceIoRead(dec->in_fd, &b, 1) == 1) {
-                c = b;
-                dec->comp_size--;
-            }
-        }
-        dec->bitbuf = (dec->bitbuf << 8) | (uint64_t)(c != -1 ? (c & 0xff) : 0);
+        int c = lha_read1(dec);
+        dec->bitbuf = (dec->bitbuf << 8) | (uint64_t)(c >= 0 ? (c & 0xff) : 0);
         dec->bitcount += 8;
     }
 }
@@ -324,6 +340,17 @@ static int lha_decode_p(LhaNativeDecoder *dec)
     return j;
 }
 
+static int lha_flush_output(SceUID out_fd, char *buffer, int *buffer_pos)
+{
+    if (*buffer_pos <= 0)
+        return 1;
+    int written = sceIoWrite(out_fd, buffer, *buffer_pos);
+    if (written != *buffer_pos)
+        return 0;
+    *buffer_pos = 0;
+    return 1;
+}
+
 static int lha_decode_file(SceUID in_fd, SceUID out_fd, uint32_t comp_size, uint32_t orig_size)
 {
     LhaNativeDecoder *dec = (LhaNativeDecoder *)calloc(1, sizeof(LhaNativeDecoder));
@@ -336,18 +363,19 @@ static int lha_decode_file(SceUID in_fd, SceUID out_fd, uint32_t comp_size, uint
     if (!dec->dtext) { free(dec); return 0; }
     memset(dec->dtext, ' ', LHA_DICSIZ);
 
-    char out_buf[4096];
+    const int out_capacity = 64 * 1024;
+    char *out_buf = (char *)malloc(out_capacity);
+    if (!out_buf) { free(dec->dtext); free(dec); return 0; }
     int out_buf_pos = 0;
-
+    int success = 1;
     uint32_t count = 0;
-    while (count < orig_size) {
+
+    while (success && count < orig_size) {
         int c = lha_decode_c(dec);
         if (c < 256) {
             out_buf[out_buf_pos++] = (char)c;
-            if (out_buf_pos >= (int)sizeof(out_buf)) {
-                sceIoWrite(out_fd, out_buf, out_buf_pos);
-                out_buf_pos = 0;
-            }
+            if (out_buf_pos >= out_capacity)
+                success = lha_flush_output(out_fd, out_buf, &out_buf_pos);
             dec->dtext[dec->dpos++] = (uint8_t)c;
             if (dec->dpos >= LHA_DICSIZ) dec->dpos = 0;
             count++;
@@ -355,30 +383,107 @@ static int lha_decode_file(SceUID in_fd, SceUID out_fd, uint32_t comp_size, uint
             int match_len = c - 256 + LHA_THRESHOLD;
             int offset = lha_decode_p(dec);
             int match_pos = (dec->dpos - offset - 1) & (LHA_DICSIZ - 1);
-            for (int k = 0; k < match_len && count < orig_size; k++) {
+            for (int k = 0; success && k < match_len && count < orig_size; k++) {
                 uint8_t ch = dec->dtext[match_pos++];
                 if (match_pos >= LHA_DICSIZ) match_pos = 0;
                 out_buf[out_buf_pos++] = (char)ch;
-                if (out_buf_pos >= (int)sizeof(out_buf)) {
-                    sceIoWrite(out_fd, out_buf, out_buf_pos);
-                    out_buf_pos = 0;
-                }
+                if (out_buf_pos >= out_capacity)
+                    success = lha_flush_output(out_fd, out_buf, &out_buf_pos);
                 dec->dtext[dec->dpos++] = ch;
                 if (dec->dpos >= LHA_DICSIZ) dec->dpos = 0;
                 count++;
             }
         }
     }
-    if (out_buf_pos > 0) {
-        sceIoWrite(out_fd, out_buf, out_buf_pos);
-    }
 
+    if (success && !lha_flush_output(out_fd, out_buf, &out_buf_pos))
+        success = 0;
+    free(out_buf);
     free(dec->dtext);
     free(dec);
-    return 1;
+    return success && count == orig_size;
 }
 
 extern "C" void vita_gui_draw_progress(const char *title, const char *subtitle, float fraction, const char *item_name);
+
+typedef struct {
+    char method[6];
+    uint32_t comp_size;
+    uint32_t orig_size;
+    uint8_t level;
+    char name[512];
+    char dirname[512];
+    uint32_t ext_total;
+} LhaHeaderInfo;
+
+static int lha_read_header(SceUID in_fd, LhaHeaderInfo *h)
+{
+    uint8_t hsize = 0;
+    uint8_t hchk = 0;
+    uint32_t time = 0;
+    uint16_t crc = 0;
+    uint8_t attr = 0;
+
+    if (sceIoRead(in_fd, &hsize, 1) != 1 || hsize == 0)
+        return 0;
+    if (sceIoRead(in_fd, &hchk, 1) != 1)
+        return 0;
+    memset(h, 0, sizeof(*h));
+    if (sceIoRead(in_fd, h->method, 5) != 5)
+        return 0;
+    h->method[5] = '\0';
+    if (sceIoRead(in_fd, &h->comp_size, 4) != 4 ||
+        sceIoRead(in_fd, &h->orig_size, 4) != 4 ||
+        sceIoRead(in_fd, &time, 4) != 4 ||
+        sceIoRead(in_fd, &attr, 1) != 1 ||
+        sceIoRead(in_fd, &h->level, 1) != 1)
+        return 0;
+
+    if (h->level == 0 || h->level == 1) {
+        uint8_t nlen = 0;
+        if (sceIoRead(in_fd, &nlen, 1) != 1)
+            return 0;
+        if (sceIoRead(in_fd, h->name, nlen) != nlen)
+            return 0;
+        h->name[nlen] = '\0';
+        if (sceIoRead(in_fd, &crc, 2) != 2)
+            return 0;
+        if (h->level == 1) {
+            uint8_t os = 0;
+            if (sceIoRead(in_fd, &os, 1) != 1)
+                return 0;
+            uint16_t ext_size = 0;
+            while (sceIoRead(in_fd, &ext_size, 2) == 2 && ext_size > 0) {
+                h->ext_total += ext_size;
+                uint8_t ext_type = 0;
+                if (sceIoRead(in_fd, &ext_type, 1) != 1)
+                    return 0;
+                if (ext_type == 0x02 && ext_size > 3) {
+                    int dlen = ext_size - 3;
+                    int read_len = dlen > 510 ? 510 : dlen;
+                    if (sceIoRead(in_fd, h->dirname, read_len) != read_len)
+                        return 0;
+                    h->dirname[read_len] = '\0';
+                    for (int i = 0; i < read_len; i++)
+                        if (h->dirname[i] == (char)0xFF) h->dirname[i] = '/';
+                    if (dlen > read_len)
+                        sceIoLseek(in_fd, dlen - read_len, SCE_SEEK_CUR);
+                } else if (ext_type == 0x01 && ext_size > 3) {
+                    int flen = ext_size - 3;
+                    int read_len = flen > 510 ? 510 : flen;
+                    if (sceIoRead(in_fd, h->name, read_len) != read_len)
+                        return 0;
+                    h->name[read_len] = '\0';
+                    if (flen > read_len)
+                        sceIoLseek(in_fd, flen - read_len, SCE_SEEK_CUR);
+                } else if (ext_size > 3) {
+                    sceIoLseek(in_fd, ext_size - 3, SCE_SEEK_CUR);
+                }
+            }
+        }
+    }
+    return 1;
+}
 
 static int count_native_lha_files(const char *archive_path)
 {
@@ -386,41 +491,10 @@ static int count_native_lha_files(const char *archive_path)
     if (in_fd < 0) return 0;
 
     int total = 0;
-    while (1) {
-        uint8_t hsize = 0;
-        if (sceIoRead(in_fd, &hsize, 1) != 1 || hsize == 0) break;
-        uint8_t hchk = 0;
-        sceIoRead(in_fd, &hchk, 1);
-        char method[6] = {0};
-        sceIoRead(in_fd, method, 5);
-        uint32_t comp_size = 0, orig_size = 0;
-        sceIoRead(in_fd, &comp_size, 4);
-        sceIoRead(in_fd, &orig_size, 4);
-        uint32_t time = 0;
-        sceIoRead(in_fd, &time, 4);
-        uint8_t attr = 0, level = 0;
-        sceIoRead(in_fd, &attr, 1);
-        sceIoRead(in_fd, &level, 1);
-
-        uint32_t ext_total = 0;
-        if (level == 0 || level == 1) {
-            uint8_t nlen = 0;
-            sceIoRead(in_fd, &nlen, 1);
-            sceIoLseek(in_fd, nlen + 2, SCE_SEEK_CUR);
-            if (level == 1) {
-                sceIoLseek(in_fd, 1, SCE_SEEK_CUR);
-                uint16_t ext_size = 0;
-                while (sceIoRead(in_fd, &ext_size, 2) == 2 && ext_size > 0) {
-                    ext_total += ext_size;
-                    sceIoLseek(in_fd, ext_size - 2, SCE_SEEK_CUR);
-                }
-            }
-        }
-
-        uint32_t actual_comp = comp_size;
-        if (level == 1 && comp_size >= ext_total) actual_comp = comp_size - ext_total;
-
-        if (strcmp(method, "-lhd-") != 0) {
+    LhaHeaderInfo h;
+    while (lha_read_header(in_fd, &h)) {
+        uint32_t actual_comp = (h.level == 1 && h.comp_size >= h.ext_total) ? h.comp_size - h.ext_total : h.comp_size;
+        if (strcmp(h.method, "-lhd-") != 0) {
             total++;
         }
         sceIoLseek(in_fd, actual_comp, SCE_SEEK_CUR);
@@ -439,69 +513,18 @@ static int extract_native_lha(const char *archive_path, const char *destination_
     if (in_fd < 0) return 0;
 
     int file_count = 0;
-    while (1) {
-        uint8_t hsize = 0;
-        if (sceIoRead(in_fd, &hsize, 1) != 1 || hsize == 0) break;
-        uint8_t hchk = 0;
-        sceIoRead(in_fd, &hchk, 1);
-        char method[6] = {0};
-        sceIoRead(in_fd, method, 5);
-        uint32_t comp_size = 0, orig_size = 0;
-        sceIoRead(in_fd, &comp_size, 4);
-        sceIoRead(in_fd, &orig_size, 4);
-        uint32_t time = 0;
-        sceIoRead(in_fd, &time, 4);
-        uint8_t attr = 0, level = 0;
-        sceIoRead(in_fd, &attr, 1);
-        sceIoRead(in_fd, &level, 1);
-
-        char name[512] = {0};
-        char dirname[512] = {0};
-
-        uint32_t ext_total = 0;
-        if (level == 0 || level == 1) {
-            uint8_t nlen = 0;
-            sceIoRead(in_fd, &nlen, 1);
-            sceIoRead(in_fd, name, nlen);
-            name[nlen] = '\0';
-            uint16_t crc = 0;
-            sceIoRead(in_fd, &crc, 2);
-            if (level == 1) {
-                char os = ' ';
-                sceIoRead(in_fd, &os, 1);
-                uint16_t ext_size = 0;
-                while (sceIoRead(in_fd, &ext_size, 2) == 2 && ext_size > 0) {
-                    ext_total += ext_size;
-                    uint8_t ext_type = 0;
-                    sceIoRead(in_fd, &ext_type, 1);
-                    if (ext_type == 0x02 && ext_size > 3) {
-                        int dlen = ext_size - 3;
-                        if (dlen > 510) dlen = 510;
-                        sceIoRead(in_fd, dirname, dlen);
-                        dirname[dlen] = '\0';
-                        for (int i = 0; i < dlen; i++) if (dirname[i] == (char)0xFF) dirname[i] = '/';
-                    } else if (ext_type == 0x01 && ext_size > 3) {
-                        int flen = ext_size - 3;
-                        if (flen > 510) flen = 510;
-                        sceIoRead(in_fd, name, flen);
-                        name[flen] = '\0';
-                    } else {
-                        sceIoLseek(in_fd, ext_size - 3, SCE_SEEK_CUR);
-                    }
-                }
-            }
-        }
-
+    LhaHeaderInfo h;
+    while (lha_read_header(in_fd, &h)) {
         char raw_path[1024];
-        if (dirname[0]) {
-            snprintf(raw_path, sizeof(raw_path), "%s%s", dirname, name);
+        if (h.dirname[0]) {
+            snprintf(raw_path, sizeof(raw_path), "%s%s", h.dirname, h.name);
         } else {
-            snprintf(raw_path, sizeof(raw_path), "%s", name);
+            snprintf(raw_path, sizeof(raw_path), "%s", h.name);
         }
 
         char relative[512];
         if (!make_safe_relative(raw_path, relative, sizeof(relative))) {
-            uint32_t skip_bytes = (level == 1 && comp_size >= ext_total) ? (comp_size - ext_total) : comp_size;
+            uint32_t skip_bytes = (h.level == 1 && h.comp_size >= h.ext_total) ? (h.comp_size - h.ext_total) : h.comp_size;
             sceIoLseek(in_fd, skip_bytes, SCE_SEEK_CUR);
             continue;
         }
@@ -513,7 +536,7 @@ static int extract_native_lha(const char *archive_path, const char *destination_
             ensure_directory(output_path);
             continue;
         }
-        if (strcmp(method, "-lhd-") == 0) {
+        if (strcmp(h.method, "-lhd-") == 0) {
             ensure_directory(output_path);
             continue;
         }
@@ -525,8 +548,7 @@ static int extract_native_lha(const char *archive_path, const char *destination_
             *slash = '/';
         }
 
-        uint32_t actual_comp = comp_size;
-        if (level == 1 && comp_size >= ext_total) actual_comp = comp_size - ext_total;
+        uint32_t actual_comp = (h.level == 1 && h.comp_size >= h.ext_total) ? h.comp_size - h.ext_total : h.comp_size;
 
         float fraction = (float)file_count / (float)total_files;
         char sub[64];
@@ -534,11 +556,11 @@ static int extract_native_lha(const char *archive_path, const char *destination_
         vita_gui_draw_progress("Extracting WHDLoad Game...", sub, fraction, raw_path);
 
         SceOff data_start = sceIoLseek(in_fd, 0, SCE_SEEK_CUR);
-        if (strcmp(method, "-lh0-") == 0) {
+        if (strcmp(h.method, "-lh0-") == 0) {
             SceUID out_fd = sceIoOpen(output_path, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
             if (out_fd >= 0) {
                 char buf[4096];
-                uint32_t remaining = orig_size;
+                uint32_t remaining = h.orig_size;
                 while (remaining > 0) {
                     uint32_t to_read = remaining < sizeof(buf) ? remaining : sizeof(buf);
                     int r = sceIoRead(in_fd, buf, to_read);
@@ -546,15 +568,16 @@ static int extract_native_lha(const char *archive_path, const char *destination_
                     sceIoWrite(out_fd, buf, r);
                     remaining -= r;
                 }
+                int copy_ok = remaining == 0;
                 sceIoClose(out_fd);
-                file_count++;
+                if (copy_ok) file_count++;
             }
-        } else if (strcmp(method, "-lh5-") == 0 || strcmp(method, "-lh4-") == 0) {
+        } else if (strcmp(h.method, "-lh5-") == 0 || strcmp(h.method, "-lh4-") == 0) {
             SceUID out_fd = sceIoOpen(output_path, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
             if (out_fd >= 0) {
-                lha_decode_file(in_fd, out_fd, actual_comp, orig_size);
+                int decode_ok = lha_decode_file(in_fd, out_fd, actual_comp, h.orig_size);
                 sceIoClose(out_fd);
-                file_count++;
+                if (decode_ok) file_count++;
             }
         }
 
@@ -873,9 +896,52 @@ static void deploy_file_if_missing(const char *src, const char *dst)
     copy_text_file(src, dst);
 }
 
+static void deploy_kickstart_file(const char *destination_name, const char *const *source_names)
+{
+    char destination[512];
+    snprintf(destination, sizeof(destination), "%s/Devs/Kickstarts/%s", VITA_WHDLOAD_ROOT, destination_name);
+    for (int i = 0; source_names[i]; i++) {
+        char source[512];
+        snprintf(source, sizeof(source), "ux0:/data/uae4all/kickstarts/%s", source_names[i]);
+        SceIoStat st;
+        if (sceIoGetstat(source, &st) >= 0 && st.st_size > 0) {
+            deploy_file_if_missing(source, destination);
+            return;
+        }
+    }
+}
+
+static void deploy_kickstart_aliases(void)
+{
+    static const char *kick12[] = { "kick12.rom", "kick33180.A500", "amiga-os-120.rom", NULL };
+    static const char *kick13[] = { "kick13.rom", "kick34005.A500", "amiga-os-130.rom", NULL };
+    static const char *kick20[] = { "kick20.rom", "kick37175.A500", "amiga-os-204.rom", NULL };
+    static const char *kick31[] = { "kick31.rom", "kick40068.A1200", "amiga-os-310-a1200.rom", NULL };
+    static const char *kick205[] = { "kick37350.A600", "kick205.rom", "amiga-os-205-a600.rom", NULL };
+    static const char *cd32[] = { "kick40060.CD32", "amiga-os-310-cd32.rom", NULL };
+    static const struct {
+        const char *name;
+        const char *const *sources;
+    } files[] = {
+        { "kick12.rom", kick12 }, { "kick33180.A500", kick12 },
+        { "kick34005.A500", kick13 }, { "kick13.rom", kick13 },
+        { "kick20.rom", kick20 }, { "kick37175.A500", kick20 },
+        { "kick31.rom", kick31 }, { "kick40068.A1200", kick31 },
+        { "kick37350.A600", kick205 }, { "kick205.rom", kick205 },
+        { "kick40060.CD32", cd32 }, { "amiga-os-310-cd32.rom", cd32 },
+        { NULL, NULL }
+    };
+    ensure_directory(VITA_WHDLOAD_ROOT "/Devs/Kickstarts");
+    for (int i = 0; files[i].name; i++)
+        deploy_kickstart_file(files[i].name, files[i].sources);
+    static const char *kick_rtb[] = { "kick34005.A500.RTB", NULL };
+    deploy_kickstart_file("kick34005.A500.RTB", kick_rtb);
+}
+
 static void deploy_whdload_base(void)
 {
     ensure_directory(VITA_WHDLOAD_ROOT);
+    deploy_kickstart_aliases();
     deploy_file_if_missing("app0:/data/whdload_base/C/WHDLoad", VITA_WHDLOAD_ROOT "/C/WHDLoad");
     deploy_file_if_missing("app0:/data/whdload_base/C/WHDLoadCD32", VITA_WHDLOAD_ROOT "/C/WHDLoadCD32");
     deploy_file_if_missing("app0:/data/whdload_base/C/DIC", VITA_WHDLOAD_ROOT "/C/DIC");
