@@ -2123,99 +2123,134 @@ static _INLINE_ void write_tdletter (int x, int y, char ch)
 	putpixel (x + j, *numptr == 'x' ? xcolors[0xfff] : xcolors[0x000]);
 	numptr++;
     }
+}static _INLINE_ void status_led_info (int led, int *track, int *on, int *on_rgb, int *off_rgb)
+{
+    if (led > 0) {
+        *track = gui_data.drive_track[led - 1];
+        *on = gui_data.drive_motor[led - 1];
+        *on_rgb = 0x0f0;
+        *off_rgb = 0x040;
+    } else if (led < -1) {
+        *track = idletime_percent;
+        *on = 1;
+        *on_rgb = 0x666;
+        *off_rgb = 0x666;
+    } else if (led < 0) {
+        *track = gui_data.fps;
+        *on = gui_data.powerled;
+        *on_rgb = 0xf00;
+        *off_rgb = 0x400;
+    } else {
+        *track = -2;
+        switch (gui_data.hdled) {
+            case HDLED_OFF:
+                *on = 0;
+                *on_rgb = 0x004;
+                *off_rgb = 0x004;
+                break;
+            case HDLED_READ:
+                *on = 1;
+                *on_rgb = 0x00f;
+                *off_rgb = 0x004;
+                break;
+            default:
+                *on = 1;
+                *on_rgb = 0xf00;
+                *off_rgb = 0x400;
+                break;
+        }
+    }
 }
 
-static _INLINE_ void draw_status_line (int line)
+static _INLINE_ void draw_status_line (int line, int top_mode)
 {
     int x, y, i, j, led, on;
     int on_rgb, off_rgb, c;
-    uae_u8 *buf;
+    int track;
     int gfxvid_width;
-    
-    if(mainMenu_displayHires)
-    	gfxvid_width = var_GFXVIDINFO_WIDTH * 2;
+
+    if (mainMenu_displayHires)
+        gfxvid_width = var_GFXVIDINFO_WIDTH * 2;
     else
-    	gfxvid_width = var_GFXVIDINFO_WIDTH;
-    	
+        gfxvid_width = var_GFXVIDINFO_WIDTH;
+
     if (td_pos & TD_RIGHT)
         x = gfxvid_width - TD_PADX - 6 * TD_WIDTH;
     else
         x = TD_PADX;
 
-    y = line - (mainMenu_displayedLines - TD_TOTAL_HEIGHT);
+    y = top_mode ? line : line - (mainMenu_displayedLines - TD_TOTAL_HEIGHT);
+    xlinebuffer = row_map[line];
+    x += 100 - (TD_WIDTH * (mainMenu_drives - 1)) - TD_WIDTH;
+
+    uae4all_memclr(xlinebuffer + (x - 4) * GFXVIDINFO_PIXBYTES, (gfxvid_width - x + 4) * GFXVIDINFO_PIXBYTES);
+
+    for (led = -2; led < (mainMenu_drives + 1); led++) {
+        status_led_info(led, &track, &on, &on_rgb, &off_rgb);
+        c = xcolors[on ? on_rgb : off_rgb];
+
+        for (j = 0; j < TD_LED_WIDTH; j++)
+            putpixel(x + j, c);
+
+        if (y >= TD_PADY && y - TD_PADY < TD_NUM_HEIGHT) {
+            if (track >= 0) {
+                int tn = track >= 100 ? 3 : 2;
+                int offs = (TD_LED_WIDTH - tn * TD_NUM_WIDTH) / 2;
+                if (track >= 100) {
+                    write_tdnumber(x + offs, y - TD_PADY, track / 100);
+                    offs += TD_NUM_WIDTH;
+                }
+                write_tdnumber(x + offs, y - TD_PADY, (track / 10) % 10);
+                write_tdnumber(x + offs + TD_NUM_WIDTH, y - TD_PADY, track % 10);
+            } else if (nr_units(currprefs.mountinfo) > 0) {
+                int offs = (TD_LED_WIDTH - 2 * TD_NUM_WIDTH) / 2;
+                write_tdletter(x + offs, y - TD_PADY, 'H');
+                write_tdletter(x + offs + TD_NUM_WIDTH, y - TD_PADY, 'D');
+            }
+        }
+        x += TD_WIDTH;
+    }
+}
+
+static _INLINE_ void draw_status_vertical (int line)
+{
+    int gfxvid_width;
+    int x;
+    int i;
+    int segment_h = 7;
+    int segment_gap = 3;
+    int count = mainMenu_drives + 3;
+    int total_h;
+    int first_y;
+    int segment;
+    int on;
+    int track;
+    int on_rgb;
+    int off_rgb;
+    int c;
+
+    if (mainMenu_displayHires)
+        gfxvid_width = var_GFXVIDINFO_WIDTH * 2;
+    else
+        gfxvid_width = var_GFXVIDINFO_WIDTH;
+
+    if (count < 3) count = 3;
+    if (count > 8) count = 8;
+    total_h = count * segment_h + (count - 1) * segment_gap;
+    first_y = (mainMenu_displayedLines - total_h) / 2;
+    x = gfxvid_width - TD_PADX - 10;
     xlinebuffer = row_map[line];
 
-	x+=100 - (TD_WIDTH*(mainMenu_drives-1)) - TD_WIDTH;
+    uae4all_memclr(xlinebuffer + (x - 2) * GFXVIDINFO_PIXBYTES, 14 * GFXVIDINFO_PIXBYTES);
 
-  uae4all_memclr (xlinebuffer + (x - 4) * GFXVIDINFO_PIXBYTES, (gfxvid_width - x + 4) * GFXVIDINFO_PIXBYTES);
+    segment = (line - first_y) / (segment_h + segment_gap);
+    if (segment < 0 || segment >= count || (line - first_y) % (segment_h + segment_gap) >= segment_h)
+        return;
 
-	for (led = -2; led < (mainMenu_drives+1); led++) {
-		int track;
-		if (led > 0) {
-			/* Floppy */
-			track = gui_data.drive_track[led-1];
-			on = gui_data.drive_motor[led-1];
-			on_rgb = 0x0f0;
-			off_rgb = 0x040;
-		} else if (led < -1) {
-			/* Idle time */
-			track = idletime_percent;
-			on = 1;
-			on_rgb = 0x666;
-			off_rgb = 0x666;
-		} else if (led < 0) {
-			/* Power */
-			track = gui_data.fps;
-			on = gui_data.powerled;
-			on_rgb = 0xf00;
-			off_rgb = 0x400;
-		} else {
-			/* Hard disk */
-			track = -2;
-			
-			switch (gui_data.hdled) {
-				case HDLED_OFF:
-					on = 0;
-					off_rgb = 0x004;
-					break;
-				case HDLED_READ:
-					on = 1;
-					on_rgb = 0x00f;
-					off_rgb = 0x004;
-					break;
-				case HDLED_WRITE:
-					on = 1;
-					on_rgb = 0xf00;
-					off_rgb = 0x400;
-					break;
-			}
-		}
-	c = xcolors[on ? on_rgb : off_rgb];
-
-	for (j = 0; j < TD_LED_WIDTH; j++) 
-	    putpixel (x + j, c);
-
-	if (y >= TD_PADY && y - TD_PADY < TD_NUM_HEIGHT) {
-	    if (track >= 0) {
-    int tn = track >= 100 ? 3 : 2;
-		int offs = (TD_LED_WIDTH - tn * TD_NUM_WIDTH) / 2;
-    if(track >= 100)
-    {
-    	write_tdnumber (x + offs, y - TD_PADY, track / 100);
-    	offs += TD_NUM_WIDTH;
-    }
-		write_tdnumber (x + offs, y - TD_PADY, (track / 10) % 10);
-		write_tdnumber (x + offs + TD_NUM_WIDTH, y - TD_PADY, track % 10);
-	    }
-		  else if (nr_units(currprefs.mountinfo) > 0) {
-    		int offs = (TD_LED_WIDTH - 2 * TD_NUM_WIDTH) / 2;
-			  write_tdletter(x + offs, y - TD_PADY, 'H');
-			  write_tdletter(x + offs + TD_NUM_WIDTH, y - TD_PADY, 'D');
-	    }
-	}
-	x += TD_WIDTH;
-    }
-
+    status_led_info(segment - 2, &track, &on, &on_rgb, &off_rgb);
+    c = xcolors[on ? on_rgb : off_rgb];
+    for (i = 0; i < 10; i++)
+        putpixel(x + i, c);
 }
 
 void check_all_prefs(void)
@@ -2276,19 +2311,18 @@ static _INLINE_ void finish_drawing_frame (void)
 			countdown = HDLED_TIMEOUT;
 		}
 
-	/* Vita status-bar modes: 0 = bottom, 1 = top, 2 = disabled.
-	   The legacy renderer treated this value as a boolean, so selecting
-	   "Top Bar" still rendered the LEDs at the bottom and "Disabled" still
-	   drew them. */
 	if (mainMenu_showStatus == 0 || mainMenu_showStatus == 1)
 	{
-		int first_line = (mainMenu_showStatus == 1)
-			? 0
-			: mainMenu_displayedLines - TD_TOTAL_HEIGHT;
+		int top_mode = mainMenu_showStatus == 1;
+		int first_line = top_mode ? 0 : mainMenu_displayedLines - TD_TOTAL_HEIGHT;
 		if (first_line < 0) first_line = 0;
-		for (i = 0; i < TD_TOTAL_HEIGHT && first_line + i < mainMenu_displayedLines; i++) {
-			draw_status_line (first_line + i);
-		}
+		for (i = 0; i < TD_TOTAL_HEIGHT && first_line + i < mainMenu_displayedLines; i++)
+			draw_status_line(first_line + i, top_mode);
+	}
+	else if (mainMenu_showStatus == 3)
+	{
+		for (i = 0; i < mainMenu_displayedLines; i++)
+			draw_status_vertical(i);
 	}
 	drawfinished=1;
 	do_flush_screen ();

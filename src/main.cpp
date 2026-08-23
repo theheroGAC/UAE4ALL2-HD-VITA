@@ -54,6 +54,9 @@ extern "C" int main( int argc, char *argv[] );
 
 #ifdef USE_SDL
 #include "SDL.h"
+#ifdef __PSP2__
+#include <SDL_ttf.h>
+#endif
 extern SDL_Surface *current_screenshot;
 #endif
 #ifdef GP2X
@@ -323,6 +326,42 @@ void real_main (int argc, char **argv)
 #endif
 
 #if defined(__PSP2__)
+    {
+        SDL_Surface *loading_screen = SDL_SetVideoMode(960, 544, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
+        if (!loading_screen)
+            loading_screen = SDL_SetVideoMode(960, 544, 16, SDL_SWSURFACE | SDL_DOUBLEBUF);
+        if (loading_screen) {
+            SDL_FillRect(loading_screen, NULL, SDL_MapRGB(loading_screen->format, 8, 10, 16));
+            SDL_Rect bar = { 240, 330, 480, 8 };
+            SDL_FillRect(loading_screen, &bar, SDL_MapRGB(loading_screen->format, 255, 140, 0));
+            if (TTF_Init() == 0) {
+                TTF_Font *font = TTF_OpenFont("app0:/data/font.ttf", 28);
+                TTF_Font *small = TTF_OpenFont("app0:/data/font.ttf", 18);
+                SDL_Color white = { 255, 255, 255, 255 };
+                SDL_Color orange = { 255, 140, 0, 255 };
+                if (font) {
+                    SDL_Surface *text = TTF_RenderUTF8_Blended(font, "Loading UAE4ALL2 HD...", white);
+                    if (text) {
+                        SDL_Rect dst = { (Sint16)((960 - text->w) / 2), 210, (Uint16)text->w, (Uint16)text->h };
+                        SDL_BlitSurface(text, NULL, loading_screen, &dst);
+                        SDL_FreeSurface(text);
+                    }
+                    TTF_CloseFont(font);
+                }
+                if (small) {
+                    SDL_Surface *text = TTF_RenderUTF8_Blended(small, "Please wait", orange);
+                    if (text) {
+                        SDL_Rect dst = { (Sint16)((960 - text->w) / 2), 260, (Uint16)text->w, (Uint16)text->h };
+                        SDL_BlitSurface(text, NULL, loading_screen, &dst);
+                        SDL_FreeSurface(text);
+                    }
+                    TTF_CloseFont(small);
+                }
+                TTF_Quit();
+            }
+            SDL_Flip(loading_screen);
+        }
+    }
 	scePowerSetArmClockFrequency(444);
     write_log("[VITA] set arm clock\n");
     scePowerSetGpuClockFrequency(222);

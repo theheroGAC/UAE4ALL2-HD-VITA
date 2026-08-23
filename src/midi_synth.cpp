@@ -1,22 +1,3 @@
-/*
- * midi_synth.cpp - Amiga serial MIDI / MT-32 style synthesizer for UAE4All2
- *
- *  - Captures MIDI bytes written by Amiga software to the serial port
- *    (SERDAT $DFF030 and CIAA SDR) through midi_synth_feed_byte().
- *  - 32-voice polyphony (16 MIDI channels x 2 voices) with additive
- *    wavetable instruments, ADSR envelopes, per-channel volume /
- *    expression / pan / pitch bend / sustain pedal.
- *  - General MIDI drum kit on channel 10 (index 9).
- *  - Mixes into the Paula audio buffer at the emulator output rate
- *    (48 kHz on Vita) from midi_synth_mix(), called in the SDL audio
- *    callback thread.
- *
- * Threading: midi_synth_feed_byte() runs on the emulation thread and
- * only pushes bytes into a lock-free ring buffer. All synthesis state
- * lives on the audio callback thread, which drains the ring in
- * midi_synth_mix(). No mutexes are required.
- */
-
 #include "midi_synth.h"
 
 #if defined(__PSP2__) || defined(__SWITCH__)
@@ -35,19 +16,11 @@
 #define MIDI_RING_SIZE 512
 #define MIDI_RING_MASK (MIDI_RING_SIZE - 1)
 
-/* ------------------------------------------------------------------ */
-/* Lock-free input ring (emulation thread -> audio thread)            */
-/* ------------------------------------------------------------------ */
-
 static volatile int s_midi_head = 0;
 static volatile int s_midi_tail = 0;
 static uint8_t s_midi_ring[MIDI_RING_SIZE];
 
 static volatile int s_enabled = 0;
-
-/* ------------------------------------------------------------------ */
-/* Envelope / voice state                                             */
-/* ------------------------------------------------------------------ */
 
 enum {
     VOICE_OFF = 0,
@@ -60,50 +33,45 @@ enum {
 typedef struct {
     int active;
     int channel;
-    int state;          /* VOICE_* */
-    int instrument;     /* wavetable index, melodic voices */
-    int drum;           /* drum type 1..N for channel 10, 0 = melodic */
+    int state;
+    int instrument;
+    int drum;
     int note;
-    float phase;        /* 0..1 cycle position */
-    float step;         /* phase advance per output sample */
-    float velocity;     /* 0..1 */
-    float volume;       /* channel volume * expression (0..1) */
+    float phase;
+    float step;
+    float velocity;
+    float volume;
     float pan_l, pan_r;
-    float env;          /* current envelope level 0..1 */
-    float attack_step;  /* per-sample envelope steps */
+    float env;
+    float attack_step;
     float decay_step;
     float release_step;
     float sustain_level;
-    unsigned int rng;   /* noise generator */
-    float noise_phase;  /* drum auxiliary phase (pitch sweeps) */
+    unsigned int rng;
+    float noise_phase;
 } MidiVoice;
 
 typedef struct {
-    int program;        /* GM program 0..127 */
-    int volume;         /* CC7  0..127 */
-    int expression;     /* CC11 0..127 */
-    int pan;            /* CC10 0..127 (64 = center) */
-    int pitch_bend;     /* 0..16383, 8192 = center */
-    int sustain;        /* CC64 pedal */
+    int program;
+    int volume;
+    int expression;
+    int pan;
+    int pitch_bend;
+    int sustain;
     MidiVoice voices[MIDI_VOICES_PER_CHANNEL];
 } MidiChannel;
 
 static MidiChannel s_channels[MIDI_NUM_CHANNELS];
 
-/* Parser state (audio thread only). */
 static int s_status = 0;
 static int s_data[2];
 static int s_data_count = 0;
-
-/* ------------------------------------------------------------------ */
-/* Wavetables (additive synthesis)                                    */
-/* ------------------------------------------------------------------ */
 
 static float s_waves[MIDI_NUM_INSTRUMENTS][MIDI_WAVE_SIZE];
 static int s_waves_built = 0;
 
 typedef struct {
-    const float *harmonics; /* pairs: harmonic, amplitude; terminated by 0.0 */
+    const float *harmonics;
     float sustain;
     float attack_ms;
     float decay_ms;
@@ -123,35 +91,30 @@ static const float WAVE_FLUTE[] = { 1,1.00f, 2,0.15f, 3,0.08f, 0,0 };
 static const float WAVE_GUITAR[] = { 1,1.00f, 2,0.60f, 3,0.30f, 4,0.15f, 5,0.10f, 6,0.07f, 0,0 };
 
 static const InstrumentDef s_instruments[MIDI_NUM_INSTRUMENTS] = {
-    { WAVE_PIANO,   0.20f, 2, 90,  220 },  /* 0 piano   */
-    { WAVE_STRINGS, 0.80f, 30, 250, 320 },  /* 1 strings */
-    { WAVE_BRASS,   0.80f, 20, 180, 260 },  /* 2 brass   */
-    { WAVE_SYNTH,   0.70f, 5, 120, 200 },   /* 3 synth lead */
-    { WAVE_ORGAN,   0.90f, 10, 100, 160 },  /* 4 organ   */
-    { WAVE_BASS,    0.70f, 4, 90,  180 },   /* 5 bass    */
-    { WAVE_PAD,     0.85f, 40, 400, 500 },  /* 6 pad     */
-    { WAVE_BELL,    0.05f, 2, 120, 900 },   /* 7 bell    */
-    { WAVE_SAW,     0.60f, 8, 150, 200 },   /* 8 saw     */
-    { WAVE_FLUTE,   0.80f, 25, 200, 220 },  /* 9 flute   */
-    { WAVE_GUITAR,  0.45f, 2, 120, 260 },   /* 10 guitar */
-    { WAVE_STRINGS, 0.85f, 30, 300, 400 }   /* 11 choir/pad */
+    { WAVE_PIANO,   0.20f, 2, 90,  220 },
+    { WAVE_STRINGS, 0.80f, 30, 250, 320 },
+    { WAVE_BRASS,   0.80f, 20, 180, 260 },
+    { WAVE_SYNTH,   0.70f, 5, 120, 200 },
+    { WAVE_ORGAN,   0.90f, 10, 100, 160 },
+    { WAVE_BASS,    0.70f, 4, 90,  180 },
+    { WAVE_PAD,     0.85f, 40, 400, 500 },
+    { WAVE_BELL,    0.05f, 2, 120, 900 },
+    { WAVE_SAW,     0.60f, 8, 150, 200 },
+    { WAVE_FLUTE,   0.80f, 25, 200, 220 },
+    { WAVE_GUITAR,  0.45f, 2, 120, 260 },
+    { WAVE_STRINGS, 0.85f, 30, 300, 400 }
 };
 
-/* GM program -> instrument index (compact table, 8 per row). */
 static const int s_gm_map[128] = {
-    0,0,0,0,0,0,0,0, 7,7,7,7,7,7,7,7,      /* 0-15  piano/perc */
-    4,4,4,4,4,4,4,4, 10,10,10,10,10,10,10,10, /* 16-31 organ/guitar */
-    5,5,5,5,5,5,5,5, 1,1,1,1,1,1,1,1,      /* 32-47 bass/strings */
-    1,1,1,1,1,1,1,1, 2,2,2,2,2,2,2,2,      /* 48-63 ensemble/brass */
-    9,9,9,9,9,9,9,9, 9,9,9,9,9,9,9,9,      /* 64-79 reed/pipe */
-    3,3,3,3,3,3,3,3, 6,6,6,6,6,6,6,6,      /* 80-95 synth lead/pad */
-    6,6,6,6,6,6,6,6, 9,9,9,9,9,9,9,9,      /* 96-111 FX/ethnic */
-    7,7,7,7,7,7,7,7, 7,7,7,7,7,7,7,7       /* 112-127 perc/effects */
+    0,0,0,0,0,0,0,0, 7,7,7,7,7,7,7,7,
+    4,4,4,4,4,4,4,4, 10,10,10,10,10,10,10,10,
+    5,5,5,5,5,5,5,5, 1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1, 2,2,2,2,2,2,2,2,
+    9,9,9,9,9,9,9,9, 9,9,9,9,9,9,9,9,
+    3,3,3,3,3,3,3,3, 6,6,6,6,6,6,6,6,
+    6,6,6,6,6,6,6,6, 9,9,9,9,9,9,9,9,
+    7,7,7,7,7,7,7,7, 7,7,7,7,7,7,7,7
 };
-
-/* ------------------------------------------------------------------ */
-/* Drum types                                                         */
-/* ------------------------------------------------------------------ */
 
 enum {
     DRUM_KICK = 1,
@@ -192,8 +155,6 @@ static int note_to_drum(int note)
     }
 }
 
-/* ------------------------------------------------------------------ */
-
 static float note_frequency(int note)
 {
     return 440.0f * powf(2.0f, (float)(note - 69) / 12.0f);
@@ -213,7 +174,6 @@ static void build_waves(void)
             }
             table[i] = sample;
         }
-        /* Normalize to 0..1 peak. */
         float peak = 0.0001f;
         for (int i = 0; i < MIDI_WAVE_SIZE; i++) {
             float a = fabsf(table[i]);
@@ -277,7 +237,6 @@ static void voice_start_drum(MidiVoice *v, int channel, int drum, int note,
     v->attack_step = 1.0f;
     v->sustain_level = 0.0f;
 
-    /* Envelope decay rates per drum type (per sample). */
     switch (drum) {
         case DRUM_KICK:         v->decay_step = 1.0f / (0.30f * sample_rate); break;
         case DRUM_SNARE:        v->decay_step = 1.0f / (0.22f * sample_rate); break;
@@ -306,19 +265,16 @@ static void note_off(int channel, int note);
 
 static MidiVoice *find_voice(MidiChannel *ch, int note)
 {
-    /* Reuse a voice already playing this exact note. */
     for (int i = 0; i < MIDI_VOICES_PER_CHANNEL; i++) {
         MidiVoice *v = &ch->voices[i];
         if (v->active && v->note == note && v->state != VOICE_RELEASE)
             return v;
     }
-    /* Free slot. */
     for (int i = 0; i < MIDI_VOICES_PER_CHANNEL; i++) {
         MidiVoice *v = &ch->voices[i];
         if (!v->active)
             return v;
     }
-    /* Steal the oldest (release state first, then sustain). */
     MidiVoice *victim = &ch->voices[0];
     for (int i = 0; i < MIDI_VOICES_PER_CHANNEL; i++) {
         if (ch->voices[i].state == VOICE_RELEASE) {
@@ -356,14 +312,13 @@ static void note_on(int channel, int note, int velocity, float sample_rate)
         v->pan_l = 0.7f;
         v->pan_r = 0.7f;
     } else {
-        float pan = (float)(ch->pan - 64) / 64.0f;      /* -1..1 */
+        float pan = (float)(ch->pan - 64) / 64.0f;
         if (pan < -1.0f) pan = -1.0f;
         if (pan > 1.0f) pan = 1.0f;
-        v->pan_l = cosf((pan + 1.0f) * 0.785398f);      /* 0..pi/2 */
+        v->pan_l = cosf((pan + 1.0f) * 0.785398f);
         v->pan_r = sinf((pan + 1.0f) * 0.785398f);
     }
 
-    /* Apply pitch bend immediately. */
     float bend = (float)(ch->pitch_bend - 8192) / 8192.0f * 2.0f;
     v->step *= powf(2.0f, bend / 12.0f);
 }
@@ -372,7 +327,6 @@ static void note_off(int channel, int note)
 {
     MidiChannel *ch = &s_channels[channel];
     if (ch->sustain) {
-        /* Sustain pedal down: keep note; it will be released on CC64=0. */
         return;
     }
     for (int i = 0; i < MIDI_VOICES_PER_CHANNEL; i++) {
@@ -398,13 +352,12 @@ static void control_change(int channel, int cc, int value)
         case 64:
             ch->sustain = value & 0x7F;
             if (!ch->sustain) {
-                /* Release all sustained notes. */
                 for (int i = 0; i < MIDI_VOICES_PER_CHANNEL; i++)
                     voice_release(&ch->voices[i]);
             }
             break;
-        case 120: /* all sound off */
-        case 123: /* all notes off */
+        case 120:
+        case 123:
             for (int i = 0; i < MIDI_VOICES_PER_CHANNEL; i++)
                 voice_release(&ch->voices[i]);
             break;
@@ -418,32 +371,28 @@ static void handle_message(int status, int d0, int d1, float sample_rate)
     int channel = status & 0x0F;
     int type = status & 0xF0;
     switch (type) {
-        case 0x80: /* note off */
+        case 0x80:
             note_off(channel, d0 & 0x7F);
             break;
-        case 0x90: /* note on */
+        case 0x90:
             note_on(channel, d0 & 0x7F, d1 & 0x7F, sample_rate);
             break;
-        case 0xA0: /* poly aftertouch - ignored */
-        case 0xD0: /* channel pressure - ignored */
+        case 0xA0:
+        case 0xD0:
             break;
-        case 0xB0: /* control change */
+        case 0xB0:
             control_change(channel, d0 & 0x7F, d1 & 0x7F);
             break;
-        case 0xC0: /* program change */
+        case 0xC0:
             s_channels[channel].program = d0 & 0x7F;
             break;
-        case 0xE0: /* pitch bend */
+        case 0xE0:
             s_channels[channel].pitch_bend = ((d1 & 0x7F) << 7) | (d0 & 0x7F);
             break;
         default:
             break;
     }
 }
-
-/* ------------------------------------------------------------------ */
-/* Public API                                                         */
-/* ------------------------------------------------------------------ */
 
 void midi_synth_init(void)
 {
@@ -474,7 +423,6 @@ void midi_synth_reset(void)
 void midi_synth_set_enabled(int enabled)
 {
     if (enabled && !s_enabled) {
-        /* Fresh start: flush any stale queued bytes. */
         s_midi_head = 0;
         s_midi_tail = 0;
         s_status = 0;
@@ -509,10 +457,6 @@ void midi_synth_feed_byte(uint8_t byte)
     }
 }
 
-/* ------------------------------------------------------------------ */
-/* Sample generation                                                  */
-/* ------------------------------------------------------------------ */
-
 static float table_sample(const float *table, float phase)
 {
     float pos = phase * (float)MIDI_WAVE_SIZE;
@@ -527,13 +471,11 @@ static float noise_sample(unsigned int *rng)
     return ((float)((*rng >> 8) & 0xFFFF) / 32767.5f) - 1.0f;
 }
 
-/* Render one output frame for a voice; returns sample (pre-pan, -1..1). */
 static float render_voice(MidiVoice *v, float sample_rate)
 {
     float out;
 
     if (v->drum) {
-        /* ---- Synthesized drum kit ---- */
         v->env -= v->decay_step;
         if (v->env <= 0.0f) {
             v->env = 0.0f;
@@ -544,7 +486,6 @@ static float render_voice(MidiVoice *v, float sample_rate)
         float env = v->env;
         switch (v->drum) {
             case DRUM_KICK: {
-                /* Sine with downward pitch sweep. */
                 float freq = 100.0f - v->noise_phase * 70.0f;
                 if (freq < 35.0f) freq = 35.0f;
                 v->phase += freq / sample_rate;
@@ -584,12 +525,11 @@ static float render_voice(MidiVoice *v, float sample_rate)
                 break;
             }
             case DRUM_CLAP: {
-                /* Two quick noise bursts. */
                 float burst = (v->env > 0.6f) ? 1.0f : (v->env > 0.25f ? 0.55f : 0.0f);
                 out = noise_sample(&v->rng) * env * burst;
                 break;
             }
-            default: { /* cowbell and misc percussion */
+            default: {
                 float tone = sinf(2.0f * 3.14159265f * v->phase);
                 v->phase += 540.0f / sample_rate;
                 out = (tone > 0.0f ? 1.0f : -0.6f) * env;
@@ -599,13 +539,11 @@ static float render_voice(MidiVoice *v, float sample_rate)
         return out;
     }
 
-    /* ---- Melodic voice ---- */
     out = table_sample(s_waves[v->instrument], v->phase);
     v->phase += v->step;
     if (v->phase >= 1.0f)
         v->phase -= 1.0f;
 
-    /* Envelope state machine. */
     switch (v->state) {
         case VOICE_ATTACK:
             v->env += v->attack_step;
@@ -643,29 +581,24 @@ void midi_synth_mix(int16_t *samples, int frames, int channels, int output_rate)
         return;
 
     if (!s_enabled) {
-        /* Discard any queued bytes while disabled and stay silent. */
         s_midi_tail = s_midi_head;
         return;
     }
 
     float sample_rate = (float)output_rate;
 
-    /* Drain the input ring and parse MIDI messages. */
     int tail = s_midi_tail;
     while (tail != s_midi_head) {
         uint8_t b = s_midi_ring[tail & MIDI_RING_MASK];
         tail++;
         if (b & 0x80) {
             if (b == 0xF0 || b == 0xF7) {
-                /* SysEx start/continue: ignore until end byte. */
                 s_status = 0;
                 s_data_count = 0;
             } else if (b == 0xF7 || b == 0xFF) {
-                /* SysEx end / system common: ignore. */
                 s_status = 0;
                 s_data_count = 0;
             } else if (b >= 0xF8) {
-                /* Real-time messages: ignore. */
             } else {
                 s_status = b;
                 s_data_count = 0;
@@ -681,7 +614,6 @@ void midi_synth_mix(int16_t *samples, int frames, int channels, int output_rate)
     }
     s_midi_tail = tail;
 
-    /* Update per-channel gains from current CC values. */
     for (int c = 0; c < MIDI_NUM_CHANNELS; c++) {
         MidiChannel *ch = &s_channels[c];
         float vol = (float)ch->volume * (float)ch->expression / (127.0f * 127.0f);
@@ -693,7 +625,6 @@ void midi_synth_mix(int16_t *samples, int frames, int channels, int output_rate)
         }
     }
 
-    /* Master gain keeps the mix well below Paula headroom. */
     const float master = 0.35f;
 
     for (int f = 0; f < frames; f++) {
@@ -705,7 +636,7 @@ void midi_synth_mix(int16_t *samples, int frames, int channels, int output_rate)
                 MidiVoice *v = &ch->voices[i];
                 if (!v->active) continue;
                 float s = render_voice(v, sample_rate);
-                if (!v->active) continue; /* voice finished during render */
+                if (!v->active) continue;
                 float amp = s * v->volume * v->velocity * master;
                 left  += amp * v->pan_l;
                 right += amp * v->pan_r;
@@ -730,4 +661,4 @@ void midi_synth_mix(int16_t *samples, int frames, int channels, int output_rate)
     }
 }
 
-#endif /* __PSP2__ || __SWITCH__ */
+#endif

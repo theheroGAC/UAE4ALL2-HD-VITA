@@ -638,6 +638,46 @@ void UpdateMemorySettings()
 }
 
 
+static int has_hdf_files(void)
+{
+    return uae4all_hard_file0[0] || uae4all_hard_file1[0] ||
+           uae4all_hard_file2[0] || uae4all_hard_file3[0];
+}
+
+void ApplyA500Profile(void)
+{
+    kickstart = 1;
+    extfile[0] = '\0';
+    mainMenu_CPU_model = 0;
+    mainMenu_chipset = 0x100;
+    mainMenu_chipMemory = 0;
+    mainMenu_slowMemory = 1;
+    mainMenu_fastMemory = 0;
+    mainMenu_bootHD = 0;
+    UpdateCPUModelSettings();
+    UpdateMemorySettings();
+    UpdateChipsetSettings();
+    reset_hdConf();
+    bReloadKickstart = 1;
+}
+
+void ApplyA1200Profile(void)
+{
+    kickstart = 3;
+    extfile[0] = '\0';
+    mainMenu_CPU_model = 1;
+    mainMenu_chipset = 2 | 0x100;
+    mainMenu_chipMemory = 2;
+    mainMenu_slowMemory = 0;
+    mainMenu_fastMemory = 3;
+    mainMenu_bootHD = has_hdf_files() ? 2 : 0;
+    UpdateCPUModelSettings();
+    UpdateMemorySettings();
+    UpdateChipsetSettings();
+    reset_hdConf();
+    bReloadKickstart = 1;
+}
+
 void ApplyCd32Profile(void)
 {
     kickstart = 6;
@@ -651,6 +691,25 @@ void ApplyCd32Profile(void)
     UpdateCPUModelSettings();
     UpdateMemorySettings();
     UpdateChipsetSettings();
+    reset_hdConf();
+    bReloadKickstart = 1;
+}
+
+void ApplyAutomaticGamePreset(int media_type)
+{
+    if (media_type == 3) {
+        ApplyCd32Profile();
+    } else if (media_type == 2) {
+        ApplyA1200Profile();
+        if (uae4all_hard_dir[0] != '\0') {
+            mainMenu_bootHD = 1;
+            reset_hdConf();
+        }
+    } else if (media_type == 1) {
+        ApplyA1200Profile();
+    } else {
+        ApplyA500Profile();
+    }
 }
 
 void UpdateChipsetSettings()

@@ -4327,8 +4327,6 @@ void REGPARAM2 custom_wput_1 (int hpos, uaecptr addr, uae_u32 value)
      case 0x02A: VPOSW (value); break;
      case 0x02E: COPCON (value); break;
      case 0x030:
-        /* Serial data register: capture MIDI bytes written by games
-         * that stream MIDI through the custom chip serial port. */
         midi_synth_feed_byte((uae_u8)(value & 0xFF));
         break;
      case 0x032: break;

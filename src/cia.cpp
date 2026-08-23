@@ -657,7 +657,6 @@ static void WriteCIAA (uae_u16 addr,uae_u8 val)
         kback = 1;
     } else {
         ciaasdr_cnt = 0;
-        /* Serial port output: capture MIDI bytes (serial mode bit 0). */
         if (ciaacra & 0x01)
             midi_synth_feed_byte((uae_u8)val);
     }
@@ -759,12 +758,11 @@ static void WriteCIAB (uae_u16 addr,uae_u8 val)
 	    ciabtod = (ciabtod & ~0xff0000) | (val << 16);
 	    ciabtodon = 0;
 	}
+	break;    case 12:
+	ciabsdr = val;
+	if (ciabcra & 0x01)
+	    midi_synth_feed_byte((uae_u8)val);
 	break;
-    case 12:
-   	ciabsdr = val;
-   	if (ciabcra & 0x01)
-   	    midi_synth_feed_byte((uae_u8)val);
-   	break;
     case 13:
 	setclr(&ciabimask,val);
 	break;

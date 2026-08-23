@@ -1,5 +1,8 @@
 extern void SetDefaultMenuSettings(int general);
 extern void ApplyCd32Profile(void);
+extern void ApplyA500Profile(void);
+extern void ApplyA1200Profile(void);
+extern void ApplyAutomaticGamePreset(int media_type);
 extern void UpdateMemorySettings();
 extern void UpdateCPUModelSettings();
 extern void UpdateChipsetSettings();
