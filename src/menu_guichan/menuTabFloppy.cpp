@@ -44,7 +44,7 @@ extern gcn::TabbedArea* tabbedArea;
 extern gcn::Icon* icon_winlogo;
 extern gcn::Widget* activateAfterClose;
 
-                    
+// Tab Floppy drives
 gcn::Container *tab_floppy;
 gcn::Button* button_df0;
 gcn::Button* button_df1;
@@ -178,7 +178,7 @@ SaveGameActionListener* saveGameActionListener;
 
 void menuTabFloppy_Init()
 {
-                                 
+    // Button and text for drives
     button_df0 = new gcn::Button("DF0");
     button_df0->setSize(34,22);
     button_df0->setPosition(10,20);
@@ -263,7 +263,7 @@ void menuTabFloppy_Init()
     button_ejectdf2->addActionListener(ejectButtonActionListener);
     button_ejectdf3->addActionListener(ejectButtonActionListener);
 
-                              
+    // Select Number of drives
     radioButton_floppy1 = new gcn::UaeRadioButton("1", "radiofloppynrgroup");
     radioButton_floppy1->setPosition(5,10);
     radioButton_floppy1->setId("Drives1");
@@ -291,7 +291,7 @@ void menuTabFloppy_Init()
     group_floppy_number->setSize(55,145);
     group_floppy_number->setBaseColor(baseCol);
 
-                          
+    // Select Floppy speed
     radioButton_floppy_speed1x = new gcn::UaeRadioButton("1x", "radiofloppyspeedgroup");
     radioButton_floppy_speed1x->setPosition(5,10);
     radioButton_floppy_speed1x->setId("Speed1x");

@@ -86,7 +86,7 @@ public:
         case 2:
             return std::string("Small");
         }
-        return std::string("");                           
+        return std::string(""); // Keep the compiler happy
     }
 };
 ButtonsizeListModel buttonsizeList;
@@ -310,7 +310,7 @@ void menuTabOnScreen_Init()
     checkBox_FloatingJoystick->setId("FloatJoy");
     checkBox_FloatingJoystick->addActionListener(onScreenCheckBoxActionListener);
 
-                               
+    // Size of onscreen-buttons
     label_buttonsize = new gcn::Label("Button Size");
     label_buttonsize->setPosition(4, 2);
     backgrd_buttonsize = new gcn::Container();

@@ -30,7 +30,7 @@
 
 extern int init_sound(void);
 extern void leave_program(void);
-                        
+// From menu_helper.cpp:
 extern int saveAdfDir(void);
 extern void update_display(void);
 extern void setCpuSpeed(void);
@@ -125,7 +125,7 @@ gcn::TabbedArea* tabbedArea;
 
 namespace sdl
 {
-                                                   
+// Main objects to draw graphics and get user input
 SDL_Surface* screen;
 gcn::SDLGraphics* graphics;
 gcn::SDLInput* input;
@@ -152,7 +152,7 @@ void init()
     SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 
 #ifdef ANDROIDSDL
-                                
+    // Enable Android multitouch
     SDL_InitSubSystem(SDL_INIT_JOYSTICK);
     SDL_JoystickOpen(0);
 #endif
@@ -185,9 +185,9 @@ void halt()
 
 void run()
 {
-                    
+    // The main loop
     while(running) {
-                           
+        // Check user input
         SDL_Event event;
         while(SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
@@ -214,43 +214,43 @@ void run()
                         widgets::showWarning("Kickstart ROM not found.", romfile);
                     break;
 
-                                        
-  
-                               
-                              
-                                                                                                                                        
-                              
-                                    
-                                                           
-                                        
-                     
-                            
+// Solved problem with returning to menu
+/*
+                case SDLK_LALT:
+                case SDLK_F12:
+                    if(widgets::window_load->isVisible() || widgets::window_warning->isVisible() || widgets::window_config->isVisible())
+                        break;
+                    if (emulating) {
+                        mainMenu_case = MAIN_MENU_CASE_RUN;
+                        running = false;
+                    }
+                    break;*/
 
                 case SDLK_UP:
                     if(widgets::HandleNavigation(DIRECTION_UP))
-                        continue;                                                                          
+                        continue; // Don't change value when enter ComboBox -> dont't send event to control
                     break;
 
                 case SDLK_DOWN:
                     if(widgets::HandleNavigation(DIRECTION_DOWN))
-                        continue;                                                                          
+                        continue; // Don't change value when enter ComboBox -> dont't send event to control
                     break;
 
                 case SDLK_LEFT:
                     if(widgets::HandleNavigation(DIRECTION_LEFT))
-                        continue;                                                                        
+                        continue; // Don't change value when enter Slider -> dont't send event to control
                     break;
 
                 case SDLK_RIGHT:
                     if(widgets::HandleNavigation(DIRECTION_RIGHT))
-                        continue;                                                                        
+                        continue; // Don't change value when enter Slider -> dont't send event to control
                     break;
 
                 case SDLK_PAGEDOWN:
                 case SDLK_HOME:
                     event.key.keysym.sym = SDLK_RETURN;
-                    input->pushInput(event);                 
-                    event.type = SDL_KEYUP;                   
+                    input->pushInput(event); // Fire key down
+                    event.type = SDL_KEYUP;  // and the key up
                     break;
 
                 case SDLK_0:
@@ -296,7 +296,7 @@ void run()
 #ifndef PANDORA
                 case SDLK_f:
                     if (event.key.keysym.mod & KMOD_CTRL) {
-                                              
+                        // Works with X11 only
                         SDL_WM_ToggleFullScreen(screen);
                     }
                     break;
@@ -304,19 +304,19 @@ void run()
                 }
             }
 #ifdef ANDROIDSDL
-              
-                                                                        
-                                                                          
-                                                                            
-                                                                            
-                                                       
-               
+            /*
+             * Now that we are done polling and using SDL events we pass
+             * the leftovers to the SDLInput object to later be handled by
+             * the Gui. (This example doesn't require us to do this 'cause a
+             * label doesn't use input. But will do it anyway to show how to
+             * set up an SDL application with Guichan.)
+             */
             if (event.type == SDL_MOUSEMOTION ||
                 event.type == SDL_MOUSEBUTTONDOWN ||
                 event.type == SDL_MOUSEBUTTONUP) {
-                                                                                   
+                // Filter emulated mouse events for Guichan, we wand absolute input
             } else {
-                                                              
+                // Convert multitouch event to SDL mouse event
                 static int x = 0, y = 0, buttons = 0, wx=0, wy=0, pr=0;
                 SDL_Event event2;
                 memcpy(&event2, &event, sizeof(event));
@@ -334,9 +334,9 @@ void run()
                     }
                     event2.motion.x = x;
                     event2.motion.y = y;
-                                                                                                                   
+                    //__android_log_print(ANDROID_LOG_INFO, "GUICHAN","Mouse motion %d %d btns %d", x, y, buttons);
                     if (buttons == 0) {
-                                                                                
+                        // Push mouse motion event first, then button down event
                         input->pushInput(event2);
                         buttons = SDL_BUTTON_LMASK;
                         event2.type = SDL_MOUSEBUTTONDOWN;
@@ -345,13 +345,13 @@ void run()
                         event2.button.state =  SDL_PRESSED;
                         event2.button.x = x;
                         event2.button.y = y;
-                                                                                                                         
+                        //__android_log_print(ANDROID_LOG_INFO, "GUICHAN","Mouse button %d coords %d %d", buttons, x, y);
                     }
                 }
                 if (event.type == SDL_JOYBUTTONUP &&
                     event.jbutton.which == 0 &&
                     event.jbutton.button == 0) {
-                                                                                                   
+                    // Do not push button down event here, because we need mouse motion event first
                     buttons = 0;
                     event2.type = SDL_MOUSEBUTTONUP;
                     event2.button.which = 0;
@@ -359,7 +359,7 @@ void run()
                     event2.button.state = SDL_RELEASED;
                     event2.button.x = x;
                     event2.button.y = y;
-                                                                                                                     
+                    //__android_log_print(ANDROID_LOG_INFO, "GUICHAN","Mouse button %d coords %d %d", buttons, x, y);
                 }
                 input->pushInput(event2);
             }
@@ -367,11 +367,11 @@ void run()
             input->pushInput(event);
 #endif
         }
-                                                       
+        // Now we let the Gui object perform its logic.
         globals::gui->logic();
-                                                 
+        // Now we let the Gui object draw itself.
         globals::gui->draw();
-                                        
+        // Finally we update the screen.
         SDL_Flip(screen);
     }
 }
@@ -440,19 +440,19 @@ gcn::Icon* icon_logo;
 gcn::Image *image_winlogo;
 gcn::Icon* icon_winlogo;
 
-               
+// Main buttons
 gcn::Button* button_quit;
 gcn::Button* button_reset;
 gcn::Button* button_resume;
 gcn::Button* button_save_config;
 gcn::Button* button_customconfig;
 
-          
+// Presets
 gcn::Window* window_preset;
 gcn::Button* button_presetA500;
 gcn::Button* button_presetA1200;
 
-             
+// Tab-Dialog
 extern gcn::Container *tab_main;
 extern gcn::Container *tab_floppy;
 extern gcn::Container *tab_hard;
@@ -540,7 +540,7 @@ public:
         mainMenu_fastMemory = 0;
         kickstart = 1;
         mainMenu_CPU_model = 0;
-        mainMenu_chipset = (mainMenu_chipset & 0xff00) | 0;                                       
+        mainMenu_chipset = (mainMenu_chipset & 0xff00) | 0; // Leave immediate_blit flag untouched
         mainMenu_CPU_speed = 0;
         UpdateCPUModelSettings();
         UpdateChipsetSettings();
@@ -560,7 +560,7 @@ public:
         mainMenu_fastMemory = 4;
         kickstart = 3;
         mainMenu_CPU_model = 1;
-        mainMenu_chipset = (mainMenu_chipset & 0xff00) | 2;                                       
+        mainMenu_chipset = (mainMenu_chipset & 0xff00) | 2; // Leave immediate_blit flag untouched
         mainMenu_CPU_speed = 1;
         UpdateCPUModelSettings();
         UpdateChipsetSettings();
@@ -604,9 +604,9 @@ void init()
     image_winlogo = gcn::Image::load("data/amiga-wallpaper-3.jpg");
     icon_winlogo = new gcn::Icon(image_winlogo);
 
-                                                        
-                          
-                                                        
+    //--------------------------------------------------
+    // Create main buttons
+    //--------------------------------------------------
     button_quit = new gcn::Button("Quit");
     button_quit->setSize(90,50);
     button_quit->setBaseColor(baseCol);
@@ -653,9 +653,9 @@ void init()
     button_customconfig->addActionListener(customCfgActionListener);
 
 
-                                                        
-                           
-                                                        
+    //--------------------------------------------------
+    // Controls for Presets
+    //--------------------------------------------------
     button_presetA500 = new gcn::Button("A500");
     button_presetA500->setSize(56,30);
     button_presetA500->setPosition(10,10);
@@ -677,9 +677,9 @@ void init()
     window_preset->setSize(80,110);
     window_preset->setBaseColor(baseCol);
 
-                                                        
-           
-                                                        
+    //--------------------------------------------------
+    // Tabs
+    //--------------------------------------------------
     menuTabMain_Init();
     menuTabFloppy_Init();
     menuTabHD_Init();
@@ -691,9 +691,9 @@ void init()
     menuTabOnScreen_Init();
 #endif
 
-                                                        
-                 
-                                                        
+    //--------------------------------------------------
+    // Tab-Dialog
+    //--------------------------------------------------
     tabbedArea = new gcn::TabbedArea();
     tabbedArea->setSize(600, 305);
     tabbedArea->setFocusable(false);
@@ -743,9 +743,9 @@ void init()
     confMan_Init();
     menuMessage_Init();
 
-                                                        
-                                    
-                                                        
+    //--------------------------------------------------
+    // Place everything on main form
+    //--------------------------------------------------
     top->add(background, 0, 0);
     top->add(icon_logo, 20, 340);
     top->add(button_reset, 210, 410);
@@ -759,9 +759,9 @@ void init()
     top->add(window_config, 120, 90);
     top->add(window_warning, 170, 220);
 
-                                                        
-                                
-                                                        
+    //--------------------------------------------------
+    // Initialize focus handling
+    //--------------------------------------------------
     tabbedArea->setFocusable(true);
     button_reset->setFocusable(true);
     button_resume->setFocusable(true);
@@ -772,9 +772,9 @@ void init()
     button_presetA1200->setFocusable(true);
     tabbedArea->requestFocus();
 
-                                                        
-                                 
-                                                        
+    //--------------------------------------------------
+    // Display values on controls
+    //--------------------------------------------------
     show_settings();
 }
 
@@ -832,9 +832,9 @@ void halt()
 }
 
 
-                                                 
-                            
-                                                 
+//-----------------------------------------------
+// Start of helper functions
+//-----------------------------------------------
 void show_settings()
 {
     show_settings_TabMain();
@@ -937,7 +937,7 @@ void ClearTempFiles()
 {
     struct dirent *de;
     DIR *dd;
-    dd = opendir(".");                       
+    dd = opendir("."); /* assume it worked */
     while ((de = readdir(dd)) != NULL) {
         if (strstr(de->d_name, "uaetmp")) {
             if (unlink(de->d_name)) __android_log_print(ANDROID_LOG_INFO, "UAE4ALL2","delete failed");
@@ -967,17 +967,17 @@ int run_mainMenuGuichan()
         sdl::halt();
     }
 #ifndef ANDROIDSDL
-                                    
+    // Catch all Guichan exceptions.
     catch (gcn::Exception e) {
         std::cout << e.getMessage() << std::endl;
         mainMenu_case = MAIN_MENU_CASE_QUIT;
     }
-                                
+    // Catch all Std exceptions.
     catch (std::exception e) {
         std::cout << "Std exception: " << e.what() << std::endl;
         mainMenu_case = MAIN_MENU_CASE_QUIT;
     }
-                                    
+    // Catch all unknown exceptions.
     catch (...) {
         std::cout << "Unknown exception" << std::endl;
         mainMenu_case = MAIN_MENU_CASE_QUIT;
@@ -1049,7 +1049,7 @@ int run_mainMenuGuichan()
         resetCpuSpeed();
 #endif
 #ifndef USE_SDLSOUND
-                       
+//			gp2x_stop_sound();
 #endif
         saveAdfDir();
 #ifndef ANDROIDSDL
@@ -1058,7 +1058,7 @@ int run_mainMenuGuichan()
 #ifdef ANDROIDSDL
         ClearTempFiles();
 #endif
-                                                             
+// FIXME (WIN32) error: 'sync' was not declared in this scope
 #ifndef WIN32
         sync();
 #endif

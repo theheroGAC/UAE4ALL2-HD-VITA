@@ -24,7 +24,7 @@ namespace gcn
 
     UaeRadioButton::~UaeRadioButton()
     {
-                                        
+        // Remove us from the group list
         setGroup("");
     }
 

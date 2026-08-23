@@ -43,7 +43,7 @@ extern gcn::TabbedArea* tabbedArea;
 extern gcn::Icon* icon_winlogo;
 
 
-                 
+// Tab Savestates
 gcn::Container *tab_savestates;
 gcn::Window *group_savestates_number;
 gcn::UaeRadioButton* radioButton_savestate_1;
@@ -116,7 +116,7 @@ SaveStateActionListener* saveStateActionListener;
 
 void menuTabSavestates_Init()
 {
-                              
+    // Select savestate number
     radioButton_savestate_1 = new gcn::UaeRadioButton("0", "radiosavestategroup");
     radioButton_savestate_1->setPosition(5,10);
     radioButton_savestate_1->setId("Savestate0");

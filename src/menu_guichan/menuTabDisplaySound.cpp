@@ -38,7 +38,7 @@ extern gcn::Icon* icon_winlogo;
 extern gcn::contrib::SDLTrueTypeFont* font14;
 #endif
 
-              
+// Tab Display
 gcn::Container *tab_displaysound;
 gcn::Window *group_width;
 gcn::UaeRadioButton* radioButton_visibleAreaWidth_320;
@@ -70,7 +70,7 @@ gcn::UaeDropDown* dropDown_cut_right;
 gcn::CheckBox* checkBox_vsync;
 #endif
 
-        
+// Sound
 gcn::Window *group_refreshrate;
 gcn::UaeRadioButton* radioButton_refreshrate_50Hz;
 gcn::UaeRadioButton* radioButton_refreshrate_60Hz;
@@ -329,7 +329,7 @@ SoundmodeActionListener* soundmodeActionListener;
 
 void menuTabDisplaySound_Init()
 {
-                          
+    // Select screen width
     radioButton_visibleAreaWidth_320 = new gcn::UaeRadioButton("320", "radiowidthgroup");
     radioButton_visibleAreaWidth_320->setPosition(5,10);
     radioButton_visibleAreaWidth_320->setId("320");
@@ -367,7 +367,7 @@ void menuTabDisplaySound_Init()
     group_width->setSize(70,205);
     group_width->setBaseColor(baseCol);
 
-                           
+    // Select Screen height
     radioButton_displayedLines_200 = new gcn::UaeRadioButton("200", "radioheightgroup");
     radioButton_displayedLines_200->setPosition(5,10);
     radioButton_displayedLines_200->setId("200");
@@ -405,7 +405,7 @@ void menuTabDisplaySound_Init()
     group_height->setSize(70,205);
     group_height->setBaseColor(baseCol);
 
-                       
+    // Select Frameskip
     radioButton_frameskip_0 = new gcn::UaeRadioButton("0", "radioframeskipgroup");
     radioButton_frameskip_0->setPosition(5,10);
     radioButton_frameskip_0->setId("Frameskip0");
@@ -493,7 +493,7 @@ void menuTabDisplaySound_Init()
     checkBox_vsync->addActionListener(vsyncActionListener);
 #endif
 
-                                   
+    // Select Sound enable/accuracy
     radioButton_sound_off = new gcn::UaeRadioButton("off", "radiosoundpresentgroup");
     radioButton_sound_off->setPosition(5,10);
     radioButton_sound_off->setId("SoundOff");
@@ -516,7 +516,7 @@ void menuTabDisplaySound_Init()
     group_sound_enable->setSize(100,115);
     group_sound_enable->setBaseColor(baseCol);
 
-                       
+    // Select Soundrate
     radioButton_soundrate_8k = new gcn::UaeRadioButton("8K", "radiosoundrategroup");
     radioButton_soundrate_8k->setPosition(5,10);
     radioButton_soundrate_8k->setId("8K");
@@ -549,7 +549,7 @@ void menuTabDisplaySound_Init()
     group_sound_rate->setSize(80,175);
     group_sound_rate->setBaseColor(baseCol);
 
-                        
+    // Select Sound mode
     radioButton_soundmode_mono = new gcn::UaeRadioButton("mono", "radiosoundmodegroup");
     radioButton_soundmode_mono->setPosition(5,10);
     radioButton_soundmode_mono->setId("mono");

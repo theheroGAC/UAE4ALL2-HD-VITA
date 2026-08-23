@@ -45,7 +45,7 @@ extern gcn::Widget* activateAfterClose;
 extern gcn::contrib::SDLTrueTypeFont* font14;
 #endif
 
-           
+// Tab Main
 gcn::Container *tab_main;
 gcn::Window *group_cpu;
 gcn::UaeRadioButton* radioButton_cpu68000;
@@ -171,7 +171,7 @@ class ChipsetButtonActionListener : public gcn::ActionListener
 public:
     void action(const gcn::ActionEvent& actionEvent) {
         if (actionEvent.getSource() == radioButton_chipsetocs)
-            mainMenu_chipset = (mainMenu_chipset & 0xff00) | 0;                                       
+            mainMenu_chipset = (mainMenu_chipset & 0xff00) | 0; // Leave immediate_blit flag untouched
         else if (actionEvent.getSource() == radioButton_chipsetecs)
             mainMenu_chipset = (mainMenu_chipset & 0xff00) | 1;
         else
@@ -302,7 +302,7 @@ KickromButtonActionListener* kickromButtonActionListener;
 
 void menuTabMain_Init()
 {
-                 
+    // Select CPU
     radioButton_cpu68000 = new gcn::UaeRadioButton("68000", "radiocpugroup");
     radioButton_cpu68000->setPosition(5,10);
     radioButton_cpu68000->setId("68000");
@@ -324,7 +324,7 @@ void menuTabMain_Init()
     group_cpu->setSize(80,85);
     group_cpu->setBaseColor(baseCol);
 
-                     
+    // Select Chipset
     radioButton_chipsetocs = new gcn::UaeRadioButton("OCS", "radiochipsetgroup");
     radioButton_chipsetocs->setPosition(5,10);
     radioButton_chipsetocs->setId("OCS");
@@ -347,7 +347,7 @@ void menuTabMain_Init()
     group_chipset->setSize(80,115);
     group_chipset->setBaseColor(baseCol);
 
-                          
+    // Select Blitter mode
 #if !(defined (ANDROIDSDL) || defined (WIN32) || defined (AROS))
     label_blittermode = new gcn::Label("Blitter mode");
     label_blittermode->setPosition(4, 2);
@@ -394,7 +394,7 @@ void menuTabMain_Init()
     group_blitmode->setBaseColor(baseCol);
 #endif
 
-                       
+    // Select Kickstart
     radioButton_kick12 = new gcn::UaeRadioButton("1.2", "radiokickgroup");
     radioButton_kick12->setPosition(5,10);
     radioButton_kick12->setId("1.2");
@@ -432,7 +432,7 @@ void menuTabMain_Init()
     group_kickstart->setSize(80,210);
     group_kickstart->setBaseColor(baseCol);
 
-                           
+    // Browse Kickstart ROM
     button_kickrom = new gcn::Button("Browse ROM");
     button_kickrom->setSize(90,22);
     button_kickrom->setPosition(105,243);
@@ -450,7 +450,7 @@ void menuTabMain_Init()
     textField_kickrom->setBaseColor(baseCol);
 
 
-                       
+    // Select CPU speed
     radioButton_cpuspeed_7Mhz = new gcn::UaeRadioButton("7MHz", "radiocpuspeedgroup");
     radioButton_cpuspeed_7Mhz->setPosition(5,10);
     radioButton_cpuspeed_7Mhz->setId("7MHz");
@@ -498,7 +498,7 @@ void menuTabMain_Init()
 #endif
     group_cpuspeed->setBaseColor(baseCol);
 
-                    
+    // Select memory
     label_chipmem = new gcn::Label("Chip");
     label_chipmem->setPosition(4, 2);
     label_slowmem = new gcn::Label("Slow");
@@ -587,7 +587,7 @@ void menuTabMain_Init()
     window_memory->setBaseColor(baseCol);
 
 #if defined(PANDORA) && !(defined(AROS) || defined(WIN32))
-                        
+    // Pandora CPU speed
     label_pandspeed = new gcn::Label("Pandora MHz");
     label_pandspeed->setPosition(4, 2);
     backgrd_pandspeed = new gcn::Container();

@@ -100,7 +100,7 @@ public:
         case 10:
             return std::string("10 px");
         }
-        return std::string("");                           
+        return std::string(""); // Keep the compiler happy
     }
 };
 OffsetListModel offsetList;
@@ -213,7 +213,7 @@ OffsetActionListener* offsetActionListener;
 
 void menuTabControl_Init()
 {
-                            
+    // Select Control config
     radioButton_control_config_1 = new gcn::UaeRadioButton("1", "radiocontrolconfiggroup");
     radioButton_control_config_1->setPosition(5,10);
     radioButton_control_config_1->setId("ControlCfg1");
@@ -251,7 +251,7 @@ void menuTabControl_Init()
     group_control_config->setSize(145,145);
     group_control_config->setBaseColor(baseCol);
 
-                        
+    // Select Statusline
     checkBox_statusline = new gcn::CheckBox("Status line");
     checkBox_statusline->setPosition(485,155);
     checkBox_statusline->setId("StatusLine");
@@ -259,7 +259,7 @@ void menuTabControl_Init()
     statuslineActionListener = new StatuslineActionListener();
     checkBox_statusline->addActionListener(statuslineActionListener);
 
-                           
+    // Select Joystick port
     radioButton_joy_port0 = new gcn::UaeRadioButton("Port0", "radiojoystickgroup");
     radioButton_joy_port0->setPosition(5,10);
     radioButton_joy_port0->setId("Port0");
@@ -282,7 +282,7 @@ void menuTabControl_Init()
     group_joystick->setSize(80,115);
     group_joystick->setBaseColor(baseCol);
 
-                      
+    // Select Autofire
     radioButton_autofirerate_light = new gcn::UaeRadioButton("Light", "radioautofirerategroup");
     radioButton_autofirerate_light->setPosition(5,10);
     radioButton_autofirerate_light->setId("Light");
@@ -305,7 +305,7 @@ void menuTabControl_Init()
     group_autofirerate->setSize(95,115);
     group_autofirerate->setBaseColor(baseCol);
 
-                              
+    // Select Mouse multiplier
     radioButton_mouseMultiplier_25 = new gcn::UaeRadioButton(".25", "radiomouseMultipliergroup");
     radioButton_mouseMultiplier_25->setPosition(5,10);
     radioButton_mouseMultiplier_25->setId("Mouse.25");
@@ -338,7 +338,7 @@ void menuTabControl_Init()
     group_mouseMultiplier->setSize(100,175);
     group_mouseMultiplier->setBaseColor(baseCol);
 
-                       
+    // Select Tap delay
     radioButton_tapDelay_10 = new gcn::UaeRadioButton("normal", "radiotapdelaygroup");
     radioButton_tapDelay_10->setPosition(5,10);
     radioButton_tapDelay_10->setId("TapNormal");
@@ -361,7 +361,7 @@ void menuTabControl_Init()
     group_tapDelay->setSize(90,115);
     group_tapDelay->setBaseColor(baseCol);
 
-                    
+    // Stylus Offset
     label_offset = new gcn::Label("Stylus offset");
     label_offset->setPosition(4, 2);
     backgrd_offset = new gcn::Container();

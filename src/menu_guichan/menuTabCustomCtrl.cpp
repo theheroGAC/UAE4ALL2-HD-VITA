@@ -30,7 +30,7 @@ extern gcn::Container* top;
 extern gcn::TabbedArea* tabbedArea;
 extern gcn::Icon* icon_winlogo;
 
-                      
+// Tab Custom controls
 gcn::Container *tab_custom_control;
 gcn::Window *group_custom_control_enable;
 gcn::UaeRadioButton* radioButton_custom_control_on;
@@ -293,7 +293,7 @@ public:
         case 105:
             return std::string("NULL");
         }
-        return std::string("");                           
+        return std::string(""); // Keep the compiler happy
     }
 };
 MappingListModel mappingList;
@@ -360,7 +360,7 @@ ComboActionListener* comboActionListener;
 
 void menuTabCustomCtrl_Init()
 {
-                                   
+    // Select Custom control on/off
     radioButton_custom_control_off = new gcn::UaeRadioButton("off", "radiocustomcontrolgroup");
     radioButton_custom_control_off->setPosition(5,10);
     radioButton_custom_control_off->setId("CustomCtrlOff");
@@ -378,7 +378,7 @@ void menuTabCustomCtrl_Init()
     group_custom_control_enable->setSize(120,55);
     group_custom_control_enable->setBaseColor(baseCol);
 
-                  
+    // Select dPad
     radioButton_dpad_custom = new gcn::UaeRadioButton("Custom", "radiodpadgroup");
     radioButton_dpad_custom->setPosition(5,10);
     radioButton_dpad_custom->setId("DPadCustom");

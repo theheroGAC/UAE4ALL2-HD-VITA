@@ -137,10 +137,10 @@ public:
         strcat(config_filename, "/");
         configstring = textField_config->getText().c_str();
         strcat(config_filename, textField_config->getText().c_str());
-                                           
+        // check extension of editable name
         if (config2terms || configstring.size()<5)
             strcat(config_filename, ".conf");
-                                                                                  
+//__android_log_print(ANDROID_LOG_INFO, "UAE4ALL2","cfg filename = %s", filename);
         saveconfig(3);
         unraise_config_guichan();
         showInfo("Config file saved.");

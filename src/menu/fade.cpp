@@ -23,17 +23,17 @@ void fade16(SDL_Surface *screen, unsigned short n)
 		unsigned short r=(buff[i]&rm)>>rs;
 		unsigned short g=(buff[i]&gm)>>gs;
 		unsigned short b=(buff[i]&bm)>>bs;
-            
+//		if (n>r)
 		if (n+r<rM)
 			r+=n;
 		else
 			r=rM;
-            
+//		if (n>g)
 		if (n+g<gM)
 			g+=n;
 		else
 			g=gM;
-            
+//		if (n>b)
 		if (n+b<bM)
 			b+=n;
 		else

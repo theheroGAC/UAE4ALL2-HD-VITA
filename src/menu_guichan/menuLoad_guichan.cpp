@@ -34,7 +34,7 @@ bool confirmselection = false;
 #include <limits.h>
 
 #if defined(__GP2X__) || defined(__WIZ__) || defined(__CAANOO__) || defined(__amigaos__)
-                                     
+// This is a random default value ...
 #define PATH_MAX 32768
 #endif
 
@@ -71,7 +71,7 @@ char *realpath(const char *_path, char *resolved_path)
     if (chdir(path)) {
         if (errno == ENOTDIR) {
 #if defined(__WIN32__) || defined(__MORPHOS__) || defined(__amigaos__)
-                                                  
+            // No symbolic links and no readlink()
             l = -1;
 #else
             l = readlink(path, lnk, PATH_MAX);
@@ -98,7 +98,7 @@ char *realpath(const char *_path, char *resolved_path)
         }
     }
 
-    if(resolved_path==NULL)                                                
+    if(resolved_path==NULL) // if we called realpath with null as a 2nd arg
         resolved_path = (char*) malloc( PATH_MAX );
 
     if (!getcwd(resolved_path, PATH_MAX)) {
@@ -119,7 +119,7 @@ abort:
 
 #endif
 
-                                             
+/* What is being loaded, floppy/hd dir/hdf */
 int menu_load_type;
 
 extern int current_drive;
@@ -541,7 +541,7 @@ static int menuLoadLoop(char *curr_path)
     char *fname = NULL;
     DIR *dir;
 
-                                    
+    // is this a dir or a full path?
     if ((dir = opendir(curr_path)))
         closedir(dir);
     else {
@@ -611,12 +611,12 @@ void checkfilename (char *currentfilename)
             strcpy(custom_kickrom, currentfilename);
         } else if (current_drive==0) {
             strcpy(uae4all_image_file0, currentfilename);
-                                             
+            // Check for disk-specific config
             char path[300];
             create_configfilename(path, uae4all_image_file0, 0);
             FILE *f=fopen(path,"rt");
             if(f) {
-                                             
+                // config file exists -> load
                 fclose(f);
                 loadconfig();
             }

@@ -99,7 +99,7 @@ SaveHDButtonActionListener* saveHDButtonActionListener;
 
 void menuTabHD_Init()
 {
-                            
+    // Select HD boot option
     radioButton_boothd_off = new gcn::UaeRadioButton("Off", "radioboothdgroup");
     radioButton_boothd_off->setPosition(5,10);
     radioButton_boothd_off->setId("HDOff");
