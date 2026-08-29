@@ -160,6 +160,7 @@ if(BUILD_PSP2)
     src/psp2/hdf_manager.cpp
     src/psp2/whdload_manager.cpp
     src/psp2/cover_downloader.cpp
+    src/psp2/ftp_server.cpp
     src/psp2/psp2_shader.cpp
     src/psp2/psp2-dirent.c
     src/psp2/psp2_touch.c
@@ -203,7 +204,7 @@ if(BUILD_PSP2)
           SceCtrl_stub ScePgf_stub ScePower_stub SceCommonDialog_stub
           SceAudio_stub SceShellSvc_stub SceHid_stub SceTouch_stub png jpeg webp archive pthread z m c
           SceAppUtil_stub SceAppMgr_stub
-          SceHttp_stub SceNet_stub SceNetCtl_stub SceSsl_stub
+          SceHttp_stub SceNet_stub SceNetCtl_stub SceSsl_stub ftpvita
   )
 
   if (BUILD_DEBUG)
@@ -225,7 +226,7 @@ if(BUILD_PSP2)
   add_custom_target(${PROJECT_NAME}.vpk
           DEPENDS ${PROJECT_NAME}.self-self
           COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Generating param.sfo"
-          COMMAND ${VITASDK}/bin/vita-mksfoex -s TITLE_ID=${TITLEID} -s APP_VER=01.05 "UAE4All2 HD" param.sfo
+          COMMAND ${VITASDK}/bin/vita-mksfoex -s TITLE_ID=${TITLEID} -s APP_VER=01.06 "UAE4All2 HD" param.sfo
           COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Packaging uae4all2hd.vpk"
           COMMAND ${VITASDK}/bin/vita-pack-vpk -s param.sfo -b ${PROJECT_NAME}.self -a ${CMAKE_SOURCE_DIR}/psp2data/data=data -a ${CMAKE_SOURCE_DIR}/psp2data/sce_sys=sce_sys uae4all2hd.vpk
   )

@@ -1,4 +1,4 @@
-# UAE4LL2 HD — PlayStation Vita 1.05
+# UAE4LL2 HD — PlayStation Vita 1.06
 
 A cleaned PlayStation Vita build of UAE4ALL2 HD, an Amiga emulator based on the UAE4ALL2 project.
 
@@ -28,7 +28,7 @@ uae4all2hd.vpk
 - Virtual keyboard, touch controls and analog mouse
 - Vita shaders and aspect-ratio scaling
 - Vita menu with floppy, hard disk, WHDLoad, presets, hardware, display, controls, savestates and system tabs
-- About screen with version 1.05 and automatic scrolling credits
+- About screen with version 1.06 and automatic scrolling credits
 - CD32 Akiko CD controller with ISO, raw BIN and multi-track CUE images
 - CD32 data tracks, CD audio playback, subcode data, DMA and controller state
 - CD32-aware savestates including the mounted image and playback position
@@ -38,6 +38,11 @@ uae4all2hd.vpk
 - Live DF0-DF3 and HDF activity lights with synthesized disk-access sounds
 - Quick Menu (L trigger in-game) with resume, save/load state, eject DF0, eject CD32 and screenshot
 - Presets saved to memory only: configuration is written only from `System -> Save Game Configuration`
+- FTP file transfer using the VitaSDK `ftpvita` service used by VitaArchive/VitaShell-compatible clients
+- Dedicated FTP screen showing the Vita IP address and port `1337`
+- FTP starts when entering the FTP screen and stops automatically with Circle when leaving it
+- FTP exposes `ux0:`, `ur0:` and `uma0:` for transferring ROMs, HDFs, configurations and backups
+- This HD release uses the separate Title ID `UAE4ALLHD` and does not overwrite the legacy UAE4ALL2
 
 ## Installation
 
@@ -51,6 +56,12 @@ ux0:/data/uae4all/kickstarts/
 3. Copy Amiga disk images to a folder on `ux0:` or `uma0:`.
 4. Start the emulator and select the image from the Floppy tab, or the HDF/WHDLoad tab.
 5. Press **START** to boot.
+
+### FTP file transfer
+
+Open the **System** tab and select **FTP File Transfer**. The dedicated FTP screen starts the VitaSDK `ftpvita` service and displays the connection address. Connect from a PC with FileZilla or another FTP client using the displayed IP address and port `1337`.
+
+The service exposes `ux0:`, `ur0:` and `uma0:`. It remains active only while the FTP screen is open; press **Circle** to stop FTP and return to the System tab. Use standard FTP only on a trusted local network because it does not encrypt traffic.
 
 ### WHDLoad relocation files
 
@@ -199,7 +210,7 @@ The packaged copies are `psp2data/data/sounds/floppy_drive.ogg` and `psp2data/da
 - **Restore Default Settings**: resets CPU, chipset, memory, Kickstart, floppies, HDFs, CD, display, audio and controls to factory defaults in memory (does not write any file).
 - **Reboot Amiga Emulation**: hard resets the Amiga with the current settings.
 - **Take Screenshot**: captures the next emulated frame as a PNG.
-- **About**: version 1.05 with scrolling credits.
+- **About**: version 1.06 with scrolling credits.
 - **Startup**: displays `Loading UAE4ALL2 HD...` before the main interface is opened.
 - **Release notes**: see [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -215,7 +226,9 @@ cmake .. -DBUILD_PSP2=ON -DCMAKE_BUILD_TYPE=Release
 ninja uae4all2.vpk
 ```
 
-The build output is `uae4all2hd.vpk`.
+The build output is `uae4all2hd.vpk`. The Vita package uses Title ID `UAE4ALLHD` and application version `01.06`, so it installs separately from the legacy UAE4ALL2.
+
+The FTP implementation links the VitaSDK `ftpvita` library, matching the service integration used by VitaArchive. Ensure the VitaSDK installation includes the `ftpvita` development library before building.
 
 The optional CD-ROM backend test target is enabled in a native build with:
 
