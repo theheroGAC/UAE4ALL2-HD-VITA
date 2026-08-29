@@ -25,6 +25,7 @@
 #include "hdf_manager.h"
 #include "midi_synth.h"
 #include "cover_downloader.h"
+#include "ftp_server.h"
 #include <SDL_image.h>
 #include <psp2/io/stat.h>
 
@@ -1759,9 +1760,35 @@ void vita_view_savestates(VitaInputState *input, int *selected_item)
     }
 }
 
+void vita_view_ftp(VitaInputState *input, int *selected_item)
+{
+    (void)selected_item;
+    char ip[32];
+    char endpoint[96];
+    vita_ftp_get_ip(ip, sizeof(ip));
+    snprintf(endpoint, sizeof(endpoint), "ftp://%s:%d", ip, vita_ftp_get_port());
+
+    if (!vita_ftp_is_running() && vita_ftp_start() != 0) {
+        vita_show_message_box("FTP Server", "Unable to start FTP service. Check Wi-Fi connection.", "OK (X)");
+        return;
+    }
+    if (input->pressed & SCE_CTRL_CIRCLE) {
+        vita_ftp_stop();
+        return;
+    }
+
+    vita_draw_card_custom(100.0f, 115.0f, 760.0f, 260.0f, VITA_COLOR_CARD, VITA_COLOR_FOCUS_BORDER);
+    vita_draw_text_centered(480.0f, 145.0f, VITA_COLOR_TEXT_WHITE, 1.25f, "FTP FILE TRANSFER");
+    vita_draw_text_centered(480.0f, 190.0f, VITA_COLOR_SUCCESS, 1.10f, "FTP SERVER ACTIVE");
+    vita_draw_text_centered(480.0f, 235.0f, VITA_COLOR_TEXT_WHITE, 1.00f, endpoint);
+    vita_draw_text_centered(480.0f, 280.0f, VITA_COLOR_TEXT_MUTED, 0.85f, "Use FileZilla or VitaShell-compatible FTP client");
+    vita_draw_text_centered(480.0f, 310.0f, VITA_COLOR_TEXT_MUTED, 0.85f, "Press O to stop FTP and return to System");
+    vita_draw_footer("FTP ACTIVE", "CIRCLE STOP / BACK");
+}
+
 void vita_view_system(VitaInputState *input, int *selected_item)
 {
-    const int total_items = 5;
+    const int total_items = 6;
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
 
@@ -1813,6 +1840,8 @@ void vita_view_system(VitaInputState *input, int *selected_item)
                     vita_show_about_box();
                 }
                 break;
+            case 5:
+                return;
         }
     }
 
@@ -1826,6 +1855,7 @@ void vita_view_system(VitaInputState *input, int *selected_item)
     vita_draw_button_item(card_x, start_y + 2.0f * (item_h + 12.0f), card_w, item_h, "Reboot Amiga Emulation", "Hard reset the Amiga virtual machine with current settings", "REBOOT", *selected_item == 2, false);
     vita_draw_button_item(card_x, start_y + 3.0f * (item_h + 12.0f), card_w, item_h, "Take Screenshot", "Capture the next emulated frame as a PNG in the screenshots folder", "SHOT", *selected_item == 3, false);
     vita_draw_button_item(card_x, start_y + 4.0f * (item_h + 12.0f), card_w, item_h, "About UAE4All2", "Credits, original authors, contributors and project acknowledgements", "ABOUT", *selected_item == 4, false);
+    vita_draw_button_item(card_x, start_y + 5.0f * (item_h + 12.0f), card_w, item_h, "FTP File Transfer", vita_ftp_is_running() ? "Anonymous upload server active" : "Start anonymous upload server", vita_ftp_is_running() ? "ON" : "OFF", *selected_item == 5, vita_ftp_is_running());
 }
 
 #endif

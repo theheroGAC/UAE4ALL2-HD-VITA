@@ -138,6 +138,7 @@ void vita_view_display(VitaInputState *input, int *selected_item);
 void vita_view_controls(VitaInputState *input, int *selected_item);
 void vita_view_savestates(VitaInputState *input, int *selected_item);
 void vita_view_system(VitaInputState *input, int *selected_item);
+void vita_view_ftp(VitaInputState *input, int *selected_item);
 
 int  vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_idx);
 

@@ -28,6 +28,7 @@
 #include "cdrom.h"
 
 #include "uae_gui_vita.h"
+#include "ftp_server.h"
 
 static void ttf_shutdown_cleanup(void);
 
@@ -250,6 +251,7 @@ void vita_gui_shutdown(void)
 
 void vita_gui_shutdown_final(void)
 {
+    vita_ftp_stop();
     ttf_shutdown_cleanup();
     s_gui_initialized = false;
     vita_gui_free_screen();
@@ -1259,7 +1261,7 @@ void vita_show_about_box(void)
 {
     static const CreditLine credits[] = {
         { "UAE4ALL2 HD Vita", CR_TITLE },
-        { "Version 1.05 - Amiga Emulator for PS Vita", CR_SUBTITLE },
+        { "Version 1.06 - Amiga Emulator for PS Vita", CR_SUBTITLE },
         { "", CR_EMPTY },
         { "A high-definition port of the classic UAE4ALL Amiga emulator,", CR_TEXT },
         { "now with WHDLoad, HDF, IPF and CD32 support on the Vita.", CR_TEXT },
@@ -1795,7 +1797,14 @@ int run_mainMenu_vita(void)
                 vita_view_savestates(&input, cur_sel);
                 break;
             case VITA_TAB_SYSTEM:
-                vita_view_system(&input, cur_sel);
+                if (*cur_sel == 5 && (input.pressed & SCE_CTRL_CROSS)) {
+                    s_active_tab = VITA_TAB_SYSTEM;
+                    vita_view_ftp(&input, cur_sel);
+                } else if (*cur_sel == 5 && vita_ftp_is_running()) {
+                    vita_view_ftp(&input, cur_sel);
+                } else {
+                    vita_view_system(&input, cur_sel);
+                }
                 break;
             default:
                 break;
