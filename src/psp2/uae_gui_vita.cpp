@@ -1731,10 +1731,8 @@ int run_mainMenu_vita(void)
             if (touched_tab >= 0 && touched_tab < VITA_TAB_COUNT) {
                 s_active_tab = (VitaGuiTab)touched_tab;
             }
-        }
-
-        if (input.pressed & SCE_CTRL_START) {
-            int automatic_media = -1;
+        }		if (input.pressed & SCE_CTRL_START) {
+			int automatic_media = -1;
             if (mainMenu_whdload_game[0] != '\0')
                 automatic_media = 2;
             else if (current_cd_image[0] != '\0')
@@ -1748,11 +1746,10 @@ int run_mainMenu_vita(void)
                      uae4all_image_file2[0] != '\0' || uae4all_image_file3[0] != '\0')
                 automatic_media = 0;
             if ((automatic_media == 1 || automatic_media == 2) && !vita_confirm_eject_for_hard_disk_launch())
-                continue;
-            if (automatic_media >= 0) {
-                ApplyAutomaticGamePreset(automatic_media);
-                vita_set_kickstart(kickstart, 0);
-            }
+                continue;			if (automatic_media >= 0 && !emulating) {
+				ApplyAutomaticGamePreset(automatic_media);
+				vita_set_kickstart(kickstart, 0);
+			}
             write_log("[VITA] menu: Start pressed (kickstart_warning=%d)\n", kickstart_warning);
             if (kickstart_warning) {
                 write_log("[VITA] run_mainMenu_vita: Start blocked, Kickstart missing\n");
