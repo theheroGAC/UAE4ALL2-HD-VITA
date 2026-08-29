@@ -439,10 +439,7 @@ static void goMenu(void)
 #if defined(__PSP2__)
 	exitmode = triggerL[0] ? run_overlay_vita() : run_mainMenu_vita();
 	if (exitmode == 0) {
-		/* Do not recreate the game framebuffer while quitting. The old code
-		   switched back to the game surface first, then resumed one more
-		   emulation step and could crash during loading. */
-		vita_gui_prepare_exit();
+			vita_gui_prepare_exit();
 		quit_program = 1;
 		return;
 	}
