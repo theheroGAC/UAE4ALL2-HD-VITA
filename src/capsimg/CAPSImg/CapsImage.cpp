@@ -14,82 +14,82 @@ int8_t CCapsImage::f1b_table[8][256];
 // compare image helper
 int CCapsImage::CompareImage()
 {
-	PDISKTRACKINFO pti=di.pdt;
+	PDISKTRACKINFO pti = di.pdt;
 
-	int res=imgeOk;
+	int res = imgeOk;
 
 	// default track size
-	pti->tracklen=pti->ci.trksize;
+	pti->tracklen = pti->ci.trksize;
 
 	// generate 1 revolution
-	pti->trackcnt=1;
+	pti->trackcnt = 1;
 
 	// unformatted track ignored
 	if (pti->ci.dentype == cpdenNoise)
-		pti->trackcnt=0;
+		pti->trackcnt = 0;
 
-	pti->tracklen*=pti->trackcnt;
+	pti->tracklen *= pti->trackcnt;
 
 	// allocate and set buffer
 	if (pti->tracklen) {
-		pti->trackbuf=new UBYTE[pti->tracklen];
+		pti->trackbuf = new uint8_t[pti->tracklen];
 		memset(pti->trackbuf, 0, pti->tracklen);
 	}
 
 	// set track size and pointer
-	pti->trackdata[0]=pti->trackbuf;
-	pti->tracksize[0]=0;
-	pti->trackstart[0]=0;
+	pti->trackdata[0] = pti->trackbuf;
+	pti->tracksize[0] = 0;
+	pti->trackstart[0] = 0;
 
 	// decoder start position is always 0
-	pti->comppos=0;
-	pti->sdpos=0;
+	pti->comppos = 0;
+	pti->sdpos = 0;
 
 	// decode blocks
 	if (pti->trackcnt) {
-		int eblk=pti->compeblk;
+		int eblk = pti->compeblk;
 		if (eblk < 0)
-			eblk=pti->ci.blkcnt;
+			eblk = pti->ci.blkcnt;
 		else
 			eblk++;
 
-		for (int blk=pti->compsblk; blk < eblk; blk++)
-			if ((res=CompareBlock(blk)) != imgeOk)
+		for (int blk = pti->compsblk; blk < eblk; blk++)
+			if ((res = CompareBlock(blk)) != imgeOk)
 				return res;
 	}
 
-	pti->tracksize[0]=pti->comppos;
+	pti->tracksize[0] = pti->comppos;
 	return res;
 }
 
 // IPF image block comparator
 int CCapsImage::CompareBlock(unsigned blk)
 {
-	PDISKTRACKINFO pti=di.pdt;
-	uint8_t *buf=di.data;
+	PDISKTRACKINFO pti = di.pdt;
+	uint8_t *buf = di.data;
 
 	// check block number requested
-	if (blk>=pti->ci.blkcnt || !buf || !di.datacount)
+	if (blk >= pti->ci.blkcnt || !buf || !di.datacount)
 		return imgeGeneric;
 
-	UDWORD maxofs=pti->datasize;
+	uint32_t maxofs = pti->datasize;
 
 	// check buffer overrun
-	if ((blk+1)*sizeof(CapsBlock) > maxofs)
+	if ((blk + 1) * sizeof(CapsBlock) > maxofs)
 		return imgeShort;
 
 	// read block data in native format
 	CapsBlock cb;
-	memcpy(&cb, buf+blk*sizeof(CapsBlock), sizeof(CapsBlock));
-	CCapsLoader::Swap((PUDWORD)&cb, sizeof(CapsBlock));
+	memcpy(&cb, buf + blk * sizeof(CapsBlock), sizeof(CapsBlock));
+	CCapsLoader::Swap(&cb, sizeof(CapsBlock));
 
 	// check buffer overrun
 	if (cb.dataoffset >= maxofs)
 		return imgeShort;
 
 	// block stream limit is either the next block or buffer end
-	if (blk != pti->ci.blkcnt-1)
-		maxofs=ReadValue(buf+(blk+1)*sizeof(CapsBlock)+offsetof(CapsBlock, dataoffset), sizeof(UDWORD));
+	if (blk != pti->ci.blkcnt - 1)
+		maxofs = ReadValue(buf + (blk + 1) * sizeof(CapsBlock) + offsetof(CapsBlock, dataoffset), sizeof(uint32_t));
 
 	// check buffer overrun
 	if (cb.dataoffset >= maxofs)
@@ -105,24 +105,24 @@ int CCapsImage::CompareBlock(unsigned blk)
 	}
 
 	// decode stream
-	int end=false;
-	int pos=pti->comppos;
-	for (UDWORD ofs=cb.dataoffset; ofs < maxofs; ) {
-		int code=buf[ofs++];
+	int end = false;
+	int pos = pti->comppos;
+	for (uint32_t ofs = cb.dataoffset; ofs < maxofs; ) {
+		int code = buf[ofs++];
 
 		// read count
-		int vc=code>>CAPS_SIZE_S;
-		code&=CAPS_DATAMASK;
-		UDWORD count;
+		int vc = code >> CAPS_SIZE_S;
+		code &= CAPS_DATAMASK;
+		uint32_t count;
 
 		if (vc) {
-			if (ofs+vc > maxofs)
+			if (ofs + vc > maxofs)
 				return imgeTrackData;
 
-			count=ReadValue(buf+ofs, vc);
-			ofs+=vc;
+			count = ReadValue(buf + ofs, vc);
+			ofs += vc;
 		} else
-			count=0;
+			count = 0;
 
 		// process data
 		switch (code) {
@@ -131,63 +131,63 @@ int CCapsImage::CompareBlock(unsigned blk)
 				// safety checks
 				if (count)
 					return imgeTrackData;
-				end=true;
+				end = true;
 				break;
 
 			case cpdatData:
 				// safety checks
 				if (!count)
 					return imgeTrackData;
-				if (ofs+count > maxofs)
+				if (ofs + count > maxofs)
 					return imgeTrackData;
 
 				// copy data if requested
 				if (di.flag & DI_COMP_DATA) {
-					memcpy(pti->trackbuf+pos, buf+ofs, count);
-					pos+=count;
+					memcpy(pti->trackbuf + pos, buf + ofs, count);
+					pos += count;
 				}
-				ofs+=count;
+				ofs += count;
 				break;
 
 			case cpdatGap:
 				// safety checks
 				if (!count)
 					return imgeTrackData;
-				if (ofs+count > maxofs)
+				if (ofs + count > maxofs)
 					return imgeTrackData;
 
 				// skip gap data
-				ofs+=count;
+				ofs += count;
 				break;
 
 			case cpdatMark:
 				// safety checks
 				if (!count)
 					return imgeTrackData;
-				if (ofs+count > maxofs)
+				if (ofs + count > maxofs)
 					return imgeTrackData;
 
 				// copy raw data if requested
 				if (di.flag & DI_COMP_MARK) {
-					memcpy(pti->trackbuf+pos, buf+ofs, count);
-					pos+=count;
+					memcpy(pti->trackbuf + pos, buf + ofs, count);
+					pos += count;
 				}
-				ofs+=count;
+				ofs += count;
 				break;
 
 			case cpdatRaw:
 				// safety checks
 				if (!count)
 					return imgeTrackData;
-				if (ofs+count > maxofs)
+				if (ofs + count > maxofs)
 					return imgeTrackData;
 
 				// copy raw data if requested
 				if (di.flag & DI_COMP_RAW) {
-					memcpy(pti->trackbuf+pos, buf+ofs, count);
-					pos+=count;
+					memcpy(pti->trackbuf + pos, buf + ofs, count);
+					pos += count;
 				}
-				ofs+=count;
+				ofs += count;
 				break;
 
 			case cpdatFData:
@@ -197,7 +197,7 @@ int CCapsImage::CompareBlock(unsigned blk)
 
 				// set flakey data to 0 (memory already cleared) if requested
 				if (di.flag & DI_COMP_FDATA)
-					pos+=count;
+					pos += count;
 				break;
 
 			default:
@@ -209,7 +209,7 @@ int CCapsImage::CompareBlock(unsigned blk)
 	if (!end)
 		return imgeTrackData;
 
-	pti->comppos=pos;
+	pti->comppos = pos;
 	return imgeOk;
 }
 
@@ -223,16 +223,16 @@ int CCapsImage::DecompressDump()
 		return imgeUnsupported;
 
 	PDISKTRACKINFO pti = di.pdt;
-	uint8_t *buf=di.data;
+	uint8_t *buf = di.data;
 
 	CCTRawCodec ctr;
 
 	// decompress data
-	int res=ctr.DecompressDump(buf, pti->datasize);
+	int res = ctr.DecompressDump(buf, pti->datasize);
 	if (res == imgeOk) {
 		ConvertDumpInfo(ctr.GetInfo());
 	} else
-		pti->type=dtitError;
+		pti->type = dtitError;
 
 	return res;
 }
@@ -243,14 +243,14 @@ void CCapsImage::ConvertDumpInfo(PCAPSWH wh)
 	PDISKTRACKINFO pti = di.pdt;
 
 	// use the number of revolutions that could be stored by pti at most or the number of revolutions sampled if less
-	int maxrev = min(CAPS_MTRS, wh->trkcnt);
+	int maxrev = std::min(CAPS_MTRS, wh->trkcnt);
 	pti->rawtrackcnt = maxrev;
 
 	// save the total size of all tracks decoded; don't have to recalculate later
 	pti->rawlen = wh->rawlen;
 
 	// prevent deallocating the buffer with the track data
-	wh->rawbuf = NULL;
+	wh->rawbuf = nullptr;
 
 	// longest track found
 	int maxtracksize = 0;
@@ -270,10 +270,10 @@ void CCapsImage::ConvertDumpInfo(PCAPSWH wh)
 	pti->rawtimecnt = wh->timlen;
 
 	// prevent deallocating the buffer with the timing data
-	wh->timbuf = NULL;
+	wh->timbuf = nullptr;
 
 	// allocate timing buffer the same size as the longest data track; +1 for alternate density
-	pti->timebuf = new UDWORD[maxtracksize + 1];
+	pti->timebuf = new uint32_t[maxtracksize + 1];
 
 	// calculate the sum of the timing samples
 	double timesum = 0;
@@ -289,7 +289,7 @@ void CCapsImage::ConvertDumpInfo(PCAPSWH wh)
 	double rem = 0;
 	for (int i = 0; i < pti->rawtimecnt; i++) {
 		double vr = pti->rawtimebuf[i] * tconv + rem;
-		UDWORD vi = (UDWORD)vr;
+		uint32_t vi = (uint32_t)vr;
 		rem = vr - vi;
 		pti->rawtimebuf[i] = vi;
 		actsum += vi;
@@ -341,7 +341,9 @@ int CCapsImage::UpdateDump()
 	PDISKTRACKINFO pti = di.pdt;
 
 	// get actual revolution number, restart after the last revolution
-	int rev = dii.nextrev % pti->rawtrackcnt;
+	int rev = 0;
+	if (pti->rawtrackcnt)
+		rev = dii.nextrev % pti->rawtrackcnt;
 
 	// true if all the available revolutions should be returned
 	int allrev = (pti->trackcnt == pti->rawtrackcnt);
@@ -366,16 +368,16 @@ int CCapsImage::UpdateDump()
 	int rawsize = pti->rawtimecnt;
 
 	// the amount of timing to be copied track size or real size - whichever is shorter
-	int tsize = min(rawsize, pti->timecnt);
+	int tsize = std::min(rawsize, pti->timecnt);
 
 	// copy the timing
-	memcpy(pti->timebuf, pti->rawtimebuf, tsize*sizeof(UDWORD));
+	memcpy(pti->timebuf, pti->rawtimebuf, tsize * sizeof(uint32_t));
 
 	// If sampled timing is shorter, fill the remaining area with 1000, default value
 	// This does not change the average, since the previous data adds up to an average of 1000
 	int pos;
 	for (pos = tsize; pos < pti->timecnt; pos++) {
-			pti->timebuf[pos] = 1000;
+		pti->timebuf[pos] = 1000;
 	}
 
 	// reset alternate density
@@ -395,13 +397,20 @@ void CCapsImage::FindWeakBits()
 {
 	PDISKTRACKINFO pti = di.pdt;
 
+	// nothing to do if samples are not available
+	if (pti->rawtrackcnt <= 0)
+		return;
+
 	// true if all the available revolutions should be returned
 	int allrev = (pti->trackcnt == pti->rawtrackcnt);
 
+	// use a single revolution if all the revolutions are returned at once, otherwise all the sampled revolutions
+	int maxrev = allrev ? 1 : pti->rawtrackcnt;
+
 	// process all revolutions
-	for (int rev = 0; rev < pti->rawtrackcnt; rev++) {
+	for (int rev = 0; rev < maxrev; rev++) {
 		// get the track data buffer and the size of the buffer
-		PUBYTE trackbuf = pti->trackdata[rev];
+		uint8_t *trackbuf = pti->trackdata[rev];
 		int tracklen = allrev ? pti->rawlen : pti->tracksize[rev];
 
 		// byte offset in track buffer for the current bitcell
@@ -420,7 +429,7 @@ void CCapsImage::FindWeakBits()
 		while (bofs < tracklen) {
 			// get actual byte from track buffer
 			uint8_t bval = trackbuf[bofs];
-			
+
 			while (1) {
 				// first 0 bit position
 				int f0b;
@@ -500,7 +509,7 @@ void CCapsImage::InitFirstBitTables()
 	// process all positions
 	for (int startbit = 0; startbit < 8; startbit++) {
 		// position#0 is bit#7...position#7 is bit#0
-		int bitmask = 1 << (7-startbit);
+		int bitmask = 1 << (7 - startbit);
 
 		// process all values
 		for (int value = 0; value < 256; value++) {

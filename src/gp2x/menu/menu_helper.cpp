@@ -195,6 +195,107 @@ void update_onscreen()
 }
 #endif
 
+#if defined(__PSP2__)
+static const int vita_shader_order[] = {
+    0, 4, 5, 7, 1, 6, 3, 8, 2, 9, 10
+};
+static const char *vita_shader_labels[] = {
+    "None / Raw (2x Integer)",
+    "Sharp Bilinear",
+    "Sharp Bilinear Simple",
+    "CRT Easymode (Scanlines)",
+    "LCD 3x (Grid)",
+    "FXAA",
+    "Advanced AA",
+    "Bicubic",
+    "Scale2x",
+    "xBR 2x",
+    "GTU CRT"
+};
+#define VITA_SHADER_COUNT ((int)(sizeof(vita_shader_order) / sizeof(vita_shader_order[0])))
+
+const char *vita_shader_label(int shader_enum)
+{
+    for (int i = 0; i < VITA_SHADER_COUNT; i++) {
+        if (vita_shader_order[i] == shader_enum)
+            return vita_shader_labels[i];
+    }
+    return vita_shader_labels[0];
+}
+
+int vita_shader_cycle(int shader_enum, int direction)
+{
+    int current = 0;
+    for (int i = 0; i < VITA_SHADER_COUNT; i++) {
+        if (vita_shader_order[i] == shader_enum) {
+            current = i;
+            break;
+        }
+    }
+    current = (current + direction + VITA_SHADER_COUNT) % VITA_SHADER_COUNT;
+    return vita_shader_order[current];
+}
+
+void vita_get_display_geometry(int *x, int *y, float *sw, float *sh)
+{
+    int preset_variant = presetModeId % 10;
+    bool fullscreen_scaling = (preset_variant == 7);
+    bool five_four_scaling = (preset_variant == 8);
+    int footer_pixels = mainMenu_footerSize;
+    if (footer_pixels < -64) footer_pixels = -64;
+    if (footer_pixels > 160) footer_pixels = 160;
+    float top_anchored_height = 544.0f - (float)footer_pixels;
+    if (top_anchored_height < 320.0f) top_anchored_height = 320.0f;
+    if (top_anchored_height > 608.0f) top_anchored_height = 608.0f;
+
+    int out_x;
+    int out_y;
+    float out_sw;
+    float out_sh;
+
+    if (fullscreen_scaling) {
+        out_x = 0;
+        out_y = 0;
+        out_sw = 960.0f;
+        out_sh = top_anchored_height;
+    } else if (five_four_scaling && mainMenu_shader != 0) {
+        out_sw = 680.0f;
+        out_sh = top_anchored_height;
+        out_x = (int)((960.0f - out_sw) * 0.5f + 0.5f);
+        out_y = 0;
+    } else if (mainMenu_shader != 0) {
+        out_sw = 725.0f;
+        out_sh = top_anchored_height;
+        out_x = (int)((960.0f - out_sw) * 0.5f + 0.5f);
+        out_y = 0;
+    } else if (five_four_scaling) {
+        out_sw = 675.0f;
+        out_sh = 540.0f - (float)footer_pixels;
+        out_x = (960 - (int)out_sw) / 2;
+        out_y = 0;
+    } else {
+        out_sw = 720.0f;
+        out_sh = 540.0f - (float)footer_pixels;
+        out_x = (960 - (int)out_sw) / 2;
+        out_y = 0;
+    }
+
+    int screen_offset_y = mainMenu_screenOffsetY;
+    if (screen_offset_y < -128) screen_offset_y = -128;
+    if (screen_offset_y > 128) screen_offset_y = 128;
+    int screen_offset_x = mainMenu_screenOffsetX;
+    if (screen_offset_x < -128) screen_offset_x = -128;
+    if (screen_offset_x > 128) screen_offset_x = 128;
+    out_x += screen_offset_x;
+    out_y += screen_offset_y;
+
+    if (x) *x = out_x;
+    if (y) *y = out_y;
+    if (sw) *sw = out_sw;
+    if (sh) *sh = out_sh;
+}
+#endif
+
 void update_display() {
 #if defined(__PSP2__)
     write_log("[VITA] update_display: start width=%d height=%d shader=%d menu=%d\n", visibleAreaWidth, mainMenu_displayedLines, mainMenu_shader, displaying_menu);
@@ -229,21 +330,7 @@ void update_display() {
        video surface is still registered. */
     if (prSDLScreen != NULL) {
         write_log("[VITA] update_display: releasing previous video surface\n");
-        for (int i = 0; i < 4; i++) {
-            SDL_FillRect(prSDLScreen, NULL, SDL_MapRGB(prSDLScreen->format, 0, 0, 0));
-            SDL_Flip(prSDLScreen);
-        }
         vita2d_wait_rendering_done();
-        if (prSDLScreen->hwdata != NULL) {
-            private_hwdata *old_hw = (private_hwdata *)prSDLScreen->hwdata;
-            if (old_hw->texture != NULL) {
-                vita2d_free_texture(old_hw->texture);
-                old_hw->texture = NULL;
-            }
-            SDL_free(prSDLScreen->hwdata);
-            prSDLScreen->hwdata = NULL;
-            prSDLScreen->pixels = NULL;
-        }
         SDL_FreeSurface(prSDLScreen);
         prSDLScreen = NULL;
         write_log("[VITA] update_display: previous video surface released\n");
@@ -317,39 +404,7 @@ void update_display() {
     int footer_pixels = mainMenu_footerSize;
     if (footer_pixels < -64) footer_pixels = -64;
     if (footer_pixels > 160) footer_pixels = 160;
-    float top_anchored_height = 544.0f - (float)footer_pixels;
-    if (top_anchored_height < 320.0f) top_anchored_height = 320.0f;
-    if (top_anchored_height > 608.0f) top_anchored_height = 608.0f;
-    if (fullscreen_scaling) {
-        x = 0;
-        y = 0;
-        sw = 960.0f;
-        sh = top_anchored_height;
-    } else if (five_four_scaling && mainMenu_shader != 0) {
-        sw = 680.0f;
-        sh = top_anchored_height;
-        x = (int)((960.0f - sw) * 0.5f + 0.5f);
-        y = 0;
-    } else if (mainMenu_shader != 0) {
-        sw = 725.0f;
-        sh = top_anchored_height;
-        x = (int)((960.0f - sw) * 0.5f + 0.5f);
-        y = 0;
-    } else if (five_four_scaling) {
-        sw = 675.0f;
-        sh = 540.0f - (float)footer_pixels;
-        x = (960 - (int)sw) / 2;
-        y = 0;
-    } else {
-        sw = 720.0f;
-        sh = 540.0f - (float)footer_pixels;
-        x = (960 - (int)sw) / 2;
-        y = 0;
-    }
-    int screen_offset_y = mainMenu_screenOffsetY;
-    if (screen_offset_y < -128) screen_offset_y = -128;
-    if (screen_offset_y > 128) screen_offset_y = 128;
-    y += screen_offset_y;
+    vita_get_display_geometry(&x, &y, &sw, &sh);
     SDL_SetVideoModeScaling(x, y, sw, sh);
     SDL_SetVideoModeBilinear(mainMenu_shader != 0 ? 1 : 0);
     const char *aspect_name = fullscreen_scaling ? "fullscreen" : (five_four_scaling ? "5:4" : "4:3");

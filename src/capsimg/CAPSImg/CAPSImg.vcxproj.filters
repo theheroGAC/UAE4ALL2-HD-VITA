@@ -81,9 +81,6 @@
     <ClInclude Include="..\Core\DiskFile.h">
       <Filter>Header Files\Core</Filter>
     </ClInclude>
-    <ClInclude Include="CapsFile.h">
-      <Filter>Header Files\System</Filter>
-    </ClInclude>
     <ClInclude Include="DiskImage.h">
       <Filter>Header Files\System</Filter>
     </ClInclude>
@@ -135,7 +132,10 @@
     <ClInclude Include="..\Device\C2Comm.h">
       <Filter>Header Files\Device</Filter>
     </ClInclude>
-    <ClInclude Include="..\Compatibility\dirent.h">
+    <ClInclude Include="..\Device\uilsb.h">
+      <Filter>Header Files\Device</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Compatibility\Win32\stream64.h">
       <Filter>Header Files\Compatibility</Filter>
     </ClInclude>
   </ItemGroup>
@@ -162,9 +162,6 @@
       <Filter>Source Files\System</Filter>
     </ClCompile>
     <ClCompile Include="DiskImage.cpp">
-      <Filter>Source Files\System</Filter>
-    </ClCompile>
-    <ClCompile Include="CapsFile.cpp">
       <Filter>Source Files\System</Filter>
     </ClCompile>
     <ClCompile Include="..\Core\BaseFile.cpp">

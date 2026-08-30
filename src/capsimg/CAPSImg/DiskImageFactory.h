@@ -9,13 +9,13 @@ class CDiskImageFactory
 public:
 	CDiskImageFactory();
 	virtual ~CDiskImageFactory();
-	static int GetImageType(PCAPSFILE pcf);
-	static PCDISKIMAGE CreateImage(int diftype);
+	static int GetImageType(const CBaseFile &file);
+	static std::unique_ptr<CDiskImage> CreateImage(int diftype);
 
 protected:
-	static int IsCAPSImage(PCAPSFILE pcf);
-	static int IsKFStream(PCAPSFILE pcf);
-	static int IsKFStreamCue(PCAPSFILE pcf);
+	static int IsCAPSImage(const CBaseFile &file);
+	static int IsKFStream(const CBaseFile &file);
+	static int IsKFStreamCue(const CBaseFile &file);
 };
 
 typedef CDiskImageFactory *PCDISKIMAGEFACTORY;

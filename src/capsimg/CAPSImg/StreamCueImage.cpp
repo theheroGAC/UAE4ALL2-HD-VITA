@@ -11,7 +11,7 @@ CStreamCueImage::~CStreamCueImage()
 }
 
 // lock and scan file
-int CStreamCueImage::Lock(PCAPSFILE pcf)
+int CStreamCueImage::Lock(std::unique_ptr<CBaseFile> pf)
 {
 	return imgeOk;
 }

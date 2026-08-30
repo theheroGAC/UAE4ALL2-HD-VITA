@@ -37,103 +37,103 @@
 
 // generic CAPS chunk
 struct CapsID {
-	UBYTE name[4]; // chunk identifier
-	UDWORD size;   // chunk size, including CapsID and extended chunk
-	UDWORD hcrc;   // chunk CRC calculated as hcrc=0
+	uint8_t name[4]; // chunk identifier
+	uint32_t size;   // chunk size, including CapsID and extended chunk
+	uint32_t hcrc;   // chunk CRC calculated as hcrc=0
 };
 
 typedef CapsID *PCAPSID;
 
 // dumped memory area
 struct CapsDump {
-	UDWORD type; // memory type
-	UDWORD size; // memory size
-	UDWORD area; // memory location
-	UDWORD did;  // data chunk identifier
+	uint32_t type; // memory type
+	uint32_t size; // memory size
+	uint32_t area; // memory location
+	uint32_t did;  // data chunk identifier
 };
 
 typedef CapsDump *PCAPSDUMP;
 
 // data area
 struct CapsData {
-	UDWORD size;  // data area size in bytes after chunk
-	UDWORD bsize; // data area size in bits
-	UDWORD dcrc;  // data area crc
-	UDWORD did;   // data chunk identifier
+	uint32_t size;  // data area size in bytes after chunk
+	uint32_t bsize; // data area size in bits
+	uint32_t dcrc;  // data area crc
+	uint32_t did;   // data chunk identifier
 };
 
 typedef CapsData *PCAPSDATA;
 
 // dumped track
 struct CapsTrack {
-	UDWORD type; // track type
-	UDWORD cyl;  // cylinder
-	UDWORD head; // head
-	UDWORD did;  // data chunk identifier
+	uint32_t type; // track type
+	uint32_t cyl;  // cylinder
+	uint32_t head; // head
+	uint32_t did;  // data chunk identifier
 };
 
 typedef CapsTrack *PCAPSTRACK;
 
 // caps packed date.time format
 struct CapsDateTime {
-	UDWORD date; // packed date, yyyymmdd
-	UDWORD time; // packed time, hhmmssttt
+	uint32_t date; // packed date, yyyymmdd
+	uint32_t time; // packed time, hhmmssttt
 };
 
 typedef CapsDateTime *PCAPSDATETIME;
 
 // image information
 struct CapsInfo {
-	UDWORD type;        // image type
-	UDWORD encoder;     // image encoder ID
-	UDWORD encrev;      // image encoder revision
-	UDWORD release;     // release ID
-	UDWORD revision;    // release revision ID
-	UDWORD origin;      // original source reference
-	UDWORD mincylinder; // lowest cylinder number
-	UDWORD maxcylinder; // highest cylinder number
-	UDWORD minhead;     // lowest head number
-	UDWORD maxhead;     // highest head number
+	uint32_t type;        // image type
+	uint32_t encoder;     // image encoder ID
+	uint32_t encrev;      // image encoder revision
+	uint32_t release;     // release ID
+	uint32_t revision;    // release revision ID
+	uint32_t origin;      // original source reference
+	uint32_t mincylinder; // lowest cylinder number
+	uint32_t maxcylinder; // highest cylinder number
+	uint32_t minhead;     // lowest head number
+	uint32_t maxhead;     // highest head number
 	CapsDateTime crdt;  // image creation date.time
-	UDWORD platform[CAPS_MAXPLATFORM]; // intended platform(s)
-	UDWORD disknum;     // disk# for release, >= 1 if multidisk
-	UDWORD userid;      // user id of the image creator
-	UDWORD reserved[3]; // future use
+	uint32_t platform[CAPS_MAXPLATFORM]; // intended platform(s)
+	uint32_t disknum;     // disk# for release, >= 1 if multidisk
+	uint32_t userid;      // user id of the image creator
+	uint32_t reserved[3]; // future use
 };
 
 typedef CapsInfo *PCAPSINFO;
 
 // track image descriptor
 struct CapsImage {
-	UDWORD cylinder; // cylinder#
-	UDWORD head;     // head#
-	UDWORD dentype;  // density type
-	UDWORD sigtype;  // signal processing type
-	UDWORD trksize;  // decoded track size, rounded
-	UDWORD startpos; // start position, rounded
-	UDWORD startbit; // start position on original data
-	UDWORD databits; // decoded data size in bits
-	UDWORD gapbits;  // decoded gap size in bits
-	UDWORD trkbits;  // decoded track size in bits
-	UDWORD blkcnt;   // number of blocks
-	UDWORD process;  // encoder prcocess
-	UDWORD flag;     // image flags
-	UDWORD did;      // data chunk identifier
-	UDWORD reserved[3]; // future use
+	uint32_t cylinder; // cylinder#
+	uint32_t head;     // head#
+	uint32_t dentype;  // density type
+	uint32_t sigtype;  // signal processing type
+	uint32_t trksize;  // decoded track size, rounded
+	uint32_t startpos; // start position, rounded
+	uint32_t startbit; // start position on original data
+	uint32_t databits; // decoded data size in bits
+	uint32_t gapbits;  // decoded gap size in bits
+	uint32_t trkbits;  // decoded track size in bits
+	uint32_t blkcnt;   // number of blocks
+	uint32_t process;  // encoder prcocess
+	uint32_t flag;     // image flags
+	uint32_t did;      // data chunk identifier
+	uint32_t reserved[3]; // future use
 };
 
 typedef CapsImage *PCAPSIMAGE;
 
 // original meaning of some CapsBlock entries for old images
 struct CapsBlockExt {
-	UDWORD blocksize;  // decoded block size, rounded
-	UDWORD gapsize;    // decoded gap size, rounded
+	uint32_t blocksize;  // decoded block size, rounded
+	uint32_t gapsize;    // decoded gap size, rounded
 };
 
 // new meaning of some CapsBlock entries for new images
 struct SPSBlockExt {
-	UDWORD gapoffset;  // offset of gap stream in data area
-	UDWORD celltype;   // bitcell type
+	uint32_t gapoffset;  // offset of gap stream in data area
+	uint32_t celltype;   // bitcell type
 };
 
 // union for old or new images
@@ -144,13 +144,13 @@ union CapsBlockType {
 
 // block image descriptor
 struct CapsBlock {
-	UDWORD blockbits;  // decoded block size in bits
-	UDWORD gapbits;    // decoded gap size in bits
+	uint32_t blockbits;  // decoded block size in bits
+	uint32_t gapbits;    // decoded gap size in bits
 	CapsBlockType bt;  // content depending on image type
-	UDWORD enctype;    // encoder type
-	UDWORD flag;       // block flags
-	UDWORD gapvalue;   // default gap value
-	UDWORD dataoffset; // offset of data stream in data area
+	uint32_t enctype;    // encoder type
+	uint32_t flag;       // block flags
+	uint32_t gapvalue;   // default gap value
+	uint32_t dataoffset; // offset of data stream in data area
 };
 
 typedef CapsBlock *PCAPSBLOCK;
@@ -159,22 +159,22 @@ typedef CapsBlock *PCAPSBLOCK;
 
 // analyser export
 struct CapsExport {
-	UDWORD cylinder; // cylinder#
-	UDWORD head;     // head#
-	UDWORD dentype;  // density type
-	UDWORD anaid;    // analyser selected format
-	UDWORD anafix;   // analyser fix method
-	UDWORD anatrs;   // analyser track size
-	UDWORD reserved[2]; // future use
+	uint32_t cylinder; // cylinder#
+	uint32_t head;     // head#
+	uint32_t dentype;  // density type
+	uint32_t anaid;    // analyser selected format
+	uint32_t anafix;   // analyser fix method
+	uint32_t anatrs;   // analyser track size
+	uint32_t reserved[2]; // future use
 };
 
 typedef CapsExport *PCAPSEXPORT;
 
 // analyser export info
 struct CapsExportInfo {
-	UDWORD releasecrc; // crc32 on release ipf
-	UDWORD anarev;     // analyser revision
-	UDWORD reserved[14]; // future use
+	uint32_t releasecrc; // crc32 on release ipf
+	uint32_t anarev;     // analyser revision
+	uint32_t reserved[14]; // future use
 };
 
 typedef CapsExportInfo *PCAPSEXPORTINFO;
@@ -183,20 +183,20 @@ typedef CapsExportInfo *PCAPSEXPORTINFO;
 
 // CAPS pack/CT Raw format
 struct CapsPack {
-	UBYTE sign[4]; // host signature
-	UDWORD usize;  // original size in bytes
-	UDWORD ucrc;   // CRC on uncompressed data
-	UDWORD csize;  // compressed size in bytes
-	UDWORD ccrc;   // CRC on compressed data
-	UDWORD hcrc;   // CRC on header calculated as hcrc=0
+	uint8_t sign[4]; // host signature
+	uint32_t usize;  // original size in bytes
+	uint32_t ucrc;   // CRC on uncompressed data
+	uint32_t csize;  // compressed size in bytes
+	uint32_t ccrc;   // CRC on compressed data
+	uint32_t hcrc;   // CRC on header calculated as hcrc=0
 };
 
 typedef CapsPack *PCAPSPACK;
 
 // CAPS raw format
 struct CapsRaw {
-	UDWORD time;
-	UDWORD raw;
+	uint32_t time;
+	uint32_t raw;
 };
 
 typedef CapsRaw *PCAPSRAW;
@@ -205,20 +205,20 @@ typedef CapsRaw *PCAPSRAW;
 
 // generic dump types
 enum {
-	cpdKICK=1, // kickstart rom
+	cpdKICK = 1, // kickstart rom
 	cpdBOOT    // bootrom
 };
 
 // image type
 enum {
-	cpimtNA=0, // invalid image type
+	cpimtNA = 0, // invalid image type
 	cpimtFDD,  // floppy disk
 	cpimtLast
 };
 
 // platform IDs, not about configuration, but intended use
 enum {
-	cppidNA=0, // invalid platform (dummy entry)
+	cppidNA = 0, // invalid platform (dummy entry)
 	cppidAmiga,
 	cppidAtariST,
 	cppidPC,
@@ -233,7 +233,7 @@ enum {
 
 // density types
 enum {
-	cpdenNA=0,     // invalid density
+	cpdenNA = 0,     // invalid density
 	cpdenNoise,    // cells are unformatted (random size)
 	cpdenAuto,     // automatic cell size, according to track size
 	cpdenCLAmiga,  // Copylock Amiga
@@ -248,21 +248,21 @@ enum {
 
 // signal processing used
 enum {
-	cpsigNA=0, // invalid signal type
+	cpsigNA = 0, // invalid signal type
 	cpsig2us,  // 2us cells
 	cpsigLast
 };
 
 // bitcell used
 enum {
-	cpbctNA=0, // invalid cell type
+	cpbctNA = 0, // invalid cell type
 	cpbct2us,  // 2us cells
 	cpbctLast
 };
 
 // encoder types
 enum {
-	cpencNA=0, // invalid encoder
+	cpencNA = 0, // invalid encoder
 	cpencMFM,  // MFM
 	cpencRaw,  // no encoder used, test data only
 	cpencLast
@@ -270,7 +270,7 @@ enum {
 
 // data types
 enum {
-	cpdatEnd=0, // data stream end
+	cpdatEnd = 0, // data stream end
 	cpdatMark,  // mark/sync
 	cpdatData,  // data
 	cpdatGap,   // gap
@@ -281,7 +281,7 @@ enum {
 
 // gap types
 enum {
-	cpgapEnd=0, // gap stream end
+	cpgapEnd = 0, // gap stream end
 	cpgapCount, // gap counter
 	cpgapData,  // gap data pattern
 	cpgapLast

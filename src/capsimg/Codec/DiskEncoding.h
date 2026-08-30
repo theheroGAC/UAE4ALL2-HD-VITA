@@ -25,16 +25,16 @@ public:
 	virtual ~CDiskEncoding();
 	static void InitFM();
 	static void InitMFM(uint32_t mfmsize);
-	static void InitGCRCBM(uint32_t *gcrtable, int gcrid);
-	static void InitGCRCBM_S(uint32_t *gcrtable, int gcrid);
+	static void InitGCRCBM(const uint32_t *gcrtable, int gcrid);
+	static void InitGCRCBM_S(const uint32_t *gcrtable, int gcrid);
 	static void InitGCRAppleH();
-	static void InitGCRApple5(uint32_t *gcrtable);
-	static void InitGCRApple6(uint32_t *gcrtable);
-	static void InitGCRVorpal(uint32_t *gcrtable);
-	static void InitGCRVorpal2(uint32_t *gcrtable);
-	static void InitGCRVMax(uint32_t *gcrtable, int vmaxid);
-	static void InitGCR4Bit(uint32_t *gcrtable);
-	static int FindViolation(uint8_t *buffer, int bitpos, int bitcnt, int max0, int max1, int mode);
+	static void InitGCRApple5(const uint32_t *gcrtable);
+	static void InitGCRApple6(const uint32_t *gcrtable);
+	static void InitGCRVorpal(const uint32_t *gcrtable);
+	static void InitGCRVorpal2(const uint32_t *gcrtable);
+	static void InitGCRVMax(const uint32_t *gcrtable, int vmaxid);
+	static void InitGCR4Bit(const uint32_t *gcrtable);
+	static int FindViolation(const uint8_t *buffer, int bitpos, int bitcnt, int max0, int max1, int mode);
 
 protected:
 	void Clear();
@@ -75,16 +75,16 @@ public:
 	static uint32_t *gcr4bitcode; // gcr 4 bit code table
 	static uint32_t *gcr4bitdecode; // gcr 4 bit decode table
 
-	static uint32_t gcr_cbm[]; // cbm gcr table
-	static uint32_t gcr_bigfive[]; // cbm big five gcr table
-	static uint32_t gcr_apple5[]; // apple 5 bit gcr table
-	static uint32_t gcr_apple6[]; // apple 6 bit gcr table
-	static uint32_t gcr_vorpal[]; // cbm vorpal 6 bit gcr table
-	static uint32_t gcr_vorpal2[]; // cbm vorpal 2, 5 bit gcr table
-	static uint32_t gcr_vmax[]; // cbm vmax 6 bit gcr table, normal
-	static uint32_t gcr_vmaxold[]; // cbm vmax 6 bit gcr table, old version
-	static uint32_t gcr_teque[]; // cbm teque 4 bit gcr table
-	static uint32_t gcr_ozisoft[]; // cbm ozisoft 4 bit gcr table
+	static const uint32_t gcr_cbm[]; // cbm gcr table
+	static const uint32_t gcr_bigfive[]; // cbm big five gcr table
+	static const uint32_t gcr_apple5[]; // apple 5 bit gcr table
+	static const uint32_t gcr_apple6[]; // apple 6 bit gcr table
+	static const uint32_t gcr_vorpal[]; // cbm vorpal 6 bit gcr table
+	static const uint32_t gcr_vorpal2[]; // cbm vorpal 2, 5 bit gcr table
+	static const uint32_t gcr_vmax[]; // cbm vmax 6 bit gcr table, normal
+	static const uint32_t gcr_vmaxold[]; // cbm vmax 6 bit gcr table, old version
+	static const uint32_t gcr_teque[]; // cbm teque 4 bit gcr table
+	static const uint32_t gcr_ozisoft[]; // cbm ozisoft 4 bit gcr table
 };
 
 typedef CDiskEncoding *PCDISKENCODING;

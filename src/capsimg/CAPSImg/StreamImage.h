@@ -7,11 +7,11 @@ class CStreamImage : public CDiskImage
 public:
 	CStreamImage();
 	virtual ~CStreamImage();
-	int Lock(PCAPSFILE pcf);
-	int Unlock();
+	int Lock(std::unique_ptr<CBaseFile> pf) override;
+	int Unlock() override;
 
 protected:
-	int LoadTrack(PDISKTRACKINFO pti, UDWORD flag);
+	int LoadTrack(PDISKTRACKINFO pti, uint32_t flag) override;
 };
 
 typedef CStreamImage *PCSTREAMIMAGE;

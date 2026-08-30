@@ -1,14 +1,14 @@
 #ifndef CRC_H
 #define CRC_H
 
-extern UDWORD crctab[256];
-extern UWORD crctab_ccitt[256];
+extern uint32_t crctab[256];
+extern uint16_t crctab_ccitt[256];
 
 void MakeCRCTable();
-UDWORD CalcCRC(PUBYTE buf, int len);
-UDWORD CalcCRC32(PUBYTE buf, int len, UDWORD seed=0);
-UWORD CalcCRC_CCITT(PUBYTE buf, int len);
-UDWORD CalcCRC16(PUBYTE buf, int len, UDWORD seed);
-UWORD CalcCRC_ANSI(PUBYTE buf, int len);
+uint32_t CalcCRC(const uint8_t *buf, size_t len);
+uint32_t CalcCRC32(const uint8_t *buf, size_t len, uint32_t seed = 0);
+uint16_t CalcCRC_CCITT(const uint8_t *buf, size_t len);
+uint32_t CalcCRC16(const uint8_t *buf, size_t len, uint32_t seed);
+uint16_t CalcCRC_ANSI(const uint8_t *buf, size_t len);
 
 #endif

@@ -12,8 +12,8 @@ class CStreamCueImage : public CStreamImage
 public:
 	CStreamCueImage();
 	virtual ~CStreamCueImage();
-	int Lock(PCAPSFILE pcf);
-	int Unlock();
+	int Lock(std::unique_ptr<CBaseFile> pf) override;
+	int Unlock() override;
 };
 
 typedef CStreamCueImage *PCSTREAMCUEIMAGE;

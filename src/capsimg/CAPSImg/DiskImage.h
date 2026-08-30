@@ -6,7 +6,6 @@
 #define DEF_TRACKINFO (1024*MAX_HEAD)
 #define DEF_SCANINFO 200
 #define DEF_SCANEXTEND 2
-#define DEF_CRCBUF 65536
 #define DEF_FDALLOC 8
 
 #define DI_COMP_MARK  DF_0
@@ -54,10 +53,6 @@ typedef DiskSectorInfo *PDISKSECTORINFO;
 struct DiskImageInfo {
 	int valid;        // true if image info is valid
 	int error;        // error code
-	int dirty;        // true if any track modified
-	int readonly;     // true if image opened in readonly mode
-	int modimage;     // true if modify requires a new image
-	int rawlock;      // true if locked track should be in raw
 	int umincylinder; // lowest cylinder number used
 	int umaxcylinder; // highest cylinder number used
 	int uminhead;     // lowest head number used
@@ -79,27 +74,27 @@ struct DiskTrackInfo {
 	int type;       // track data type
 	int linked;     // non zero if linked image
 	int linkinfo;   // private link data for user
-	UDWORD linkflag; // linked image flag
+	uint32_t linkflag; // linked image flag
 	int cylinder;   // cylinder number
 	int head;       // head number
 	int sectorcnt;  // available sectors
-	int headerpos;  // pointer into image file (-1 no header)
-	int datapos;    // pointer into image file (-1 no data)
-	int datasize;   // data area size in image
+	file_pos_t headerpos;  // pointer into image file (-1 no header)
+	file_pos_t datapos;    // pointer into image file (-1 no data)
+	uint32_t datasize;   // data area size in image
 	int trackcnt;   // track variant count
 	int rawtrackcnt;   // track variant count for raw dumps
 	int rawlen; // track buffer memory length for raw dumps
 	int rawtimecnt; // timing information size for raw dumps
-	PUDWORD rawtimebuf; // timing information for raw dumps
+	uint32_t *rawtimebuf; // timing information for raw dumps
 	int rawupdate;   // use raw dump update functionality if true (only if 1 revolution decoded is requested)
 	int rawdump;     // true if this track is a raw dump
-	PUBYTE trackbuf; // track buffer memory 
+	uint8_t *trackbuf; // track buffer memory 
 	int tracklen;    // track buffer memory length
-	PUBYTE trackdata[CAPS_MTRS]; // track data pointer if available
+	uint8_t *trackdata[CAPS_MTRS]; // track data pointer if available
 	int tracksize[CAPS_MTRS];    // track data size
 	int trackstart[CAPS_MTRS];   // track start position
 	int timecnt;     // timing information size
-	PUDWORD timebuf; // timing information
+	uint32_t *timebuf; // timing information
 	int fixpos;      // position data for track fixing functions
 	int comppos;     // position data for track compare functions
 	int sdpos;       // decoder start position
@@ -133,42 +128,41 @@ enum {
 
 
 // disk image handler
-class CDiskImage  
+class CDiskImage
 {
 public:
 	CDiskImage();
 	virtual ~CDiskImage();
-	virtual int Lock(PCAPSFILE pcf);
+	virtual int Lock(std::unique_ptr<CBaseFile> pf);
 	virtual int Unlock();
-	virtual int LoadImage(UDWORD flag, int free=false);
+	virtual int LoadImage(uint32_t flag, int free = false);
 	PDISKTRACKINFO GetTrack(int cylinder, int head);
-	PDISKTRACKINFO LockTrack(int cylinder, int head, UDWORD flag);
-	PDISKTRACKINFO LockTrackComp(int cylinder, int head, UDWORD flag, int sblk, int eblk);
-	PDISKTRACKINFO UnlockTrack(int cylinder, int head, int forced=false);
-	static void UnlockTrack(PDISKTRACKINFO pti, int forced=false);
-	void UnlockTrack(int forced=false);
+	PDISKTRACKINFO LockTrack(int cylinder, int head, uint32_t flag);
+	PDISKTRACKINFO LockTrackComp(int cylinder, int head, uint32_t flag, int sblk, int eblk);
+	PDISKTRACKINFO UnlockTrack(int cylinder, int head, int forced = false);
+	static void UnlockTrack(PDISKTRACKINFO pti, int forced = false);
+	void UnlockTrack(int forced = false);
 	static int LinkTrackData(PDISKTRACKINFO pti, int size);
 	PDISKIMAGEINFO GetInfo();
 	static void CreateDateTime(PCAPSDATETIME pcd);
 	static void DecodeDateTime(PCAPSDATETIMEEXT dec, PCAPSDATETIME pcd);
-	static LPCSTR GetPlatformName(int pid);
-	static UDWORD CrcFile(PCAPSFILE pcf);
+	static const char * GetPlatformName(int pid);
 
 protected:
 	void Destroy();
 	int AddTrack(PDISKTRACKINFO pdti);
-	virtual int LoadTrack(PDISKTRACKINFO pti, UDWORD flag);
+	virtual int LoadTrack(PDISKTRACKINFO pti, uint32_t flag);
 	int LoadPlain(PDISKTRACKINFO pti);
-	int AllocTrack(PDISKTRACKINFO pti, UDWORD flag);
-	static void FreeTrack(PDISKTRACKINFO pti, int forced=false);
+	int AllocTrack(PDISKTRACKINFO pti, uint32_t flag);
+	static void FreeTrack(PDISKTRACKINFO pti, int forced = false);
 	static void FreeTrackData(PDISKTRACKINFO pti);
 	static void FreeTrackTiming(PDISKTRACKINFO pti);
 	static void FreeTrackFD(PDISKTRACKINFO pti);
 	PDISKTRACKINFO MapTrack(int cylinder, int head);
 	void UpdateImageInfo(PDISKTRACKINFO pti);
-	static UDWORD ReadValue(PUBYTE buf, int cnt);
-	static PDISKDATAMARK AddFD(PDISKTRACKINFO pti, PDISKDATAMARK src, int size, int units=0);
-	static PDISKDATAMARK AllocFD(PDISKTRACKINFO pti, int size, int units=DEF_FDALLOC);
+	static uint32_t ReadValue(uint8_t *buf, int cnt);
+	static PDISKDATAMARK AddFD(PDISKTRACKINFO pti, PDISKDATAMARK src, int size, int units = 0);
+	static PDISKDATAMARK AllocFD(PDISKTRACKINFO pti, int size, int units = DEF_FDALLOC);
 	static void AllocTrackSI(PDISKTRACKINFO pti);
 	static void FreeTrackSI(PDISKTRACKINFO pti);
 
@@ -178,7 +172,7 @@ protected:
 	int dticyl;
 	int dtihed;
 	PDISKTRACKINFO dti;
-	static LPCSTR pidname[cppidLast];
+	static const char * const pidname[cppidLast];
 };
 
 typedef CDiskImage *PCDISKIMAGE;
@@ -188,7 +182,7 @@ typedef CDiskImage *PCDISKIMAGE;
 // get image information
 inline PDISKIMAGEINFO CDiskImage::GetInfo()
 {
-	return dii.valid ? &dii : NULL;
+	return dii.valid ? &dii : nullptr;
 }
 
 #endif

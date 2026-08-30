@@ -11,34 +11,51 @@ CBitBuffer::~CBitBuffer()
 {
 }
 
-// clear variables
+// clear the buffer state, no read or write is allowed before Init
 void CBitBuffer::Clear()
 {
-	bufmem = NULL;
-	bufsize = 0;
-	bufbits = 0;
+	buf_write = nullptr;
+	buf_read = nullptr;
+	buf_size = 0;
+	buf_bits = 0;
 }
 
-// initialize byte sized class associated buffer
+// initialize a read/write buffer to byte size
 void CBitBuffer::InitByteSize(uint8_t *buf, uint32_t bytesize)
 {
-	bufmem = buf;
-	bufsize = bytesize;
-	bufbits = bytesize << 3;
+	buf_write = buf;
+	buf_read = buf;
+	buf_size = bytesize;
+	buf_bits = bytesize << 3;
 }
 
-// initialize bit sized class associated buffer
+// initialize a read-only buffer to byte size
+void CBitBuffer::InitByteSize(const uint8_t *buf, uint32_t bytesize)
+{
+	InitByteSize(const_cast<uint8_t *>(buf), bytesize);
+	buf_write = nullptr;
+}
+
+// initialize a read/write buffer to bit size
 void CBitBuffer::InitBitSize(uint8_t *buf, uint32_t bitsize)
 {
-	bufmem = buf;
-	bufsize = CalculateByteSize(bitsize);
-	bufbits = bitsize;
+	buf_write = buf;
+	buf_read = buf;
+	buf_size = CalculateByteSize(bitsize);
+	buf_bits = bitsize;
+}
+
+// initialize a read-only buffer to bit size
+void CBitBuffer::InitBitSize(const uint8_t *buf, uint32_t bitsize)
+{
+	InitBitSize(const_cast<uint8_t *>(buf), bitsize);
+	buf_write = nullptr;
 }
 
 
 
 // read up to 32 data bits from the specified buffer, wrap around
-uint32_t CBitBuffer::ReadBitWrap(uint8_t *buf, uint32_t bufwrap, uint32_t bitpos, int bitcnt)
+uint32_t CBitBuffer::ReadBitWrap(const uint8_t *buf, uint32_t bufwrap, uint32_t bitpos, int bitcnt)
 {
 	uint32_t res;
 
@@ -70,7 +87,7 @@ uint32_t CBitBuffer::ReadBitWrap(uint8_t *buf, uint32_t bufwrap, uint32_t bitpos
 }
 
 // read up to 32 data bits from the specified buffer
-uint32_t CBitBuffer::ReadBit(uint8_t *buf, uint32_t bitpos, int bitcnt)
+uint32_t CBitBuffer::ReadBit(const uint8_t *buf, uint32_t bitpos, int bitcnt)
 {
 	// result is 0 if bit count is 0 or less
 	if (bitcnt <= 0)
@@ -244,7 +261,7 @@ void CBitBuffer::ClearBitWrap(uint8_t *buf, uint32_t bufwrap, uint32_t bitpos, i
 			if (bitpos >= bufwrap)
 				bitpos -= bufwrap;
 		}
-	}	else {
+	} else {
 		// fast mode; write at once
 		ClearBit(buf, bitpos, bitcnt);
 	}
@@ -269,7 +286,7 @@ void CBitBuffer::ClearBit(uint8_t *buf, uint32_t bitpos, int bitcnt)
 
 
 // compare two bitfields in the specified buffers, return 0 if they are identical
-int CBitBuffer::CompareBit(uint8_t *buf1, uint32_t buf1pos, uint8_t *buf2, uint32_t buf2pos, int bitcnt)
+int CBitBuffer::CompareBit(const uint8_t *buf1, uint32_t buf1pos, const uint8_t *buf2, uint32_t buf2pos, int bitcnt)
 {
 	// compare every bit in the two fields, 32 bit at a time, and finally the remaining bits
 	while (bitcnt > 0) {
@@ -299,7 +316,7 @@ int CBitBuffer::CompareBit(uint8_t *buf1, uint32_t buf1pos, uint8_t *buf2, uint3
 }
 
 // compare two bitfields in the specified buffers, return the number of the first N identical bits
-int CBitBuffer::CompareAndCountBit(uint8_t *buf1, uint32_t buf1pos, uint8_t *buf2, uint32_t buf2pos, int bitcnt)
+int CBitBuffer::CompareAndCountBit(const uint8_t *buf1, uint32_t buf1pos, const uint8_t *buf2, uint32_t buf2pos, int bitcnt)
 {
 	// number of bits processed, size of current block
 	int bitproc = 0, blocksize;
@@ -358,7 +375,7 @@ int CBitBuffer::CompareAndCountBit(uint8_t *buf1, uint32_t buf1pos, uint8_t *buf
 
 
 // copy a bitfield in the specified buffers, wrap around
-void CBitBuffer::CopyBitWrap(uint8_t *srcbuf, uint32_t srcwrap, uint32_t srcpos, uint8_t *dstbuf, uint32_t dstwrap, uint32_t dstpos, int bitcnt)
+void CBitBuffer::CopyBitWrap(const uint8_t *srcbuf, uint32_t srcwrap, uint32_t srcpos, uint8_t *dstbuf, uint32_t dstwrap, uint32_t dstpos, int bitcnt)
 {
 	// copy areas in largest possible size up to the track wrap points
 	while (bitcnt > 0) {
@@ -386,7 +403,8 @@ void CBitBuffer::CopyBitWrap(uint8_t *srcbuf, uint32_t srcwrap, uint32_t srcpos,
 	}
 }
 
-void CBitBuffer::CopyBit(uint8_t *srcbuf, uint32_t srcpos, uint8_t *dstbuf, uint32_t dstpos, int bitcnt)
+// copy a bitfield in the specified buffers
+void CBitBuffer::CopyBit(const uint8_t *srcbuf, uint32_t srcpos, uint8_t *dstbuf, uint32_t dstpos, int bitcnt)
 {
 	// copy the field in 32 bit blocks, and finally the remaining 1...31 bits
 	while (bitcnt > 0) {

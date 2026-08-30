@@ -1,3 +1,8 @@
+#ifndef _MENU_CONFIG_H
+#define _MENU_CONFIG_H
+
+#include "sysconfig.h"
+
 extern void SetDefaultMenuSettings(int general);
 extern void ApplyCd32Profile(void);
 extern void ApplyA500Profile(void);
@@ -7,10 +12,16 @@ extern void UpdateMemorySettings();
 extern void UpdateCPUModelSettings();
 extern void UpdateChipsetSettings();
 extern void SetPresetMode(int mode);
+#if defined(__PSP2__)
+extern void vita_get_display_geometry(int *x, int *y, float *sw, float *sh);
+extern const char *vita_shader_label(int shader_enum);
+extern int vita_shader_cycle(int shader_enum, int direction);
+#endif
 extern void reset_hdConf(void);
 extern void kill_hd_configs();
 #if defined(__PSP2__) || defined(__SWITCH__)
 extern void remap_custom_controls();
+extern void mapback_custom_controls();
 #endif
 
 #ifndef _MENU_CONFIG_CPP
@@ -73,11 +84,15 @@ extern int mainMenu_cutLeft;
 extern int mainMenu_cutRight;
 extern int mainMenu_footerSize;
 extern int mainMenu_screenOffsetY;
+extern int mainMenu_screenOffsetX;
 extern int mainMenu_ntsc;
 extern int mainMenu_frameskip;
 extern int mainMenu_vkbdLanguage;
 extern int mainMenu_vkbdStyle;
+extern int mainMenu_vkbdTransparency;
+extern int mainMenu_vkbdPosition;
 extern int mainMenu_autofire;
+extern int mainMenu_autofireMode;
 extern int visibleAreaWidth;
 
 extern int saveMenu_n_savestate;
@@ -139,6 +154,9 @@ extern int mainMenu_autoEjectFloppy;
 extern int mainMenu_midiSynth;
 extern int mainMenu_pinballMode;
 extern char mainMenu_whdload_game[128];
+extern char mainMenu_whdload_args[256];
+extern int mainMenu_floppyWriteProtect[4];
+extern int mainMenu_cycleExact;
 extern int mainMenu_custom_controlSet;
 extern int mainMenu_customPreset_up[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
 extern int mainMenu_customPreset_down[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
@@ -159,11 +177,10 @@ extern int mainMenu_customPreset_L2[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS]
 extern int mainMenu_customPreset_R2[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
 extern int mainMenu_customPreset_L3[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
 extern int mainMenu_customPreset_R3[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
-#endif
-#ifdef __SWITCH__
 extern int mainMenu_swapAB;
 extern int mainMenu_singleJoycons;
 #endif
-#endif
 
-#endif
+#endif // defined(__PSP2__) || defined(__SWITCH__)
+#endif // _MENU_CONFIG_CPP
+#endif // _MENU_CONFIG_H

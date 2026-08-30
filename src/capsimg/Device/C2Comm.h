@@ -1,6 +1,13 @@
 #ifndef C2COMM_H
 #define C2COMM_H
 
+#ifdef C2_APP_ACCESS
+#include "uilsb.h"
+#else
+#define uilsb16_t uint16_t
+#define uilsb32_t uint32_t
+#endif
+
 // Commands are sent in Setup packets as Vendor.Other requests, this prevents changing the content of the packet
 // bmRequestType is Vendor.Other with Data transfer direction, the type of C2 request is in bRequest
 // bRequest types:
@@ -21,7 +28,7 @@
 
 // valid requests
 enum {
-	c2Opt_S_Status=0,
+	c2Opt_S_Status = 0,
 	c2Opt_S_Info,
 	c2Opt_S_Result,
 	c2Opt_S_Data,
@@ -37,7 +44,7 @@ enum {
 	c2Opt_V_Max_Track,
 	c2Opt_T_Set_Line,
 	c2Opt_T_Density_Select,
-	c2Opt_T_Drive_Select, 
+	c2Opt_T_Drive_Select,
 	c2Opt_T_Side_Select,
 	c2Opt_T_Direction_Select,
 	c2Opt_T_Spin_Up,
@@ -58,7 +65,7 @@ enum {
 // WSIB: Write Stream Information Block
 // WSSB:  Write Stream Setup Block
 enum {
-	c2SEROk=0,   // no error
+	c2SEROk = 0,   // no error
 	c2SERBuffer, // buffering problem; overflow during read, underflow during write
 	c2SERIndexTimeout, // no index signal detected during timeout period
 	c2SERTransferTimeout, // timeout detected during transfer
@@ -88,7 +95,7 @@ enum {
 
 // info request types
 enum {
-	c2InfoInvalid=0,
+	c2InfoInvalid = 0,
 	c2InfoFirmware,
 	c2InfoHardware,
 	c2InfoLast
@@ -96,14 +103,14 @@ enum {
 
 // streaming functions
 enum {
-	c2StreamStop=0,
+	c2StreamStop = 0,
 	c2StreamRead,
 	c2StreamWrite
 };
 
 // status values
 enum {
-	c2StatusReady=0,
+	c2StatusReady = 0,
 	c2StatusBusy,
 	c2StatusCommand
 };
@@ -127,7 +134,7 @@ enum {
 
 // write stream setup commands and escape code
 enum {
-	c2wInvalid=0, // invalid command for error detection
+	c2wInvalid = 0, // invalid command for error detection
 	c2wSetupEnd, // setup finished, write stream start
 	c2wTableidx, // define the first value that is a table entry index, arg: index start value-1 1 byte
 	c2wTime2, // flux reversal time table entry, arg: entry index# 1 byte, 2 bytes big endian time
@@ -139,7 +146,7 @@ enum {
 	c2wIQResume2, // index queue: resume stream processing, arg: 2 bytes big endian time
 	c2wIQEnd, // index queue: stop stream processing
 	c2wIQWSuspend, // index queue: wait for suspend command processed by the write stream
-	c2wEscape=0 // normal write stream escape code, not for setup stream
+	c2wEscape = 0 // normal write stream escape code, not for setup stream
 };
 
 // A new write stream entry is either a time command or a control command.
@@ -191,8 +198,8 @@ enum {
 
 // read stream encoding (by device)
 enum {
-	c2eValue=8,
-	c2eNop1=c2eValue,
+	c2eValue = 8,
+	c2eNop1 = c2eValue,
 	c2eNop2,
 	c2eNop3,
 	c2eOverflow16,
@@ -223,70 +230,90 @@ enum {
 
 // OOB type used in OOB Header
 enum {
-	c2otInvalid=0,
+	c2otInvalid = 0,
 	c2otStreamRead,
 	c2otIndex,
 	c2otStreamEnd,
 	c2otInfo,
-	c2otEnd=c2eOOB
+	c2otEnd = c2eOOB
 };
 
-#if !defined(__GNUC__)
 #pragma pack(push, 1)
-#define __attribute__(x)
+
+// if used by the firmware the structures must be aligned
+#ifdef C2_APP_ACCESS
+#define C2_COMM_ATTR
+#else
+#define C2_COMM_ATTR __attribute__((aligned))
 #endif
 
 // write stream information block
 typedef struct {
 	uint8_t sign[4];  // signature
-	uint32_t frpw; // flux reversal pulse width in nanoseconds
-	uint32_t processtimeout; // timeout for the entire write stream process in milliseconds
-	uint32_t setupsize; // size of setup block in bytes
-	uint32_t writesize; // size of write entry data block in bytes
-	uint32_t streamsize; // complete size of stream, sum of all block sizes including the info block
-} __attribute__ ((packed)) __attribute__((aligned)) C2WSInfo;
+	uilsb32_t frpw; // flux reversal pulse width in nanoseconds
+	uilsb32_t processtimeout; // timeout for the entire write stream process in milliseconds
+	uilsb32_t setupsize; // size of setup block in bytes
+	uilsb32_t writesize; // size of write entry data block in bytes
+	uilsb32_t streamsize; // complete size of stream, sum of all block sizes including the info block
+} C2_COMM_ATTR C2WSInfo;
 
 // OOB Header
 typedef struct {
 	uint8_t sign;  // c2eOOB
 	uint8_t type;  // type of OOB following the header
-	uint16_t size; // size of following data
-} __attribute__ ((packed)) __attribute__((aligned)) C2OOBHdr;
+	uilsb16_t size; // size of following data
+} C2_COMM_ATTR C2OOBHdr;
 
 // OOB Stream Read
 typedef struct {
-	uint32_t streampos; // start offset of this transfer
-	uint32_t trtime;    // elapsed time since last transfer in ms
-} __attribute__ ((packed)) __attribute__((aligned)) C2OOBStreamRead;
+	uilsb32_t streampos; // start offset of this transfer
+	uilsb32_t trtime;    // elapsed time since last transfer in ms
+} C2_COMM_ATTR C2OOBStreamRead;
 
 // OOB Disk Index
 typedef struct {
-	uint32_t streampos; // next position in stream when index detected
-	uint32_t timer;     // timer value when index detected
-	uint32_t systime;   // system clock time when index detected
-} __attribute__ ((packed)) __attribute__((aligned)) C2OOBDiskIndex;
+	uilsb32_t streampos; // next position in stream when index detected
+	uilsb32_t timer;     // timer value when index detected
+	uilsb32_t systime;   // system clock time when index detected
+} C2_COMM_ATTR C2OOBDiskIndex;
 
 // OOB Stream End
 typedef struct {
-	uint32_t streampos; // end offset of transfer
-	uint32_t result;    // error code
-} __attribute__ ((packed)) __attribute__((aligned)) C2OOBStreamEnd;
+	uilsb32_t streampos; // end offset of transfer
+	uilsb32_t result;    // error code
+} C2_COMM_ATTR C2OOBStreamEnd;
 
 // all possible data types for oob messages
 typedef union {
 	C2OOBStreamRead read;
 	C2OOBDiskIndex index;
 	C2OOBStreamEnd end;
-} __attribute__ ((packed)) __attribute__((aligned)) C2OOBData;
+} C2_COMM_ATTR C2OOBData;
 
-// complete oob message
+// complete, generic OOB message
 typedef struct {
 	C2OOBHdr header;
 	C2OOBData data;
-} __attribute__ ((packed)) __attribute__((aligned)) C2OOBMessage;
+} C2_COMM_ATTR C2OOBMessage;
 
-#if !defined(__GNUC__)
+// complete OOB Read message
+typedef struct {
+	C2OOBHdr header;
+	C2OOBStreamRead read;
+} C2_COMM_ATTR C2OOBReadMessage;
+
+// complete OOB Index message
+typedef struct {
+	C2OOBHdr header;
+	C2OOBDiskIndex index;
+} C2_COMM_ATTR C2OOBIndexMessage;
+
+// complete OOB End message
+typedef struct {
+	C2OOBHdr header;
+	C2OOBStreamEnd end;
+} C2_COMM_ATTR C2OOBEndMessage;
+
 #pragma pack(pop)
-#endif
 
 #endif

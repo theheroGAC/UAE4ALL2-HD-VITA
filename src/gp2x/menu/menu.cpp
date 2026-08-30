@@ -468,25 +468,11 @@ void init_text(int splash)
 #if defined(__PSP2__) || defined(__SWITCH__)
 	//Display menu always in 320*240 on Vita
 	if(prSDLScreen != NULL) {
-		for (int i=0; i<10; i++)
-		{
-			SDL_FillRect(prSDLScreen,NULL,0);
-			SDL_Flip(prSDLScreen);
-		}
-#ifdef __PSP2__ // NOT __SWITCH__
-		if (prSDLScreen->hwdata != NULL) {
-			private_hwdata *myhwdata = (private_hwdata *)prSDLScreen->hwdata;
-			vita2d_wait_rendering_done();
-			if (myhwdata->texture != NULL) {
-				vita2d_free_texture(myhwdata->texture);
-			}
-			SDL_free(prSDLScreen->hwdata);
-			prSDLScreen->hwdata = NULL;
-			prSDLScreen->pixels = NULL;
-		}
+#ifdef __PSP2__
+		vita2d_wait_rendering_done();
 #endif
 		SDL_FreeSurface(prSDLScreen);
-      prSDLScreen = NULL;
+		prSDLScreen = NULL;
 	};
 
 	displaying_menu = 1;

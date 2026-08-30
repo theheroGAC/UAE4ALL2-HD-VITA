@@ -23,17 +23,17 @@ int CCapsFile::Open(PCAPSFILE pcf)
 		return res;
 
 	if (pcf->flag & CFF_MEMMAP) {
-		PCMEMORYFILE f = new CMemoryFile();
+		CMemoryFile *f = new CMemoryFile();
 		file = f;
 		int mode = (pcf->flag & CFF_MEMREF) ? 0 : BFFLAG_CREATE;
-		res=f->Open(pcf->memmap, pcf->size, mode);
+		res = f->Open(pcf->name ? pcf->name : "", pcf->memmap, pcf->size, mode);
 	}	else {
-		PCDISKFILE f = new CDiskFile();
+		CDiskFile *f = new CDiskFile();
 		file = f;
 		int fm = (pcf->flag & CFF_WRITE) ? BFFLAG_WRITE : 0;
 		if (pcf->flag & CFF_CREATE)
 			fm |= BFFLAG_CREATE;
-		res = f->Open(pcf->name, fm);
+		res = f->Open(pcf->name ? pcf->name : "", fm);
 	}
 
 	return res;

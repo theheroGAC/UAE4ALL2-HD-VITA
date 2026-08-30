@@ -8,25 +8,46 @@ public:
 	CDiskFile();
 	virtual ~CDiskFile();
 	int Open(const char *name, unsigned int mode);
-	int OpenAny(char **name, unsigned int mode);
-	int OpenAnyPath(char **path, const char *name, unsigned int mode);
-	int Close();
-	size_t Read(void *buf, size_t size);
-	size_t Write(void *buf, size_t size);
-	long Seek(long pos, int mode);
-	long GetSize();
-	long GetPosition();
-	uint8_t *GetBuffer();
-	static void MakePath(const char *filename);
-	static int FindFile(char *result, const char *filename, const char *filter);
-	static int FileNameMatch(const char *pattern, const char *filename);
+	int Open(std::string_view name, unsigned int mode);
+	int OpenAny(const char * const *name, unsigned int mode);
+	int OpenAnyPath(const char * const *path, const char *name, unsigned int mode);
+	void Flush() const override;
+	std::unique_ptr<CBaseFile> Clone(unsigned int mode) const override;
+	int Clone(const CBaseFile &origin, unsigned int mode) override;
+	int Close() override;
+	size_t Read(void *buf, size_t size) override;
+	size_t Write(const void *buf, size_t size) override;
+	size_t Write(std::string_view text) override;
+	file_pos_t Seek(file_pos_t pos, int mode) override;
+	file_pos_t GetPosition() const override;
+	file_size_t GetSize() const override;
+	file_size_t GetRemainingSize() const override;
 
 protected:
-	FILE *dfile;
-	int lastop;
-	char tempname[MAX_FILENAMELEN]; // temporary file name
+	// last file operation
+	enum {
+		loNone, // there was no read/write on this file yet
+		loRead, // last operation was Read
+		loWrite // last operation was Write
+	};
+
+	void Clear();
+	file_size_t GetFileSize();
+	file_pos_t Seek(file_pos_t pos, int mode, file_pos_t offset);
+
+protected:
+	FILE *disk_file; // the internal file handle
+	int last_op; // last operation read or write - required for safe syncing/changing read/write
+	file_size_t file_count; // size of file (may be changed by multi-part functions)
+	file_size_t file_pos; // file position
 };
 
-typedef CDiskFile *PCDISKFILE;
+
+
+// write string to file
+inline size_t CDiskFile::Write(std::string_view text)
+{
+	return Write(text.data(), text.size());
+}
 
 #endif

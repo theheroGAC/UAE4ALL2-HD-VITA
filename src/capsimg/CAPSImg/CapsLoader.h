@@ -4,7 +4,7 @@
 
 
 // CAPS image generic loader
-class CCapsLoader  
+class CCapsLoader
 {
 public:
 	enum {
@@ -28,22 +28,21 @@ public:
 
 	CCapsLoader();
 	virtual ~CCapsLoader();
-	int Lock(PCAPSFILE pcf);
+	int Lock(std::unique_ptr<CBaseFile> pf);
 	void Unlock();
-	int ReadChunk(int idbrk=false);
-	int SkipData();
-	int ReadData(PUBYTE buf);
-	int GetDataSize();
-	int GetPosition();
-	int SetPosition(int pos);
+	int ReadChunk(int idbrk = false);
+	uint32_t SkipData();
+	uint32_t ReadData(uint8_t *buf);
+	uint32_t GetDataSize();
+	file_pos_t GetPosition();
+	file_pos_t SetPosition(file_pos_t pos);
 	PCAPSCHUNK GetChunk();
-	PCCAPSFILE GetFile();
 	static void ConvertChunk(PCAPSCHUNK pc);
-	static void Swap(PUDWORD buf, int cnt);
+	static void Swap(void *buf, size_t cnt);
 
 protected:
 	struct ChunkType {
-		LPCSTR name;
+		const char *name;
 		int type;
 	};
 
@@ -52,12 +51,10 @@ protected:
 	static int GetChunkType(PCAPSCHUNK pc);
 
 protected:
-	int readmode;
-	CCapsFile file;
-	int flen;
+	std::unique_ptr<CBaseFile> file;
 	CapsGeneric xchunk;
 	CapsChunk chunk;
-	static ChunkType chunklist[];
+	static const ChunkType chunklist[];
 };
 
 typedef CCapsLoader *PCCAPSLOADER;
@@ -68,12 +65,6 @@ typedef CCapsLoader *PCCAPSLOADER;
 inline PCAPSCHUNK CCapsLoader::GetChunk()
 {
 	return &chunk;
-}
-
-// access file directly
-inline PCCAPSFILE CCapsLoader::GetFile()
-{
-	return &file;
 }
 
 #endif

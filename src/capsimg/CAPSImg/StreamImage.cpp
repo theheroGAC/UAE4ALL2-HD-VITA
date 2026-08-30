@@ -11,7 +11,7 @@ CStreamImage::~CStreamImage()
 }
 
 // lock and scan file
-int CStreamImage::Lock(PCAPSFILE pcf)
+int CStreamImage::Lock(std::unique_ptr<CBaseFile> pf)
 {
 	return imgeOk;
 }
@@ -23,7 +23,7 @@ int CStreamImage::Unlock()
 }
 
 // read and decode caps track format
-int CStreamImage::LoadTrack(PDISKTRACKINFO pti, UDWORD flag)
+int CStreamImage::LoadTrack(PDISKTRACKINFO pti, uint32_t flag)
 {
 	return imgeOk;
 }

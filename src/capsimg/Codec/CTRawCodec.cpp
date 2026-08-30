@@ -15,7 +15,7 @@ CCTRawCodec::~CCTRawCodec()
 // clear variables
 void CCTRawCodec::Clear()
 {
-	memset(&wh, 0, sizeof(wh));
+	wh = {};
 }
 
 // free all allocated buffers
@@ -31,24 +31,24 @@ void CCTRawCodec::Free()
 // free compressed CT Raw density information
 void CCTRawCodec::FreeCompressedDensity()
 {
-	delete [] wh.cdbuf;
-	wh.cdbuf = NULL;
+	delete[] wh.cdbuf;
+	wh.cdbuf = nullptr;
 	wh.cdlen = 0;
 }
 
 // free uncompressed CT Raw density information
 void CCTRawCodec::FreeUncompressedDensity()
 {
-	delete [] wh.timbuf;
-	wh.timbuf = NULL;
+	delete[] wh.timbuf;
+	wh.timbuf = nullptr;
 	wh.timlen = 0;
 }
 
 // free compressed CT Raw track information
 void CCTRawCodec::FreeCompressedTrack()
 {
-	delete [] wh.ctbuf;
-	wh.ctbuf = NULL;
+	delete[] wh.ctbuf;
+	wh.ctbuf = nullptr;
 	wh.ctlen = 0;
 }
 
@@ -62,11 +62,11 @@ void CCTRawCodec::FreeUncompressedTrack()
 void CCTRawCodec::FreeUncompressedTrack(PCAPSWH w)
 {
 	delete[] w->rawbuf;
-	w->rawbuf = NULL;
+	w->rawbuf = nullptr;
 	w->rawlen = 0;
 
 	for (int trk = 0; trk < CAPS_MTRS; trk++) {
-		w->trkbuf[trk] = NULL;
+		w->trkbuf[trk] = nullptr;
 		w->trklen[trk] = 0;
 	}
 
@@ -75,14 +75,15 @@ void CCTRawCodec::FreeUncompressedTrack(PCAPSWH w)
 
 
 
-// set data to network byte order
-void CCTRawCodec::Swap(PUDWORD buf, int cnt)
+// set data to/from network byte order on little-endian host
+void CCTRawCodec::Swap(void *buf, size_t cnt)
 {
-#ifdef INTEL
-	for (cnt >>= 2; cnt > 0; cnt--, buf++) {
-		UDWORD src = *buf;
-		UDWORD dst = _lrotl(src, 8) & 0x00ff00ff | _lrotr(src, 8) & 0xff00ff00;
-		*buf = dst;
+#ifdef LITTLE_ENDIAN
+	auto bbuf = static_cast<uint8_t *>(buf);
+
+	for (cnt >>= 2; cnt > 0; cnt--, bbuf += sizeof(uint32_t)) {
+		uint32_t val = CBitBuffer::ReadBit32(bbuf);
+		CBitBuffer::WriteBitLE32(bbuf, val);
 	}
 #endif
 }

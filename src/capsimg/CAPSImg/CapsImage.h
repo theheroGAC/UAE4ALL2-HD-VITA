@@ -14,11 +14,11 @@ public:
 	PCCAPSLOADER GetLoader();
 
 protected:
-	int CompareImage();
+	int CompareImage() override;
 	int CompareBlock(unsigned blk);
-	int DecompressDump();
+	int DecompressDump() override;
 	void ConvertDumpInfo(PCAPSWH wh);
-	int UpdateDump();
+	int UpdateDump() override;
 	void FindWeakBits();
 	void AddWeakBitArea(int group, int bitpos, int size);
 	void InitFirstBitTables();

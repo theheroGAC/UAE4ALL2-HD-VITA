@@ -99,114 +99,114 @@
 
 // drive state
 struct CapsDrive {
-	UDWORD type;      // structure size
-	UDWORD rpm;       // drive rpm
-	SDWORD maxtrack;  // track with hard stop (head can't move)
-	SDWORD track;     // actual track
-	SDWORD buftrack;  // track# in buffer
-	SDWORD side;      // actual side used for processing
-	SDWORD bufside;   // side# in buffer
-	SDWORD newside;   // side to select after processing
-	UDWORD diskattr;  // disk attributes
-	UDWORD idistance; // distance from index in clock cycles
-	UDWORD clockrev;  // clock cycles per revolution
-	SDWORD clockip;   // clock cycles for index pulse hold
-	SDWORD ipcnt;     // index pulse clock counter, <0 init, 0 stopped
-	UDWORD ttype;     // track type
-	PUBYTE trackbuf;  // track buffer memory
-	PUDWORD timebuf;  // timing buffer
-	UDWORD tracklen;  // track buffer memory length
-	SDWORD overlap;   // overlap position
-	SDWORD trackbits; // used track size
-	SDWORD ovlmin;    // overlap first bit position
-	SDWORD ovlmax;    // overlap last bit position
-	SDWORD ovlcnt;    // overlay bit count
-	SDWORD ovlact;    // active overlay phase
-	SDWORD nact;      // active noise phase
-	UDWORD nseed;     // noise generator seed
-	PVOID userptr;    // free to use pointer for the host application
-	UDWORD userdata;  // free to use data for the host application
+	uint32_t type;      // structure size
+	uint32_t rpm;       // drive rpm
+	int32_t maxtrack;  // track with hard stop (head can't move)
+	int32_t track;     // actual track
+	int32_t buftrack;  // track# in buffer
+	int32_t side;      // actual side used for processing
+	int32_t bufside;   // side# in buffer
+	int32_t newside;   // side to select after processing
+	uint32_t diskattr;  // disk attributes
+	uint32_t idistance; // distance from index in clock cycles
+	uint32_t clockrev;  // clock cycles per revolution
+	int32_t clockip;   // clock cycles for index pulse hold
+	int32_t ipcnt;     // index pulse clock counter, <0 init, 0 stopped
+	uint32_t ttype;     // track type
+	uint8_t *trackbuf;  // track buffer memory
+	uint32_t *timebuf;  // timing buffer
+	uint32_t tracklen;  // track buffer memory length
+	int32_t overlap;   // overlap position
+	int32_t trackbits; // used track size
+	int32_t ovlmin;    // overlap first bit position
+	int32_t ovlmax;    // overlap last bit position
+	int32_t ovlcnt;    // overlay bit count
+	int32_t ovlact;    // active overlay phase
+	int32_t nact;      // active noise phase
+	uint32_t nseed;     // noise generator seed
+	void *userptr;    // free to use pointer for the host application
+	uint32_t userdata;  // free to use data for the host application
 };
 
 typedef struct CapsDrive *PCAPSDRIVE;
 
 typedef struct CapsFdc *PCAPSFDC;
-typedef void (__cdecl *CAPSFDCHOOK)(PCAPSFDC pfdc, UDWORD state);
+typedef void(__cdecl *CAPSFDCHOOK)(PCAPSFDC pfdc, uint32_t state);
 
 // fdc state
 struct CapsFdc {
-	UDWORD type;         // structure size
-	UDWORD model;        // fdc type
-	UDWORD endrequest;   // non-zero value ends command
-	UDWORD clockact;     // clock cycles completed
-	UDWORD clockreq;     // requested clock cycles to complete
-	UDWORD clockfrq;     // clock frequency
-	UDWORD addressmask;  // valid address lines
-	UDWORD dataline;     // data bus
-	UDWORD datamask;     // valid data lines
-	UDWORD lineout;      // output lines
-	UDWORD runmode;      // run mode
-	UDWORD runstate;     // local run state in a command
-	UDWORD r_st0;        // status0 register
-	UDWORD r_st1;        // status1 register
-	UDWORD r_stm;        // status mask register (1 bits select st1)
-	UDWORD r_command;    // command register
-	UDWORD r_track;      // track register
-	UDWORD r_sector;     // sector register
-	UDWORD r_data;       // data register
-	UDWORD seclenmask;   // sector length mask
-	UDWORD seclen;       // sector length
-	UDWORD crc;          // crc holder
-	UDWORD crccnt;       // crc bit counter
-	UDWORD amdecode;     // am detector decoder/shifter
-	UDWORD aminfo;       // am info
-	UDWORD amisigmask;   // enabled am info signal bits
-	SDWORD amdatadelay;  // am data delay clock
-	SDWORD amdataskip;   // am data skip clock
-	SDWORD ammarkdist;   // am invalid distance from last mark in bitcells or 0 if valid
-	SDWORD ammarktype;   // am last mark type
-	UDWORD dsr;          // data shift register
-	SDWORD dsrcnt;       // dsr bit counter
-	SDWORD datalock;     // data lock bit position, <0 not locked
-	UDWORD datamode;     // data access mode
-	UDWORD datacycle;    // clock cycle remainder of actual bit
-	UDWORD dataphase;    // data access phase
-	UDWORD datapcnt;     // data phase counter
-	SDWORD indexcount;   // index pulse counter
-	SDWORD indexlimit;   // index pulse abort point
-	SDWORD readlimit;    // read abort point
-	SDWORD verifylimit;  // verify abort point
-	SDWORD spinupcnt;    // counter for spin-up status
-	SDWORD spinuplimit;  // spin-up point
-	SDWORD idlecnt;      // counter for idle
-	SDWORD idlelimit;    // idle point
-	UDWORD clockcnt;     // clock counter
-	UDWORD steptime[4];  // stepping rates us
-	UDWORD clockstep[4]; // clock cycles for stepping rates
-	UDWORD hstime;       // head settling delay us
-	UDWORD clockhs;      // clock cycles for head settling
-	UDWORD iptime;       // index pulse hold us
-	UDWORD updatetime;   // update delay between short operations us
-	UDWORD clockupdate;  // clock cycles for update delay
-	SDWORD drivecnt;     // number of drives, 0: no drive attached
-	SDWORD drivemax;     // number of active drives, 0: no drive attached
-	SDWORD drivenew;     // drive to select after processing, <0 invalid
-	SDWORD drivesel;     // drive selected for processing, <0 invalid
-	SDWORD driveact;     // drive used for processing, <0 invalid
+	uint32_t type;         // structure size
+	uint32_t model;        // fdc type
+	uint32_t endrequest;   // non-zero value ends command
+	uint32_t clockact;     // clock cycles completed
+	uint32_t clockreq;     // requested clock cycles to complete
+	uint32_t clockfrq;     // clock frequency
+	uint32_t addressmask;  // valid address lines
+	uint32_t dataline;     // data bus
+	uint32_t datamask;     // valid data lines
+	uint32_t lineout;      // output lines
+	uint32_t runmode;      // run mode
+	uint32_t runstate;     // local run state in a command
+	uint32_t r_st0;        // status0 register
+	uint32_t r_st1;        // status1 register
+	uint32_t r_stm;        // status mask register (1 bits select st1)
+	uint32_t r_command;    // command register
+	uint32_t r_track;      // track register
+	uint32_t r_sector;     // sector register
+	uint32_t r_data;       // data register
+	uint32_t seclenmask;   // sector length mask
+	uint32_t seclen;       // sector length
+	uint32_t crc;          // crc holder
+	uint32_t crccnt;       // crc bit counter
+	uint32_t amdecode;     // am detector decoder/shifter
+	uint32_t aminfo;       // am info
+	uint32_t amisigmask;   // enabled am info signal bits
+	int32_t amdatadelay;  // am data delay clock
+	int32_t amdataskip;   // am data skip clock
+	int32_t ammarkdist;   // am invalid distance from last mark in bitcells or 0 if valid
+	int32_t ammarktype;   // am last mark type
+	uint32_t dsr;          // data shift register
+	int32_t dsrcnt;       // dsr bit counter
+	int32_t datalock;     // data lock bit position, <0 not locked
+	uint32_t datamode;     // data access mode
+	uint32_t datacycle;    // clock cycle remainder of actual bit
+	uint32_t dataphase;    // data access phase
+	uint32_t datapcnt;     // data phase counter
+	int32_t indexcount;   // index pulse counter
+	int32_t indexlimit;   // index pulse abort point
+	int32_t readlimit;    // read abort point
+	int32_t verifylimit;  // verify abort point
+	int32_t spinupcnt;    // counter for spin-up status
+	int32_t spinuplimit;  // spin-up point
+	int32_t idlecnt;      // counter for idle
+	int32_t idlelimit;    // idle point
+	uint32_t clockcnt;     // clock counter
+	uint32_t steptime[4];  // stepping rates us
+	uint32_t clockstep[4]; // clock cycles for stepping rates
+	uint32_t hstime;       // head settling delay us
+	uint32_t clockhs;      // clock cycles for head settling
+	uint32_t iptime;       // index pulse hold us
+	uint32_t updatetime;   // update delay between short operations us
+	uint32_t clockupdate;  // clock cycles for update delay
+	int32_t drivecnt;     // number of drives, 0: no drive attached
+	int32_t drivemax;     // number of active drives, 0: no drive attached
+	int32_t drivenew;     // drive to select after processing, <0 invalid
+	int32_t drivesel;     // drive selected for processing, <0 invalid
+	int32_t driveact;     // drive used for processing, <0 invalid
 	PCAPSDRIVE driveprc; // drive processed, helper
 	PCAPSDRIVE drive;    // available drives
 	CAPSFDCHOOK cbirq;   // irq line change callback
 	CAPSFDCHOOK cbdrq;   // drq line change callback
 	CAPSFDCHOOK cbtrk;   // track change callback
-	PVOID userptr;       // free to use pointer for the host application
-	UDWORD userdata;     // free to use data for the host application
+	void *userptr;       // free to use pointer for the host application
+	uint32_t userdata;     // free to use data for the host application
 };
 
 #pragma pack(pop)
 
 // emulator info
 enum {
-	cfdciNA=0,       // invalid
+	cfdciNA = 0,       // invalid
 	cfdciSize_Fdc,   // size required for FDC structure
 	cfdciSize_Drive, // size required for Drive structure
 	cfdciR_Command,  // command register
@@ -218,13 +218,13 @@ enum {
 
 // fdc models
 enum {
-	cfdcmNA=0,   // invalid fdc model
+	cfdcmNA = 0,   // invalid fdc model
 	cfdcmWD1772  // WD1772
 };
 
 // run modes
 enum {
-	cfdcrmNop=0,  // no-operation
+	cfdcrmNop = 0,  // no-operation
 	cfdcrmIdle,   // idle/wait loop
 	cfdcrmType1,  // type 1 loop
 	cfdcrmType2R, // type 2 read loop
@@ -237,10 +237,16 @@ enum {
 
 // data modes
 enum {
-	cfdcdmNoline=0, // no line input
+	cfdcdmNoline = 0, // no line input
 	cfdcdmNoise,    // noise input
 	cfdcdmData,     // data input
 	cfdcdmDMap      // data with density map
+};
+
+// reset states
+enum {
+	cfdcrs_Cold = 0, // cold reset
+	cfdcrs_Warm, // warm reset
 };
 
 #endif

@@ -108,7 +108,7 @@ struct DiskDecoderInfo {
 	uint32_t encgapsplit; // bit position where gap was split
 	uint8_t *data; // source data buffer
 	int datasize; // size of data buffer
-	int datacount; // number of valid data size
+	uint32_t datacount; // number of valid data size
 	PIMAGEBLOCKINFO block; // block descriptor
 	int blocksize; // block descriptor maximum size
 	int blockcount; // number of valid block descriptors
@@ -126,17 +126,17 @@ class CCapsImageStd : public CDiskImage
 public:
 	CCapsImageStd();
 	virtual ~CCapsImageStd();
-	int Lock(PCAPSFILE pcf);
-	int Unlock();
+	int Lock(std::unique_ptr<CBaseFile> pf) override;
+	int Unlock() override;
 
 protected:
 	struct ScanInfo {
-		int track;
-		int data;
+		file_pos_t track; // file position for TRCK chunk
+		file_pos_t data; // file position for DATA chunk
 	};
 
 protected:
-	int LoadTrack(PDISKTRACKINFO pti, UDWORD flag);
+	int LoadTrack(PDISKTRACKINFO pti, uint32_t flag) override;
 	int ScanImage();
 	int UpdateImage(int group);
 	int UpdateWeakBit(int group);
@@ -147,18 +147,18 @@ protected:
 	virtual int DecompressDump();
 	virtual int UpdateDump();
 
-	int DecodeDensity(PDISKTRACKINFO pti, PUBYTE buf, UDWORD flag);
+	int DecodeDensity(PDISKTRACKINFO pti, uint8_t *buf, uint32_t flag);
 	int ConvertDensity(PDISKTRACKINFO pti);
 	int GenerateNoiseTrack(PDISKTRACKINFO pti);
 	int GenerateNoiseDensity(PDISKTRACKINFO pti);
 	int GenerateAutoDensity(PDISKTRACKINFO pti);
-	int GenerateCLA(PDISKTRACKINFO pti, PUBYTE buf);
-	int GenerateCLA2(PDISKTRACKINFO pti, PUBYTE buf);
-	int GenerateCLST(PDISKTRACKINFO pti, PUBYTE buf);
-	int GenerateSLA(PDISKTRACKINFO pti, PUBYTE buf);
-	int GenerateSLA2(PDISKTRACKINFO pti, PUBYTE buf);
-	int GenerateABA(PDISKTRACKINFO pti, PUBYTE buf);
-	int GenerateABA2(PDISKTRACKINFO pti, PUBYTE buf);
+	int GenerateCLA(PDISKTRACKINFO pti, uint8_t *buf);
+	int GenerateCLA2(PDISKTRACKINFO pti, uint8_t *buf);
+	int GenerateCLST(PDISKTRACKINFO pti, uint8_t *buf);
+	int GenerateSLA(PDISKTRACKINFO pti, uint8_t *buf);
+	int GenerateSLA2(PDISKTRACKINFO pti, uint8_t *buf);
+	int GenerateABA(PDISKTRACKINFO pti, uint8_t *buf);
+	int GenerateABA2(PDISKTRACKINFO pti, uint8_t *buf);
 
 	void InitSystem();
 	void Clear();

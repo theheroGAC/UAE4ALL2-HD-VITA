@@ -3,7 +3,7 @@
 
 
 // decompress CT Raw dump format
-int CCTRawCodec::DecompressDump(PUBYTE buf, int len)
+int CCTRawCodec::DecompressDump(uint8_t *buf, size_t len)
 {
 	CapsPack cpk;
 	PCAPSPACK pk;
@@ -12,26 +12,26 @@ int CCTRawCodec::DecompressDump(PUBYTE buf, int len)
 	Free();
 
 	// check dump header
-	int hlen = sizeof(CapsRaw);
+	auto hlen = sizeof(CapsRaw);
 	if (len < hlen)
 		return imgeShort;
 	wh.cr = *(PCAPSRAW)buf;
-	Swap((PUDWORD)&wh.cr, sizeof(CapsRaw));
+	Swap(&wh.cr, sizeof(CapsRaw));
 
 	// check dump size
-	int tlen = wh.cr.time;
-	int rlen = wh.cr.raw;
+	auto tlen = wh.cr.time;
+	auto rlen = wh.cr.raw;
 	if (len < hlen + tlen + rlen)
 		return imgeShort;
 
 	// check density information
-	PUBYTE denbuf = buf + hlen;
+	uint8_t *denbuf = buf + hlen;
 	pk = GetPackHeader(&cpk, denbuf, tlen);
 	if (!pk)
 		return imgeDensityHeader;
 
 	// check track information
-	PUBYTE trkbuf = denbuf + tlen;
+	uint8_t *trkbuf = denbuf + tlen;
 	pk = GetPackHeader(&cpk, trkbuf, rlen);
 	if (!pk)
 		return imgeTrackHeader;
@@ -43,7 +43,7 @@ int CCTRawCodec::DecompressDump(PUBYTE buf, int len)
 	wh.cdlen = tlen;
 	if (!(err = DecompressDensity(1)))
 		err = DecompressDensity();
-	wh.cdbuf = NULL;
+	wh.cdbuf = nullptr;
 	if (err)
 		return err;
 
@@ -52,7 +52,7 @@ int CCTRawCodec::DecompressDump(PUBYTE buf, int len)
 	wh.ctlen = rlen;
 	if (!(err = DecompressTrack(1)))
 		err = DecompressTrack();
-	wh.ctbuf = NULL;
+	wh.ctbuf = nullptr;
 
 	return err;
 }
@@ -79,7 +79,7 @@ int CCTRawCodec::DecompressDensity(int verify)
 			return imgeDensityStream;
 
 	// decompress density data
-	PUDWORD dst = DecompressDensity(wh.cdbuf, wh.cdlen);
+	uint32_t *dst = DecompressDensity(wh.cdbuf, wh.cdlen);
 	int res = imgeOk;
 
 	if (verify) {
@@ -87,12 +87,12 @@ int CCTRawCodec::DecompressDensity(int verify)
 		Swap(dst, pk->usize);
 
 		// check crc on uncompressed data
-		if (pk->ucrc != CalcCRC((PUBYTE)dst, pk->usize))
+		if (pk->ucrc != CalcCRC((uint8_t *)dst, pk->usize))
 			res = imgeDensityData;
 
 		// free density data
 		delete[] dst;
-	}	else {
+	} else {
 		// in decompress mode save density data
 		wh.timbuf = dst;
 		wh.timlen = pk->usize >> 2;
@@ -102,28 +102,28 @@ int CCTRawCodec::DecompressDensity(int verify)
 }
 
 // decompress CT Raw density information
-PUDWORD CCTRawCodec::DecompressDensity(PUBYTE src, int slen, PUDWORD dst)
+uint32_t *CCTRawCodec::DecompressDensity(uint8_t *src, int slen, uint32_t *dst)
 {
 	CapsPack cpk;
 
 	// get density header
 	PCAPSPACK pk = GetPackHeader(&cpk, src, slen);
 	if (!pk)
-		return NULL;
+		return nullptr;
 
 	// use caller supplied buffer or allocate a new one
-	PUDWORD buf = dst;
+	uint32_t *buf = dst;
 	if (!buf && pk->usize)
-		buf = new UDWORD[pk->usize >> 2];
+		buf = new uint32_t[pk->usize >> 2];
 
-	// buffer pointer to end of destionation and source buffer
-	PUDWORD mem = buf + (pk->usize >> 2);
+	// buffer pointer to end of destination and source buffer
+	uint32_t *mem = buf + (pk->usize >> 2);
 	src += slen;
 
 	// decode the data, see compressor for encoding
 	while (mem > buf) {
 		int size, ofs;
-		UBYTE cb0 = *--src;
+		uint8_t cb0 = *--src;
 
 		switch (cb0 & 0x03) {
 			// data block
@@ -136,7 +136,7 @@ PUDWORD CCTRawCodec::DecompressDensity(PUBYTE src, int slen, PUDWORD dst)
 				if (cb0 & 0x04) {
 					// 4 bytes per value
 					while (size--) {
-						UDWORD data;
+						uint32_t data;
 						data = (*--src);
 						data = (data << 8) | (*--src);
 						data = (data << 8) | (*--src);
@@ -169,6 +169,9 @@ PUDWORD CCTRawCodec::DecompressDensity(PUBYTE src, int slen, PUDWORD dst)
 				ofs = (*--src);
 				ofs = (ofs << 8) | (*--src);
 				break;
+
+			default:
+				NODEFAULT;
 		}
 
 		// copy decoded data
@@ -231,34 +234,44 @@ int CCTRawCodec::DecompressTrack(int verify)
 }
 
 // decompress CT Raw track information
-PCAPSWH CCTRawCodec::DecompressTrack(PCAPSWH w, PUBYTE src, int slen, PUBYTE dst)
+PCAPSWH CCTRawCodec::DecompressTrack(PCAPSWH w, uint8_t *src, int slen, uint8_t *dst)
 {
 	CapsPack cpk;
 
 	// get track header
 	PCAPSPACK pk = GetPackHeader(&cpk, src, slen);
 	if (!pk)
-		return NULL;
+		return nullptr;
 
 	// use caller supplied buffer or allocate a new one
-	w->rawbuf = NULL;
+	w->rawbuf = nullptr;
 	FreeUncompressedTrack(w);
 	w->rawlen = pk->usize;
 	w->rawbuf = dst;
 	if (!w->rawbuf && w->rawlen)
-		w->rawbuf = new UBYTE[w->rawlen];
+		w->rawbuf = new uint8_t[w->rawlen];
 
 	// read track number
 	w->ctmem = src + sizeof(CapsPack);
-	w->trkcnt = CTR(w, 1);
+	w->trkcnt = ReadStream(w, 1);
 
 	// read <track number> track sizes and calculate track buffer positions
 	dst = w->rawbuf;
 	for (int trk = 0; trk < w->trkcnt; trk++) {
-		w->trklen[trk] = CTR(w, 2);
-		w->trkbuf[trk] = dst;
-		dst += w->trklen[trk];
+		// find the track size - we need to do this to update the source stream even if the value is discarded later
+		auto tsize = ReadStream(w, 2);
+
+		// ensure that only the supported number of tracks get updated
+		if (trk < CAPS_MTRS) {
+			w->trklen[trk] = tsize;
+			w->trkbuf[trk] = dst;
+			dst += tsize;
+		}
 	}
+
+	// limit the number of tracks
+	if (w->trkcnt > CAPS_MTRS)
+		w->trkcnt = CAPS_MTRS;
 
 	// first track is stored
 	if (w->trkcnt) {
@@ -279,20 +292,20 @@ PCAPSWH CCTRawCodec::DecompressTrack(PCAPSWH w, PUBYTE src, int slen, PUBYTE dst
 void CCTRawCodec::DecompressTrackData(PCAPSWH w)
 {
 	// source stream
-	PUBYTE src = w->ctmem;
+	uint8_t *src = w->ctmem;
 
 	// destination buffer
-	PUBYTE dst = w->trkbuf[w->txact];
+	uint8_t *dst = w->trkbuf[w->txact];
 
 	// end of destination buffer
-	PUBYTE max = dst + w->trklen[w->txact];
+	uint8_t *max = dst + w->trklen[w->txact];
 
 	// first, stored track
-	PUBYTE mem = w->txsrc;
+	uint8_t *mem = w->txsrc;
 
 	// decode the data, see compressor for encoding
 	while (dst < max) {
-		UDWORD size = *src++;
+		uint32_t size = *src++;
 
 		if (size & 0x80) {
 			// copy block
@@ -303,16 +316,16 @@ void CCTRawCodec::DecompressTrackData(PCAPSWH w)
 			size = ((size & 0xf) << 8) | (*src++);
 
 			// 16 bit offset
-			UDWORD ofs = *src++;
+			uint32_t ofs = *src++;
 			ofs = (ofs << 8) | (*src++);
-			PUBYTE buf = mem + ofs;
+			uint8_t *buf = mem + ofs;
 
 			if (shift) {
 				// bitshift copy
 				ofs = *buf++;
 				while (size--) {
 					ofs = (ofs << 8) | (*buf++);
-					*dst++ = (UBYTE)(ofs >> shift);
+					*dst++ = (uint8_t)(ofs >> shift);
 				}
 			} else {
 				// simple copy
@@ -334,40 +347,40 @@ void CCTRawCodec::DecompressTrackData(PCAPSWH w)
 
 
 // get CT Raw pack format header in host format and test integrity
-PCAPSPACK CCTRawCodec::GetPackHeader(PCAPSPACK cpk, PUBYTE src, int slen)
+PCAPSPACK CCTRawCodec::GetPackHeader(PCAPSPACK cpk, const uint8_t *src, size_t slen)
 {
 	// check header size
-	if (!src || slen<sizeof(CapsPack))
-		return NULL;
+	if (!src || slen < sizeof(CapsPack))
+		return nullptr;
 
 	// check signature
 	if (memcmp(src, CAPS_IDPACK, sizeof(cpk->sign)))
-		return NULL;
+		return nullptr;
 
 	// copy header to result
 	memcpy(cpk, src, sizeof(CapsPack));
 
 	// change header crc to host format and check crc
 	Swap(&cpk->hcrc, sizeof(cpk->hcrc));
-	UDWORD hcrc = cpk->hcrc;
+	uint32_t hcrc = cpk->hcrc;
 	cpk->hcrc = 0;
-	if (hcrc != CalcCRC((PUBYTE)cpk, sizeof(CapsPack)))
-		return NULL;
+	if (hcrc != CalcCRC((uint8_t *)cpk, sizeof(CapsPack)))
+		return nullptr;
 
 	// change header to host format
-	Swap(PUDWORD(PUBYTE(cpk) + sizeof(cpk->sign)), sizeof(CapsPack) - sizeof(cpk->sign));
+	Swap((uint8_t *)(cpk)+sizeof(cpk->sign), sizeof(CapsPack) - sizeof(cpk->sign));
 
 	// buffer length must match the size of header and compressed data size
-	if ((UDWORD)slen != sizeof(CapsPack) + cpk->csize)
-		return NULL;
+	if (slen != sizeof(CapsPack) + cpk->csize)
+		return nullptr;
 
 	return cpk;
 }
 
-// read up to a dword value from CT Raw stream, update stream position
-UDWORD CCTRawCodec::CTR(PCAPSWH w, int size)
+// read up to a 32 bit value from CT Raw stream, update stream position
+uint32_t CCTRawCodec::ReadStream(PCAPSWH w, unsigned int size)
 {
-	UDWORD res = 0;
+	uint32_t res = 0;
 
 	for (; size; size--) {
 		res <<= 8;

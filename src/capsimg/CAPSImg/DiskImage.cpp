@@ -3,7 +3,7 @@
 
 
 // platform name helper
-LPCSTR CDiskImage::pidname[cppidLast]= {
+const char * const CDiskImage::pidname[cppidLast] = {
 	"N/A",
 	"Amiga",
 	"Atari ST",
@@ -21,7 +21,7 @@ LPCSTR CDiskImage::pidname[cppidLast]= {
 CDiskImage::CDiskImage()
 {
 	MakeCRCTable();
-	dti=NULL;
+	dti = nullptr;
 	Destroy();
 }
 
@@ -31,7 +31,7 @@ CDiskImage::~CDiskImage()
 }
 
 // lock and scan file
-int CDiskImage::Lock(PCAPSFILE pcf)
+int CDiskImage::Lock(std::unique_ptr<CBaseFile> pf)
 {
 	return imgeUnsupported;
 }
@@ -43,17 +43,17 @@ int CDiskImage::Unlock()
 }
 
 // load image file and test for erros
-int CDiskImage::LoadImage(UDWORD flag, int free)
+int CDiskImage::LoadImage(uint32_t flag, int free)
 {
-	int res=imgeOk;
+	int res = imgeOk;
 
 	// cancel, if no track data
 	if (!dti)
 		return res;
 
 	// try to load all tracks
-	for (int trk=0; trk < dticnt; trk++) {
-		PDISKTRACKINFO pt=dti+trk;
+	for (int trk = 0; trk < dticnt; trk++) {
+		PDISKTRACKINFO pt = dti + trk;
 
 		// test only untested tracks
 		switch (pt->type) {
@@ -63,7 +63,7 @@ int CDiskImage::LoadImage(UDWORD flag, int free)
 		}
 
 		// load and decode
-		int read=AllocTrack(pt, flag);
+		int read = AllocTrack(pt, flag);
 
 		// free track only if requested
 		if (free)
@@ -74,8 +74,8 @@ int CDiskImage::LoadImage(UDWORD flag, int free)
 			// stop if image can't be read
 			case imgeUnsupported:
 			case imgeIncompatible:
-				trk=dticnt;
-				res=read;
+				trk = dticnt;
+				res = read;
 				continue;
 
 			// no errors
@@ -84,7 +84,7 @@ int CDiskImage::LoadImage(UDWORD flag, int free)
 
 			// set error
 			default:
-				res=imgeGeneric;
+				res = imgeGeneric;
 				break;
 		}
 	}
@@ -101,18 +101,12 @@ void CDiskImage::Destroy()
 	// invalid image
 	memset(&dii, 0, sizeof(dii));
 
-	// read only
-	dii.readonly=true;
-
-	// track lock to raw format
-	dii.rawlock=true;
-
 	// no track data
-	dticnt=0;
-	delete [] dti;
-	dti=NULL;
-	dticyl=0;
-	dtihed=0;
+	dticnt = 0;
+	delete[] dti;
+	dti = nullptr;
+	dticyl = 0;
+	dtihed = 0;
 }
 
 // add or replace track
@@ -122,12 +116,12 @@ int CDiskImage::AddTrack(PDISKTRACKINFO pdti)
 	UnlockTrack(pdti->cylinder, pdti->head, true);
 
 	// map track info to memory
-	PDISKTRACKINFO pt=MapTrack(pdti->cylinder, pdti->head);
+	PDISKTRACKINFO pt = MapTrack(pdti->cylinder, pdti->head);
 	if (!pt)
 		return imgeOutOfRange;
 
 	// replace info
-	*pt=*pdti;
+	*pt = *pdti;
 
 	// update image info
 	UpdateImageInfo(pdti);
@@ -140,58 +134,58 @@ PDISKTRACKINFO CDiskImage::GetTrack(int cylinder, int head)
 {
 	// cancel, if no track data
 	if (!dti)
-		return NULL;
+		return nullptr;
 
 	// ignore wrong cylinder
-	if (cylinder<0 || cylinder>=dticyl)
-		return NULL;
+	if (cylinder < 0 || cylinder >= dticyl)
+		return nullptr;
 
 	// ignore wrong head
-	if (head<0 || head>=dtihed)
-		return NULL;
+	if (head < 0 || head >= dtihed)
+		return nullptr;
 
-	return &dti[cylinder*dtihed+head];
+	return &dti[cylinder*dtihed + head];
 }
 
 // get track information and lock track into memory
-PDISKTRACKINFO CDiskImage::LockTrack(int cylinder, int head, UDWORD flag)
+PDISKTRACKINFO CDiskImage::LockTrack(int cylinder, int head, uint32_t flag)
 {
 	// save the current revolution counter
 	dii.lastrev = dii.nextrev;
 
 	// locate track information
-	PDISKTRACKINFO pti=GetTrack(cylinder, head);
+	PDISKTRACKINFO pti = GetTrack(cylinder, head);
 
 	// allocate and load buffers
-	dii.error=AllocTrack(pti, flag);
+	dii.error = AllocTrack(pti, flag);
 
 	// update the revolution counter unless updates are disabled
 	// limit the counter value to 8 bit
 	if (!(flag & DI_LOCK_NOUPDATE))
 		dii.nextrev = (dii.nextrev + 1) & 0xff;
 
-	return dii.error == imgeOk ? pti : NULL;
+	return dii.error == imgeOk ? pti : nullptr;
 }
 
 // get track information and lock track into memory for comparison
-PDISKTRACKINFO CDiskImage::LockTrackComp(int cylinder, int head, UDWORD flag, int sblk, int eblk)
+PDISKTRACKINFO CDiskImage::LockTrackComp(int cylinder, int head, uint32_t flag, int sblk, int eblk)
 {
 	// locate track information
-	PDISKTRACKINFO pti=GetTrack(cylinder, head);
-	pti->compsblk=sblk;
-	pti->compeblk=eblk;
-	flag|=DI_LOCK_COMP;
+	PDISKTRACKINFO pti = GetTrack(cylinder, head);
+	pti->compsblk = sblk;
+	pti->compeblk = eblk;
+	flag |= DI_LOCK_COMP;
 
 	// allocate and load buffers
-	dii.error=AllocTrack(pti, flag);
-	return dii.error == imgeOk ? pti : NULL;
+	dii.error = AllocTrack(pti, flag);
+	return dii.error == imgeOk ? pti : nullptr;
 }
 
 // get track information and unlock track from memory
 PDISKTRACKINFO CDiskImage::UnlockTrack(int cylinder, int head, int forced)
 {
 	// locate track information
-	PDISKTRACKINFO pti=GetTrack(cylinder, head);
+	PDISKTRACKINFO pti = GetTrack(cylinder, head);
 
 	// free buffers
 	FreeTrack(pti, forced);
@@ -214,15 +208,15 @@ void CDiskImage::UnlockTrack(int forced)
 		return;
 
 	// free all buffers
-	for (int trk=0; trk < dticnt; trk++)
-		FreeTrack(dti+trk, forced);
+	for (int trk = 0; trk < dticnt; trk++)
+		FreeTrack(dti + trk, forced);
 }
 
 // replace locked track data with a private buffer
 int CDiskImage::LinkTrackData(PDISKTRACKINFO pti, int size)
 {
 	// cancel if bad parameters
-	if (!pti || size<0)
+	if (!pti || size < 0)
 		return imgeGeneric;
 
 	// free existing buffers
@@ -230,27 +224,27 @@ int CDiskImage::LinkTrackData(PDISKTRACKINFO pti, int size)
 
 	// 1 revolution
 	if (size) {
-		pti->trackcnt=1;
-		pti->tracklen=size;
-		pti->trackbuf=new UBYTE[pti->tracklen];
-		pti->trackdata[0]=pti->trackbuf;
-		pti->tracksize[0]=pti->tracklen;
-		pti->trackstart[0]=0;
+		pti->trackcnt = 1;
+		pti->tracklen = size;
+		pti->trackbuf = new uint8_t[pti->tracklen];
+		pti->trackdata[0] = pti->trackbuf;
+		pti->tracksize[0] = pti->tracklen;
+		pti->trackstart[0] = 0;
 
 		// clear track data
 		memset(pti->trackbuf, 0, pti->tracklen);
 	}
 
 	// prevent operations that could modify or remove the buffer
-	pti->linked=true;
-	pti->linkinfo=0;
-	pti->linkflag=0;
+	pti->linked = true;
+	pti->linkinfo = 0;
+	pti->linkflag = 0;
 
 	return imgeOk;
 }
 
 // read and decode track format
-int CDiskImage::LoadTrack(PDISKTRACKINFO pti, UDWORD flag)
+int CDiskImage::LoadTrack(PDISKTRACKINFO pti, uint32_t flag)
 {
 	return imgeUnsupported;
 }
@@ -262,7 +256,7 @@ int CDiskImage::LoadPlain(PDISKTRACKINFO pti)
 }
 
 // allocate and decode track
-int CDiskImage::AllocTrack(PDISKTRACKINFO pti, UDWORD flag)
+int CDiskImage::AllocTrack(PDISKTRACKINFO pti, uint32_t flag)
 {
 	// cancel if bad track
 	if (!pti)
@@ -297,9 +291,9 @@ void CDiskImage::FreeTrack(PDISKTRACKINFO pti, int forced)
 		return;
 
 	// linked track data does not exist anymore
-	pti->linked=false;
-	pti->linkinfo=0;
-	pti->linkflag=0;
+	pti->linked = false;
+	pti->linkinfo = 0;
+	pti->linkflag = 0;
 
 	// free buffers
 	FreeTrackData(pti);
@@ -317,19 +311,19 @@ void CDiskImage::FreeTrackData(PDISKTRACKINFO pti)
 		delete[] pti->trackdata[0];
 
 	// clear track data
-	for (int trk=0; trk < CAPS_MTRS; trk++) {
-		pti->trackdata[trk]=NULL;
-		pti->tracksize[trk]=0;
+	for (int trk = 0; trk < CAPS_MTRS; trk++) {
+		pti->trackdata[trk] = nullptr;
+		pti->tracksize[trk] = 0;
 	}
 
 	// free track buffer
-	pti->trackcnt=0;
+	pti->trackcnt = 0;
 
 	if (!pti->rawdump)
 		delete[] pti->trackbuf;
 
-	pti->trackbuf=NULL;
-	pti->tracklen=0;
+	pti->trackbuf = nullptr;
+	pti->tracklen = 0;
 
 	// free data specific buffers
 	FreeTrackFD(pti);
@@ -344,14 +338,14 @@ void CDiskImage::FreeTrackTiming(PDISKTRACKINFO pti)
 		return;
 
 	// free timing buffer
-	pti->timecnt=0;
-	delete [] pti->timebuf;
-	pti->timebuf=NULL;
+	pti->timecnt = 0;
+	delete[] pti->timebuf;
+	pti->timebuf = nullptr;
 
 	// free raw timing buffer
 	pti->rawtimecnt = 0;
 	delete[] pti->rawtimebuf;
-	pti->rawtimebuf = NULL;
+	pti->rawtimebuf = nullptr;
 }
 
 // free flakey position buffer
@@ -362,48 +356,48 @@ void CDiskImage::FreeTrackFD(PDISKTRACKINFO pti)
 		return;
 
 	// free flakey buffer
-	pti->fdpsize=0;
-	pti->fdpmax=0;
-	delete [] pti->fdp;
-	pti->fdp=NULL;
+	pti->fdpsize = 0;
+	pti->fdpmax = 0;
+	delete[] pti->fdp;
+	pti->fdp = nullptr;
 }
 
 // map track info into memory
 PDISKTRACKINFO CDiskImage::MapTrack(int cylinder, int head)
 {
 	// ignore wrong cylinder
-	if (cylinder<0 || cylinder>=MAX_CYLINDER)
-		return NULL;
+	if (cylinder < 0 || cylinder >= MAX_CYLINDER)
+		return nullptr;
 
 	// ignore wrong head
-	if (head<0 || head>=MAX_HEAD)
-		return NULL;
+	if (head < 0 || head >= MAX_HEAD)
+		return nullptr;
 
 	// return if available
-	PDISKTRACKINFO pt=GetTrack(cylinder, head);
+	PDISKTRACKINFO pt = GetTrack(cylinder, head);
 	if (pt)
 		return pt;
 
 	if (!dti) {
 		// first allocation
-		dtihed=MAX_HEAD;
-		dticnt=((cylinder*dtihed)/DEF_TRACKINFO+1)*DEF_TRACKINFO;
-		dticyl=dticnt/MAX_HEAD;
-		dti=new DiskTrackInfo[dticnt];
+		dtihed = MAX_HEAD;
+		dticnt = ((cylinder*dtihed) / DEF_TRACKINFO + 1)*DEF_TRACKINFO;
+		dticyl = dticnt / MAX_HEAD;
+		dti = new DiskTrackInfo[dticnt];
 		memset(dti, 0, sizeof(DiskTrackInfo)*dticnt);
 	} else {
 		// reallocation
-		int scnt=dticnt;
-		PDISKTRACKINFO sti=dti;
-		dticnt=((cylinder*dtihed)/DEF_TRACKINFO+1)*DEF_TRACKINFO;
-		dticyl=dticnt/MAX_HEAD;
-		dti=new DiskTrackInfo[dticnt];
+		int scnt = dticnt;
+		PDISKTRACKINFO sti = dti;
+		dticnt = ((cylinder*dtihed) / DEF_TRACKINFO + 1)*DEF_TRACKINFO;
+		dticyl = dticnt / MAX_HEAD;
+		dti = new DiskTrackInfo[dticnt];
 		memcpy(dti, sti, sizeof(DiskTrackInfo)*scnt);
-		memset(dti+scnt, 0, sizeof(DiskTrackInfo)*(dticnt-scnt));
-		delete [] sti;
+		memset(dti + scnt, 0, sizeof(DiskTrackInfo)*(dticnt - scnt));
+		delete[] sti;
 	}
 
-	return &dti[cylinder*dtihed+head];
+	return &dti[cylinder*dtihed + head];
 }
 
 // update diskimage information
@@ -411,21 +405,21 @@ void CDiskImage::UpdateImageInfo(PDISKTRACKINFO pti)
 {
 	if (!dii.valid) {
 		// first time
-		dii.umincylinder=pti->cylinder;
-		dii.umaxcylinder=pti->cylinder;
-		dii.uminhead=pti->head;
-		dii.umaxhead=pti->head;
-		dii.valid=true;
+		dii.umincylinder = pti->cylinder;
+		dii.umaxcylinder = pti->cylinder;
+		dii.uminhead = pti->head;
+		dii.umaxhead = pti->head;
+		dii.valid = true;
 	} else {
 		// compare and update
 		if (pti->cylinder < dii.umincylinder)
-			dii.umincylinder=pti->cylinder;
+			dii.umincylinder = pti->cylinder;
 		if (pti->cylinder > dii.umaxcylinder)
-			dii.umaxcylinder=pti->cylinder;
+			dii.umaxcylinder = pti->cylinder;
 		if (pti->head < dii.uminhead)
-			dii.uminhead=pti->head;
+			dii.uminhead = pti->head;
 		if (pti->head > dii.umaxhead)
-			dii.umaxhead=pti->head;
+			dii.umaxhead = pti->head;
 	}
 }
 
@@ -439,40 +433,23 @@ void CDiskImage::CreateDateTime(PCAPSDATETIME pcd)
 		return;
 
 	// read OS time, since time_t won't work in a few decades... :)
-#ifdef _WIN32
 	SYSTEMTIME st;
 	GetLocalTime(&st);
-#else
-	#include <time.h>
-	struct tm st_tm;
-	time_t t_now = time(NULL);
-	localtime_r(&t_now, &st_tm);
-	struct {
-		int wYear, wMonth, wDay, wHour, wMinute, wSecond, wMilliseconds;
-	} st;
-	st.wYear = st_tm.tm_year + 1900;
-	st.wMonth = st_tm.tm_mon + 1;
-	st.wDay = st_tm.tm_mday;
-	st.wHour = st_tm.tm_hour;
-	st.wMinute = st_tm.tm_min;
-	st.wSecond = st_tm.tm_sec;
-	st.wMilliseconds = 0;
-#endif
 
 	// create date
-	UDWORD t=0;
-	t+=st.wYear*10000;
-	t+=st.wMonth*100;
-	t+=st.wDay;
-	pcd->date=t;
+	uint32_t t = 0;
+	t += st.wYear * 10000;
+	t += st.wMonth * 100;
+	t += st.wDay;
+	pcd->date = t;
 
 	// create time
-	t=0;
-	t+=st.wHour*10000000;
-	t+=st.wMinute*100000;
-	t+=st.wSecond*1000;
-	t+=st.wMilliseconds%1000;
-	pcd->time=t;
+	t = 0;
+	t += st.wHour * 10000000;
+	t += st.wMinute * 100000;
+	t += st.wSecond * 1000;
+	t += st.wMilliseconds % 1000;
+	pcd->time = t;
 }
 
 // decode packed date.time
@@ -490,83 +467,41 @@ void CDiskImage::DecodeDateTime(PCAPSDATETIMEEXT dec, PCAPSDATETIME pcd)
 		return;
 
 	// decode date
-	UDWORD t=pcd->date;
-	dec->year=t/10000;
-	t%=10000;
-	dec->month=t/100;
-	t%=100;
-	dec->day=t;
+	uint32_t t = pcd->date;
+	dec->year = t / 10000;
+	t %= 10000;
+	dec->month = t / 100;
+	t %= 100;
+	dec->day = t;
 
 	// decode time;
-	t=pcd->time;
-	dec->hour=t/10000000;
-	t%=10000000;
-	dec->min=t/100000;
-	t%=100000;
-	dec->sec=t/1000;
-	t%=1000;
-	dec->tick=t;
+	t = pcd->time;
+	dec->hour = t / 10000000;
+	t %= 10000000;
+	dec->min = t / 100000;
+	t %= 100000;
+	dec->sec = t / 1000;
+	t %= 1000;
+	dec->tick = t;
 }
 
 // get name for cppid
-LPCSTR CDiskImage::GetPlatformName(int pid)
+const char * CDiskImage::GetPlatformName(int pid)
 {
-	if (pid>=cppidNA && pid<cppidLast)
+	if (pid >= cppidNA && pid < cppidLast)
 		return pidname[pid];
 	else
-		return NULL;
-}
-
-// calculate CRC32 on file
-UDWORD CDiskImage::CrcFile(PCAPSFILE pcf)
-{
-	UDWORD crc=0;
-
-	// shortcut for memory files
-	if (pcf->flag & CFF_MEMMAP) {
-		if (!pcf->memmap || pcf->size<0)
-			return crc;
-
-		return CalcCRC(pcf->memmap, pcf->size);
-	}
-
-	// open file
-	CCapsFile file;
-	if (file.Open(pcf))
-		return crc;
-
-	int len=file.GetSize();
-
-	if (len) {
-		int bufsize=DEF_CRCBUF;
-		PUBYTE buf=new UBYTE[bufsize];
-
-		// calculate CRC32 on file
-		while (len) {
-			int size=len > bufsize ? bufsize : len;
-			if (file.Read(buf, size) != size) {
-				crc=0;
-				break;
-			}
-
-			crc=CalcCRC32(buf, size, crc);
-			len-=size;
-		}
-
-		delete [] buf;
-	}
-
-	return crc;
+		return nullptr;
 }
 
 // read network ordered value
-UDWORD CDiskImage::ReadValue(PUBYTE buf, int cnt)
+uint32_t CDiskImage::ReadValue(uint8_t *buf, int cnt)
 {
-	UDWORD val;
+	uint32_t val;
 
-	for (val=0; cnt > 0; cnt--) {
-		val<<=8;
-		val|=*buf++;
+	for (val = 0; cnt > 0; cnt--) {
+		val <<= 8;
+		val |= *buf++;
 	}
 
 	return val;
@@ -576,13 +511,13 @@ UDWORD CDiskImage::ReadValue(PUBYTE buf, int cnt)
 PDISKDATAMARK CDiskImage::AddFD(PDISKTRACKINFO pti, PDISKDATAMARK src, int size, int units)
 {
 	// cancel if nothing to add
-	if (!src || size<=0)
-		return NULL;
+	if (!src || size <= 0)
+		return nullptr;
 
 	// allocate and copy to buffer
-	PDISKDATAMARK alloc=AllocFD(pti, size, units);
+	PDISKDATAMARK alloc = AllocFD(pti, size, units);
 	if (alloc)
-		memcpy(alloc, src, size*sizeof(DiskDataMark));
+		memcpy(alloc, src, size * sizeof(DiskDataMark));
 
 	return alloc;
 }
@@ -592,27 +527,27 @@ PDISKDATAMARK CDiskImage::AllocFD(PDISKTRACKINFO pti, int size, int units)
 {
 	// cancel if invalid allocation
 	if (!pti)
-		return NULL;
+		return nullptr;
 
 	// get buffer mark
 	if (size <= 0)
-		return pti->fdp+pti->fdpsize;
+		return pti->fdp + pti->fdpsize;
 
 	// grow buffer if necessary
-	if (pti->fdpsize+size > pti->fdpmax) {
-		units+=pti->fdpsize+size;
-		PDISKDATAMARK fdp=pti->fdp;
-		pti->fdp=new DiskDataMark[units];
+	if (pti->fdpsize + size > pti->fdpmax) {
+		units += pti->fdpsize + size;
+		PDISKDATAMARK fdp = pti->fdp;
+		pti->fdp = new DiskDataMark[units];
 		if (pti->fdpsize)
-			memcpy(pti->fdp, fdp, pti->fdpsize*sizeof(DiskDataMark));
-		delete [] fdp;
-		pti->fdpmax=units;
+			memcpy(pti->fdp, fdp, pti->fdpsize * sizeof(DiskDataMark));
+		delete[] fdp;
+		pti->fdpmax = units;
 	}
 
 	// allocate new data
-	PDISKDATAMARK alloc=pti->fdp+pti->fdpsize;
-	memset(alloc, 0, size*sizeof(DiskDataMark));
-	pti->fdpsize+=size;
+	PDISKDATAMARK alloc = pti->fdp + pti->fdpsize;
+	memset(alloc, 0, size * sizeof(DiskDataMark));
+	pti->fdpsize += size;
 	return alloc;
 }
 
@@ -627,10 +562,10 @@ void CDiskImage::AllocTrackSI(PDISKTRACKINFO pti)
 
 	// allocate buffer if needed
 	if (pti->sectorcnt > 0) {
-		int size=pti->sectorcnt;
-		pti->sip=new DiskSectorInfo[size];
-		pti->sipsize=size;
-		memset(pti->sip, 0, size*sizeof(DiskSectorInfo));
+		int size = pti->sectorcnt;
+		pti->sip = new DiskSectorInfo[size];
+		pti->sipsize = size;
+		memset(pti->sip, 0, size * sizeof(DiskSectorInfo));
 	}
 }
 
@@ -642,8 +577,8 @@ void CDiskImage::FreeTrackSI(PDISKTRACKINFO pti)
 		return;
 
 	// free sector info buffer
-	pti->sipsize=0;
-	delete [] pti->sip;
-	pti->sip=NULL;
+	pti->sipsize = 0;
+	delete[] pti->sip;
+	pti->sip = nullptr;
 }
 

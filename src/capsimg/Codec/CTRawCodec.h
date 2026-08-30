@@ -4,23 +4,23 @@
 // CAPS work helper
 struct CapsWH {
 	CapsRaw cr;
-	PUDWORD timbuf;
+	uint32_t *timbuf;
 	int timlen;
-	PUBYTE cdbuf;
+	uint8_t *cdbuf;
 	int cdlen;
-	PUBYTE cdmem;
-	PUBYTE rawbuf;
+	uint8_t *cdmem;
+	uint8_t *rawbuf;
 	int rawlen;
-	PUBYTE trkbuf[CAPS_MTRS];
+	uint8_t *trkbuf[CAPS_MTRS];
 	int trklen[CAPS_MTRS];
 	int trkcnt;
-	PUBYTE ctbuf;
+	uint8_t *ctbuf;
 	int ctlen;
-	PUBYTE ctmem;
-	PUBYTE txsrc;
+	uint8_t *ctmem;
+	uint8_t *txsrc;
 	int txlen;
 	int txact;
-	PUBYTE ctstore;
+	uint8_t *ctstore;
 	int ctstop;
 };
 
@@ -36,12 +36,12 @@ public:
 	virtual ~CCTRawCodec();
 	PCAPSWH GetInfo();
 	void Free();
-	int DecompressDump(PUBYTE buf, int len);
+	int DecompressDump(uint8_t *buf, size_t len);
 	int DecompressDensity(int verify = 0);
 	int DecompressTrack(int verify = 0);
 	int CompressDensity();
 	int CompressTrack();
-	static void Swap(PUDWORD buf, int cnt);
+	static void Swap(void *buf, size_t cnt);
 
 protected:
 	void Clear();
@@ -51,17 +51,17 @@ protected:
 	void FreeUncompressedTrack();
 	static void FreeUncompressedTrack(PCAPSWH w);
 
-	static PUDWORD DecompressDensity(PUBYTE src, int slen, PUDWORD dst = NULL);
-	static PCAPSWH DecompressTrack(PCAPSWH w, PUBYTE src, int slen, PUBYTE dst = NULL);
+	static uint32_t *DecompressDensity(uint8_t *src, int slen, uint32_t *dst = nullptr);
+	static PCAPSWH DecompressTrack(PCAPSWH w, uint8_t *src, int slen, uint8_t *dst = nullptr);
 	static void DecompressTrackData(PCAPSWH w);
-	static PCAPSPACK GetPackHeader(PCAPSPACK cpk, PUBYTE src, int slen);
-	static UDWORD CTR(PCAPSWH w, int size);
+	static PCAPSPACK GetPackHeader(PCAPSPACK cpk, const uint8_t *src, size_t slen);
+	static uint32_t ReadStream(PCAPSWH w, unsigned int size);
 
 	int EncodeDensity(int equ, int epos, int dpos, int dcnt);
 	void CompressTrackData();
 	void EncodeData(int dpos, int dcnt, int epos, int ecnt, int shf);
-	static void CTW(PCAPSWH w, UDWORD value, int size);
-	
+	static void WriteStream(PCAPSWH w, uint32_t value, unsigned int size);
+
 protected:
 	CapsWH wh;
 };

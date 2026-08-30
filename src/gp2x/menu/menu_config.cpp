@@ -137,7 +137,8 @@ int mainMenu_customPreset_L3[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS] = { };
 int mainMenu_customPreset_R3[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS] = { };
 #endif
 #endif
-int mainMenu_autofire = DEFAULT_AUTOFIRE;
+int mainMenu_autofire = 0;
+int mainMenu_autofireMode = 0;
 
 int mainMenu_displayedLines = 240;
 int mainMenu_displayHires = 0;
@@ -147,10 +148,13 @@ int mainMenu_cutLeft = 0;
 int mainMenu_cutRight = 0;
 int mainMenu_footerSize = 0;
 int mainMenu_screenOffsetY = 0;
+int mainMenu_screenOffsetX = 0;
 int mainMenu_ntsc = DEFAULT_NTSC;
 int mainMenu_frameskip = 0;
 int mainMenu_vkbdLanguage = 0; //Default is US Keyboard
 int mainMenu_vkbdStyle = 0; //Default is original style
+int mainMenu_vkbdTransparency = 1; //Default is 50% (128)
+int mainMenu_vkbdPosition = 0; //Default is Bottom (0 = Bottom, 1 = Top, 2 = Center)
 int visibleAreaWidth = 320;
 
 
@@ -169,6 +173,9 @@ int mainMenu_autoEjectFloppy = 1;
 int mainMenu_midiSynth = 0;
 int mainMenu_pinballMode = 0;
 char mainMenu_whdload_game[128] = "";
+char mainMenu_whdload_args[256] = "";
+int mainMenu_floppyWriteProtect[4] = { 0, 0, 0, 0 };
+int mainMenu_cycleExact = 0;
 #endif
 #ifdef __SWITCH__
 int mainMenu_swapAB = DEFAULT_SWAPAB;
@@ -549,11 +556,15 @@ void SetDefaultMenuSettings(int general)
     mainMenu_cutRight = 0;
     mainMenu_footerSize = 0;
     mainMenu_screenOffsetY = 0;
+    mainMenu_screenOffsetX = 0;
     mainMenu_ntsc = DEFAULT_NTSC;
     mainMenu_frameskip = 0;
     mainMenu_vkbdLanguage = 0; //Default is US Keyboard
     mainMenu_vkbdStyle = 0; //Default is original style
-    mainMenu_autofire = DEFAULT_AUTOFIRE;
+    mainMenu_vkbdTransparency = 1; //Default is 50% (128)
+    mainMenu_vkbdPosition = 0; //Default is Bottom
+    mainMenu_autofire = 0;
+    mainMenu_autofireMode = 0;
 
 #if defined(__PSP2__) || defined(__SWITCH__)
 #ifdef __SWITCH__
@@ -728,19 +739,24 @@ void UpdateChipsetSettings()
     switch (mainMenu_chipset & 0xff00) {
     case 0x100:
     //Immediate Blitter
-        changed_prefs.immediate_blits = true;
+        changed_prefs.immediate_blits = mainMenu_cycleExact ? false : true;
         blitter_in_partial_mode = 0;
         break;
     //Improved Blitter
     case 0x200:
         changed_prefs.immediate_blits = false;
-        blitter_in_partial_mode = 1;
+        blitter_in_partial_mode = mainMenu_cycleExact ? 0 : 1;
         break;
     //Normal Blitter
     default:
         changed_prefs.immediate_blits = false;
         blitter_in_partial_mode = 0;
         break;
+    }
+    if (mainMenu_cycleExact) {
+        changed_prefs.immediate_blits = false;
+        blitter_in_partial_mode = 0;
+        mainMenu_spriteCollisions = 1;
     }
 }
 
@@ -1240,6 +1256,8 @@ int create_configfilename(char *dest, char *basename, int fromDir)
 }
 
 
+const char *config_save_as_name = NULL;
+
 int saveconfig(int general)
 {
     char path[300];
@@ -1277,7 +1295,16 @@ int saveconfig(int general)
 #ifdef __SWITCH__
         kbdswitch_get("Enter config name:", "", 100, 0, buf);
 #else
-        strcpy(buf, kbdvita_get("Enter config name:", "", 100, 0));
+        if (config_save_as_name && config_save_as_name[0] != '\0') {
+            strncpy(buf, config_save_as_name, sizeof(buf) - 1);
+            buf[sizeof(buf) - 1] = '\0';
+        } else {
+            char *ime_name = kbdvita_get("Enter config name:", "", 100, 0);
+            if (!ime_name || ime_name[0] == '\0')
+                return 0;
+            strncpy(buf, ime_name, sizeof(buf) - 1);
+            buf[sizeof(buf) - 1] = '\0';
+        }
 #endif
         if (buf[0] == 0)
             return 0;
@@ -1339,6 +1366,10 @@ int saveconfig(int general)
     fputs(buffer,f);
     snprintf((char*)buffer, 255, "vkbdstyle=%d\n",mainMenu_vkbdStyle);
     fputs(buffer,f);
+    snprintf((char*)buffer, 255, "vkbdtransparency=%d\n",mainMenu_vkbdTransparency);
+    fputs(buffer,f);
+    snprintf((char*)buffer, 255, "vkbdposition=%d\n",mainMenu_vkbdPosition);
+    fputs(buffer,f);
     snprintf((char*)buffer, 255, "sound=%d\n",mainMenu_sound + mainMenu_soundStereo * 10);
     fputs(buffer,f);
     snprintf((char*)buffer, 255, "soundstereosep=%d\n",mainMenu_soundStereoSep);
@@ -1355,6 +1386,18 @@ int saveconfig(int general)
     fputs(buffer,f);
     snprintf((char*)buffer, 255, "autofire=%d\n",mainMenu_autofire);
     fputs(buffer,f);
+    snprintf((char*)buffer, 255, "autofireMode=%d\n",mainMenu_autofireMode);
+    fputs(buffer,f);
+#if defined(__PSP2__) || defined(__SWITCH__)
+    snprintf((char*)buffer, 255, "whdload_args=%s\n",mainMenu_whdload_args);
+    fputs(buffer,f);
+    for (int i = 0; i < 4; i++) {
+        snprintf((char*)buffer, 255, "floppyWriteProtect%d=%d\n", i, mainMenu_floppyWriteProtect[i]);
+        fputs(buffer, f);
+    }
+    snprintf((char*)buffer, 255, "cycleExact=%d\n", mainMenu_cycleExact);
+    fputs(buffer, f);
+#endif
     snprintf((char*)buffer, 255, "customAutofireButton=%d\n",mainMenu_customAutofireButton);
     fputs(buffer,f);
     snprintf((char*)buffer, 255, "stylusOffset=%d\n",mainMenu_stylusOffset);
@@ -1545,7 +1588,6 @@ int saveconfig(int general)
     else
         snprintf((char*)buffer, 255, "hard_disk_file3=%s\n",uae4all_hard_file3);
     fputs(buffer,f);
-    // Per-slot HDF read-only flags
     snprintf((char*)buffer, 255, "hard_disk_file_ro=%d,%d,%d,%d\n",
              uae4all_hard_file_ro[0], uae4all_hard_file_ro[1],
              uae4all_hard_file_ro[2], uae4all_hard_file_ro[3]);
@@ -1630,6 +1672,8 @@ int saveconfig(int general)
     snprintf((char*)buffer, 255, "footerSize=%d\n",mainMenu_footerSize);
     fputs(buffer,f);
     snprintf((char*)buffer, 255, "screenOffsetY=%d\n",mainMenu_screenOffsetY);
+    fputs(buffer,f);
+    snprintf((char*)buffer, 255, "screenOffsetX=%d\n",mainMenu_screenOffsetX);
     fputs(buffer,f);
 #ifdef __SWITCH__
     snprintf((char*)buffer, 255, "swapAB=%d\n",mainMenu_swapAB);
@@ -1769,6 +1813,8 @@ void loadconfig(int general)
         fscanf(f,"frameskip=%d\n",&mainMenu_frameskip);
         fscanf(f,"vkbdlanguage=%d\n",&mainMenu_vkbdLanguage);
         fscanf(f,"vkbdstyle=%d\n",&mainMenu_vkbdStyle);
+        fscanf(f,"vkbdtransparency=%d\n",&mainMenu_vkbdTransparency);
+        fscanf(f,"vkbdposition=%d\n",&mainMenu_vkbdPosition);
         fscanf(f,"sound=%d\n",&mainMenu_sound );
         if (mainMenu_sound >= 10) {
             mainMenu_soundStereo = 1;
@@ -1791,6 +1837,13 @@ void loadconfig(int general)
             mainMenu_joyPort = 2;
         fscanf(f,"autofireRate=%d\n",&mainMenu_autofireRate);
         fscanf(f,"autofire=%d\n",&mainMenu_autofire);
+        fscanf(f,"autofireMode=%d\n",&mainMenu_autofireMode);
+#if defined(__PSP2__) || defined(__SWITCH__)
+        fscanf(f,"whdload_args=%255[^\n]\n", mainMenu_whdload_args);
+        for (int i = 0; i < 4; i++)
+            fscanf(f,"floppyWriteProtect%d=%d\n", i, &mainMenu_floppyWriteProtect[i]);
+        fscanf(f,"cycleExact=%d\n", &mainMenu_cycleExact);
+#endif
         fscanf(f,"customAutofireButton=%d\n",&mainMenu_customAutofireButton);
 // Never actually load the custom Autofire button to reduce user confusion
         mainMenu_customAutofireButton = 0;
@@ -2024,7 +2077,6 @@ void loadconfig(int general)
             if (uae4all_hard_file3[0] == '*')
                 uae4all_hard_file3[0] = '\0';
         }
-        // Per-slot HDF read-only flags (absent in old configs -> stays off)
         fscanf(f,"hard_disk_file_ro=%d,%d,%d,%d\n",
                &uae4all_hard_file_ro[0], &uae4all_hard_file_ro[1],
                &uae4all_hard_file_ro[2], &uae4all_hard_file_ro[3]);
@@ -2082,6 +2134,10 @@ void loadconfig(int general)
             mainMenu_screenOffsetY = 0;
         if (mainMenu_screenOffsetY < -128) mainMenu_screenOffsetY = -128;
         if (mainMenu_screenOffsetY > 128) mainMenu_screenOffsetY = 128;
+        if (fscanf(f,"screenOffsetX=%d\n",&mainMenu_screenOffsetX) != 1)
+            mainMenu_screenOffsetX = 0;
+        if (mainMenu_screenOffsetX < -128) mainMenu_screenOffsetX = -128;
+        if (mainMenu_screenOffsetX > 128) mainMenu_screenOffsetX = 128;
 #ifdef __SWITCH__ 
         fscanf(f,"swapAB=%d\n",&mainMenu_swapAB);
         fscanf(f,"singleJoycons=%d\n",&mainMenu_singleJoycons);

@@ -4,7 +4,8 @@
 
 CDiskImageFactory::CDiskImageFactory()
 {
-	// dummy objects to initialize static variables removed for PS Vita compatibility
+	// dummy objects to initialize static variables
+	CCapsImage img;
 }
 
 CDiskImageFactory::~CDiskImageFactory()
@@ -12,25 +13,24 @@ CDiskImageFactory::~CDiskImageFactory()
 }
 
 // quickly identify the file type; opening the file may still fail if this is a false positive
-int CDiskImageFactory::GetImageType(PCAPSFILE pcf)
+int CDiskImageFactory::GetImageType(const CBaseFile &file)
 {
-	// error if file cannot be opened
-	CCapsFile file;
-	if (file.Open(pcf))
+	// error if file is not already open
+	if (!file.IsOpen())
 		return citError;
 
 	// check IPF or CT Raw
-	int type = IsCAPSImage(pcf);
+	int type = IsCAPSImage(file);
 	if (type != citUnknown)
 		return type;
 
 	// check KryoFlux stream cue
-	type = IsKFStreamCue(pcf);
+	type = IsKFStreamCue(file);
 	if (type != citUnknown)
 		return type;
 
 	// check KryoFlux stream
-	type = IsKFStream(pcf);
+	type = IsKFStream(file);
 	if (type != citUnknown)
 		return type;
 
@@ -39,11 +39,16 @@ int CDiskImageFactory::GetImageType(PCAPSFILE pcf)
 }
 
 // return image type if IPF or CT Raw, otherwise Unknown
-int CDiskImageFactory::IsCAPSImage(PCAPSFILE pcf)
+int CDiskImageFactory::IsCAPSImage(const CBaseFile &file)
 {
+	// clone the source file as a read-only view, and set it to the same position
+	auto pf = file.Clone(BFFLAG_INHERIT_POSITION);
+	if (!pf)
+		return citError;
+
 	// try to parse CT Raw or IPF
 	CCapsLoader cload;
-	int res = cload.Lock(pcf);
+	int res = cload.Lock(std::move(pf));
 
 	// parser succeeded, check type in more detail
 	if (res == CCapsLoader::ccidCaps) {
@@ -82,55 +87,47 @@ int CDiskImageFactory::IsCAPSImage(PCAPSFILE pcf)
 }
 
 // return image type if KryoFlux stream, otherwise Unknown
-int CDiskImageFactory::IsKFStream(PCAPSFILE pcf)
+int CDiskImageFactory::IsKFStream(const CBaseFile &file)
 {
-	// error if file can't be opened
-	CCapsFile file;
-	if (file.Open(pcf))
-		return citError;
-
 	C2OOBHdr oob;
-	uint8_t buf[512];
+	char buf[256];
 
-	// remaining file size
-	int frem = file.GetSize();
+	// clone the source file as a read-only view, and set it to the same position
+	auto pf = file.Clone(BFFLAG_INHERIT_POSITION);
+	if (!pf)
+		return citError;
 
 	// process the file as long as the data read is an OOB info area
 	while (true) {
 		// stop if OOB header is longer than the remaining file size
-		int rlen = sizeof(oob);
-		if (rlen > frem)
+		constexpr auto rlen = sizeof(oob);
+		if (pf->GetRemainingSize() < rlen)
 			break;
 
 		// read OOB header, stop on error
-		if (file.Read((PUBYTE)&oob, rlen) != rlen)
+		if (pf->Read(&oob, rlen) != rlen)
 			return citError;
-
-		// update the remaining file size
-		frem -= rlen;
 
 		// check that OOB is Info
 		if (oob.sign != c2eOOB || oob.type != c2otInfo)
 			break;
 
-		// read info size value as little-endian
-		uint8_t *po = (uint8_t *)&oob;
-		int so = offsetof(C2OOBHdr, size);
-		int infosize = po[so+1] << 8 | po[so];
+		// read Info size value
+		uint32_t infosize = oob.size;
 
-		// stop if info size is 0 or larger than remaining file size or larger than the buffer
-		if (!infosize || infosize > frem || infosize > sizeof(buf))
+		// stop if info size is 0 or larger than remaining file size
+		if (!infosize || pf->GetRemainingSize() < infosize || infosize > sizeof(buf))
 			break;
-		
-		// read info, stop on error
-		if (file.Read(buf, infosize) != infosize)
+
+		// read Info, stop on error
+		if (pf->Read(buf, infosize) != infosize)
 			return citError;
 
-		// update the remaining file size
-		frem -= infosize;
+		// create a view on the local buffer
+		std::string_view buf_view(buf, infosize);
 
-		// success, if KryoFlux text found in info
-		if (strstr((char *)buf, "KryoFlux"))
+		// success, if KryoFlux text found in Info
+		if (buf_view.find("KryoFlux") != std::string_view::npos)
 			return citKFStream;
 	}
 
@@ -139,33 +136,31 @@ int CDiskImageFactory::IsKFStream(PCAPSFILE pcf)
 }
 
 // return image type if KryoFlux stream cue, otherwise Unknown
-int CDiskImageFactory::IsKFStreamCue(PCAPSFILE pcf)
+int CDiskImageFactory::IsKFStreamCue(const CBaseFile &file)
 {
-	// error if file can't be opened
-	CCapsFile file;
-	if (file.Open(pcf))
+	char buf[256];
+
+	// clone the source file as a read-only view, and set it to the same position
+	auto pf = file.Clone(BFFLAG_INHERIT_POSITION);
+	if (!pf)
 		return citError;
 
-	// the ID string must be within this area from the beginning of the file
-	uint8_t buf[256];
+	// read up to the remaining file size
+	auto readsize = file.GetRemainingSize();
 
-	// remaining file size
-	int frem = file.GetSize();
+	// limit the read size to the buffer size
+	if (readsize > sizeof(buf))
+		readsize = sizeof(buf);
 
-	// buffer allowed, with room for terminating 0
-	int bufmax = sizeof(buf)-1;
-
-	int readsize = min(frem, bufmax);
-
-	// read from the beginning of the file, stop on error
-	if (file.Read(buf, readsize) != readsize)
+	// read from the file, stop on error
+	if (pf->Read(buf, static_cast<size_t>(readsize)) != readsize)
 		return citError;
 
-	// add terminating 0
-	buf[readsize] = 0;
+	// create a view on the local buffer
+	std::string_view buf_view(buf, static_cast<size_t>(readsize));
 
-	// success, if ID text found in info
-	if (strstr((char *)buf, KF_STREAM_CUE_ID))
+	// success, if KryoFlux cue text found
+	if (buf_view.find(KF_STREAM_CUE_ID) != std::string_view::npos)
 		return citKFStreamCue;
 
 	// unknown or unsupported image type
@@ -173,26 +168,26 @@ int CDiskImageFactory::IsKFStreamCue(PCAPSFILE pcf)
 }
 
 // create the class supporting the specified disk image type
-PCDISKIMAGE CDiskImageFactory::CreateImage(int diftype)
+std::unique_ptr<CDiskImage> CDiskImageFactory::CreateImage(int diftype)
 {
-	PCDISKIMAGE pdi = NULL;
+	std::unique_ptr<CDiskImage> pdi;
 
 	// create the image class required
 	switch (diftype) {
 		case citIPF:
-			pdi = new CCapsImageStd;
+			pdi = std::make_unique<CCapsImageStd>();
 			break;
 
 		case citCTRaw:
-			pdi = new CCapsImage;
+			pdi = std::make_unique<CCapsImage>();
 			break;
 
 		case citKFStream:
-			pdi = new CStreamImage;
+			pdi = std::make_unique<CStreamImage>();
 			break;
 
 		case citKFStreamCue:
-			pdi = new CStreamCueImage;
+			pdi = std::make_unique<CStreamCueImage>();
 			break;
 	}
 

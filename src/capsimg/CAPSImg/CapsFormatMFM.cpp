@@ -3,23 +3,23 @@
 
 
 // MFM format conversion
-SDWORD __cdecl CAPSFormatDataToMFM(PVOID pformattrack, UDWORD flag)
+int32_t __cdecl CAPSFormatDataToMFM(void *pformattrack, uint32_t flag)
 {
 	if (!pformattrack)
 		return imgeGeneric;
 
 	// structure revision is zero, unless newer one requested
-	unsigned rev=0;
+	unsigned rev = 0;
 	if (flag & DI_LOCK_TYPE)
-		rev=*(PUDWORD)pformattrack;
+		rev = *(uint32_t *)pformattrack;
 
 	// if unsupported type set the highest supported version
 	if (rev > 0) {
-		*(PUDWORD)pformattrack=0;
+		*(uint32_t *)pformattrack = 0;
 		return imgeUnsupportedType;
 	}
 
-	PCAPSFORMATTRACK pf=(PCAPSFORMATTRACK)pformattrack;
+	PCAPSFORMATTRACK pf = (PCAPSFORMATTRACK)pformattrack;
 
 	// if buffer not set, return the required buffer size
 	if (!pf->trackbuf || !pf->tracklen || !pf->buflen)
@@ -30,7 +30,7 @@ SDWORD __cdecl CAPSFormatDataToMFM(PVOID pformattrack, UDWORD flag)
 		return imgeBufferShort;
 
 	// calculate track size and check descriptors
-	int res=FmfmGetSize(pf);
+	int res = FmfmGetSize(pf);
 
 	// cancel if track definition error
 	if (res != imgeOk)
@@ -54,40 +54,40 @@ SDWORD __cdecl CAPSFormatDataToMFM(PVOID pformattrack, UDWORD flag)
 int FmfmGetSize(PCAPSFORMATTRACK pf)
 {
 	// reset track size
-	UDWORD len=0;
-	pf->bufreq=0;
+	uint32_t len = 0;
+	pf->bufreq = 0;
 
 	// first gap size
-	len+=pf->gapacnt;
+	len += pf->gapacnt;
 
 	// cancel if invalid blocks
 	if (pf->blockcnt && !pf->block)
 		return imgeGeneric;
 
 	// add length for each block
-	for (int blk=0; blk < pf->blockcnt; blk++) {
+	for (int blk = 0; blk < pf->blockcnt; blk++) {
 		// get block
-		PCAPSFORMATBLOCK pb=pf->block+blk;
+		PCAPSFORMATBLOCK pb = pf->block + blk;
 
 		// add gap sizes
-		len+=pb->gapacnt;
-		len+=pb->gapbcnt;
-		len+=pb->gapccnt;
-		len+=pb->gapdcnt;
+		len += pb->gapacnt;
+		len += pb->gapbcnt;
+		len += pb->gapccnt;
+		len += pb->gapdcnt;
 
 		// sum block data
-		int sv=false;
+		int sv = false;
 		switch (pb->blocktype) {
 			// index block; 3am, fc
 			case cfrmbtIndex:
-				len+=4;
+				len += 4;
 				break;
 
 			// data block; 3am, fe, 4hdr, 2crc, 3am, fb, data, 2crc
 			case cfrmbtData:
-				len+=16;
-				len+=pb->sectorlen;
-				sv=true;
+				len += 16;
+				len += pb->sectorlen;
+				sv = true;
 				break;
 
 			default:
@@ -95,12 +95,12 @@ int FmfmGetSize(PCAPSFORMATTRACK pf)
 		}
 
 		// if sector length used check its validity
-		if (sv && FmfmSectorLength(pb->sectorlen)<0)
+		if (sv && FmfmSectorLength(pb->sectorlen) < 0)
 			return imgeBadBlockSize;
 	}
 
 	// set requested size in mfm
-	pf->bufreq=len*2;
+	pf->bufreq = len * 2;
 
 	return imgeOk;
 }
@@ -111,97 +111,97 @@ int FmfmGetSize(PCAPSFORMATTRACK pf)
 int FmfmConvert(PCAPSFORMATTRACK pf)
 {
 	// reset size
-	pf->size=0;
+	pf->size = 0;
 
 	// reset size counter and mfm state
-	UDWORD state=(0)<<15 ^ 0xffff;
+	uint32_t state = (0) << 15 ^ 0xffff;
 
 	// write index gap
-	state=FmfmWriteDataByte(pf, state, pf->gapavalue, pf->gapacnt);
+	state = FmfmWriteDataByte(pf, state, pf->gapavalue, pf->gapacnt);
 
 	// process all blocks
-	for (int blk=0; blk < pf->blockcnt; blk++) {
+	for (int blk = 0; blk < pf->blockcnt; blk++) {
 		// get block
-		PCAPSFORMATBLOCK pb=pf->block+blk;
+		PCAPSFORMATBLOCK pb = pf->block + blk;
 
 		// write block data
 		switch (pb->blocktype) {
 			// index block; 3am, fc,gap
 			case cfrmbtIndex:
-				state=FmfmWriteBlockIndex(pf, state, pb);
+				state = FmfmWriteBlockIndex(pf, state, pb);
 				break;
 
 			// data block; 3am, fe, 4hdr, 2crc, 3am, fb, data, 2crc
 			case cfrmbtData:
-				state=FmfmWriteBlockData(pf, state, pb);
+				state = FmfmWriteBlockData(pf, state, pb);
 				break;
 		}
 	}
 
 	// write gap size before index
-	int gapbcnt=(pf->tracklen-pf->size)/2;
+	int gapbcnt = (pf->tracklen - pf->size) / 2;
 	if (gapbcnt > 0)
-		state=FmfmWriteDataByte(pf, state, pf->gapbvalue, gapbcnt);
+		state = FmfmWriteDataByte(pf, state, pf->gapbvalue, gapbcnt);
 
 	return imgeOk;
 }
 
 // write data bytes into mfm buffer
-UDWORD FmfmWriteDataByte(PCAPSFORMATTRACK pf, UDWORD state, UDWORD value, int count)
+uint32_t FmfmWriteDataByte(PCAPSFORMATTRACK pf, uint32_t state, uint32_t value, int count)
 {
-	pf->size+=count*2;
-	UDWORD pos=pf->startpos;
+	pf->size += count * 2;
+	uint32_t pos = pf->startpos;
 
 	// write mfm bytes
 	while (count--) {
-		UDWORD val=CDiskEncoding::mfmcode[value & 0xff] & state;
-		state=(val & 1)<<15 ^ 0xffff;
+		uint32_t val = CDiskEncoding::mfmcode[value & 0xff] & state;
+		state = (val & 1) << 15 ^ 0xffff;
 
-		pf->trackbuf[pos++]=UBYTE(val>>8);
+		pf->trackbuf[pos++] = uint8_t(val >> 8);
 		if (pos >= pf->tracklen)
-			pos=0;
+			pos = 0;
 
-		pf->trackbuf[pos++]=(UBYTE)val;
+		pf->trackbuf[pos++] = (uint8_t)val;
 		if (pos >= pf->tracklen)
-			pos=0;
+			pos = 0;
 	}
 
-	pf->startpos=pos;
+	pf->startpos = pos;
 
 	return state;
 }
 
 // write mark bytes into mfm buffer
-UDWORD FmfmWriteMarkByte(PCAPSFORMATTRACK pf, UDWORD state, UDWORD value, int count)
+uint32_t FmfmWriteMarkByte(PCAPSFORMATTRACK pf, uint32_t state, uint32_t value, int count)
 {
-	pf->size+=count*2;
-	UDWORD pos=pf->startpos;
-	UDWORD val=value & 0xffff;
-	state=(val & 1)<<15 ^ 0xffff;
+	pf->size += count * 2;
+	uint32_t pos = pf->startpos;
+	uint32_t val = value & 0xffff;
+	state = (val & 1) << 15 ^ 0xffff;
 
 	// write mfm bytes
 	while (count--) {
-		pf->trackbuf[pos++]=UBYTE(val>>8);
+		pf->trackbuf[pos++] = uint8_t(val >> 8);
 		if (pos >= pf->tracklen)
-			pos=0;
+			pos = 0;
 
-		pf->trackbuf[pos++]=(UBYTE)val;
+		pf->trackbuf[pos++] = (uint8_t)val;
 		if (pos >= pf->tracklen)
-			pos=0;
+			pos = 0;
 	}
 
-	pf->startpos=pos;
+	pf->startpos = pos;
 
 	return state;
 }
 
 // calculate crc
-UWORD FmfmCrc(UWORD crc, UDWORD value, int count)
+uint16_t FmfmCrc(uint16_t crc, uint32_t value, int count)
 {
-	value&=0xff;
+	value &= 0xff;
 
 	while (count--)
-		crc=crctab_ccitt[value^(crc>>8)] ^ (crc << 8);
+		crc = crctab_ccitt[value ^ (crc >> 8)] ^ (crc << 8);
 
 	return crc;
 }
@@ -227,93 +227,93 @@ int FmfmSectorLength(int value)
 }
 
 // write index block
-UDWORD FmfmWriteBlockIndex(PCAPSFORMATTRACK pf, UDWORD state, PCAPSFORMATBLOCK pb)
+uint32_t FmfmWriteBlockIndex(PCAPSFORMATTRACK pf, uint32_t state, PCAPSFORMATBLOCK pb)
 {
 	// gap before first am
-	state=FmfmWriteDataByte(pf, state, pb->gapavalue, pb->gapacnt);
+	state = FmfmWriteDataByte(pf, state, pb->gapavalue, pb->gapacnt);
 
 	// 3 am c2/5224
-	state=FmfmWriteMarkByte(pf, state, 0x5224, 3);
+	state = FmfmWriteMarkByte(pf, state, 0x5224, 3);
 
 	// fc
-	state=FmfmWriteDataByte(pf, state, 0xfc, 1);
+	state = FmfmWriteDataByte(pf, state, 0xfc, 1);
 
 	// gap after first am
-	state=FmfmWriteDataByte(pf, state, pb->gapbvalue, pb->gapbcnt);
+	state = FmfmWriteDataByte(pf, state, pb->gapbvalue, pb->gapbcnt);
 
 	return state;
 }
 
 // write data block
-UDWORD FmfmWriteBlockData(PCAPSFORMATTRACK pf, UDWORD state, PCAPSFORMATBLOCK pb)
+uint32_t FmfmWriteBlockData(PCAPSFORMATTRACK pf, uint32_t state, PCAPSFORMATBLOCK pb)
 {
-	UWORD crc;
+	uint16_t crc;
 
 	// sector length
-	int seclen=FmfmSectorLength(pb->sectorlen);
+	int seclen = FmfmSectorLength(pb->sectorlen);
 
 	// write sector ID
 	// gap before first am
-	state=FmfmWriteDataByte(pf, state, pb->gapavalue, pb->gapacnt);
+	state = FmfmWriteDataByte(pf, state, pb->gapavalue, pb->gapacnt);
 
 	// 3 am a1/4489
-	crc=~0;
-	state=FmfmWriteMarkByte(pf, state, 0x4489, 3);
-	crc=FmfmCrc(crc, 0xa1, 3);
+	crc = ~0;
+	state = FmfmWriteMarkByte(pf, state, 0x4489, 3);
+	crc = FmfmCrc(crc, 0xa1, 3);
 
 	// fe
-	state=FmfmWriteDataByte(pf, state, 0xfe, 1);
-	crc=FmfmCrc(crc, 0xfe);
+	state = FmfmWriteDataByte(pf, state, 0xfe, 1);
+	crc = FmfmCrc(crc, 0xfe);
 
 	// track#
-	state=FmfmWriteDataByte(pf, state, pb->track, 1);
-	crc=FmfmCrc(crc, pb->track);
+	state = FmfmWriteDataByte(pf, state, pb->track, 1);
+	crc = FmfmCrc(crc, pb->track);
 
 	// side#
-	state=FmfmWriteDataByte(pf, state, pb->side, 1);
-	crc=FmfmCrc(crc, pb->side);
+	state = FmfmWriteDataByte(pf, state, pb->side, 1);
+	crc = FmfmCrc(crc, pb->side);
 
 	// sector#
-	state=FmfmWriteDataByte(pf, state, pb->sector, 1);
-	crc=FmfmCrc(crc, pb->sector);
+	state = FmfmWriteDataByte(pf, state, pb->sector, 1);
+	crc = FmfmCrc(crc, pb->sector);
 
 	// sector length
-	state=FmfmWriteDataByte(pf, state, seclen, 1);
-	crc=FmfmCrc(crc, seclen);
+	state = FmfmWriteDataByte(pf, state, seclen, 1);
+	crc = FmfmCrc(crc, seclen);
 
 	// crc
-	state=FmfmWriteDataByte(pf, state, crc>>8, 1);
-	state=FmfmWriteDataByte(pf, state, crc, 1);
+	state = FmfmWriteDataByte(pf, state, crc >> 8, 1);
+	state = FmfmWriteDataByte(pf, state, crc, 1);
 
 	// gap after first am
-	state=FmfmWriteDataByte(pf, state, pb->gapbvalue, pb->gapbcnt);
+	state = FmfmWriteDataByte(pf, state, pb->gapbvalue, pb->gapbcnt);
 
 	// write sector data
 	// gap before second am
-	state=FmfmWriteDataByte(pf, state, pb->gapcvalue, pb->gapccnt);
+	state = FmfmWriteDataByte(pf, state, pb->gapcvalue, pb->gapccnt);
 
 	// 3 am a1/4489
-	crc=~0;
-	state=FmfmWriteMarkByte(pf, state, 0x4489, 3);
-	crc=FmfmCrc(crc, 0xa1, 3);
+	crc = ~0;
+	state = FmfmWriteMarkByte(pf, state, 0x4489, 3);
+	crc = FmfmCrc(crc, 0xa1, 3);
 
 	// fb
-	state=FmfmWriteDataByte(pf, state, 0xfb, 1);
-	crc=FmfmCrc(crc, 0xfb);
+	state = FmfmWriteDataByte(pf, state, 0xfb, 1);
+	crc = FmfmCrc(crc, 0xfb);
 
 	// data
-	for (int i=0; i < pb->sectorlen; i++) {
-		UDWORD data=pb->databuf ? pb->databuf[i] : pb->datavalue;
-		state=FmfmWriteDataByte(pf, state, data, 1);
-		crc=FmfmCrc(crc, data);
+	for (int i = 0; i < pb->sectorlen; i++) {
+		uint32_t data = pb->databuf ? pb->databuf[i] : pb->datavalue;
+		state = FmfmWriteDataByte(pf, state, data, 1);
+		crc = FmfmCrc(crc, data);
 	}
 
 	// crc
-	state=FmfmWriteDataByte(pf, state, crc>>8, 1);
-	state=FmfmWriteDataByte(pf, state, crc, 1);
+	state = FmfmWriteDataByte(pf, state, crc >> 8, 1);
+	state = FmfmWriteDataByte(pf, state, crc, 1);
 
 	// gap after second am
-	state=FmfmWriteDataByte(pf, state, pb->gapdvalue, pb->gapdcnt);
+	state = FmfmWriteDataByte(pf, state, pb->gapdvalue, pb->gapdcnt);
 
 	return state;
 }

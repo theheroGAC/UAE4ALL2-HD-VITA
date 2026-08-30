@@ -1,11 +1,39 @@
 #ifndef COMMONTYPES_H
 #define COMMONTYPES_H
 
-//-- Linux changes
-typedef int8_t BYTE;
-typedef int16_t WORD;
-typedef int32_t DWORD;
-//-- Linux changes
+// Fixed-width integer types are used unqualified below (and by the public
+// headers that pull this in via CapsLibAll.h). Use <stdint.h> rather than
+// <cstdint> so the global-namespace names are available to both C and C++
+// consumers of the installed dev package.
+#include <stdint.h>
+#include <stdio.h>
+
+#if !defined(_MSC_VER) && !defined(__GLIBC__)
+#ifndef fopen64
+#define fopen64 fopen
+#endif
+#ifndef fseeko64
+#define fseeko64 fseeko
+#endif
+#ifndef ftello64
+#define ftello64 ftello
+#endif
+#ifndef off64_t
+#define off64_t off_t
+#endif
+#endif
+
+typedef uintmax_t file_size_t;
+typedef intmax_t file_pos_t;
+
+#ifndef _WIN32
+typedef const char *LPCSTR;
+typedef char *LPSTR;
+typedef uint32_t DWORD;
+typedef uint8_t BYTE;
+typedef uint16_t WORD;
+typedef int BOOL;
+#endif
 
 typedef void *PVOID;
 typedef char *PCHAR;
@@ -96,6 +124,8 @@ enum {
 #define DF_30 (1UL<<DB_30)
 #define DF_31 (1UL<<DB_31)
 
+#ifdef _WIN32
+
 #define DllImport __declspec(dllimport)
 #define DllExport __declspec(dllexport)
 
@@ -103,8 +133,18 @@ enum {
 
 #ifdef _DEBUG
 #define NODEFAULT   assert(0)
-#else
+#elif defined(_MSC_VER)
 #define NODEFAULT   __assume(0)
+#else
+// MinGW (GCC/Clang) does not provide __assume
+#define NODEFAULT   __builtin_unreachable()
+#endif
+
+#else // POSIX
+#define DllImport
+#define DllExport
+#define Naked
+#define NODEFAULT
 #endif
 
 #endif

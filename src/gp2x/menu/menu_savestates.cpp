@@ -809,7 +809,11 @@ int run_menuSavestates()
 #ifdef __SWITCH__
 						kbdswitch_get("Enter savestate name:", "", 100, 0, buf);
 #else
-						strcpy(buf, kbdvita_get("Enter savestate name:", "", 100, 0));
+						char *ime_name = kbdvita_get("Enter savestate name:", "", 100, 0);
+						if (!ime_name)
+							break;
+						strncpy(buf, ime_name, sizeof(buf) - 1);
+						buf[sizeof(buf) - 1] = '\0';
 #endif
 						if (buf[0] != 0) {
 							char state[255] = "";

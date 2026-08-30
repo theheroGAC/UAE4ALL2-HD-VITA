@@ -46,128 +46,128 @@
 
 // decoded caps date.time
 struct CapsDateTimeExt {
-	UDWORD year;
-	UDWORD month;
-	UDWORD day;
-	UDWORD hour;
-	UDWORD min;
-	UDWORD sec;
-	UDWORD tick;
+	uint32_t year;
+	uint32_t month;
+	uint32_t day;
+	uint32_t hour;
+	uint32_t min;
+	uint32_t sec;
+	uint32_t tick;
 };
 
 typedef struct CapsDateTimeExt *PCAPSDATETIMEEXT;
 
 // library version information block
 struct CapsVersionInfo {
-	UDWORD type;     // library type
-	UDWORD release;  // release ID
-	UDWORD revision; // revision ID
-	UDWORD flag;     // supported flags
+	uint32_t type;     // library type
+	uint32_t release;  // release ID
+	uint32_t revision; // revision ID
+	uint32_t flag;     // supported flags
 };
 
 typedef struct CapsVersionInfo *PCAPSVERSIONINFO;
 
 // disk image information block
 struct CapsImageInfo {
-	UDWORD type;        // image type
-	UDWORD release;     // release ID
-	UDWORD revision;    // release revision ID
-	UDWORD mincylinder; // lowest cylinder number
-	UDWORD maxcylinder; // highest cylinder number
-	UDWORD minhead;     // lowest head number
-	UDWORD maxhead;     // highest head number
+	uint32_t type;        // image type
+	uint32_t release;     // release ID
+	uint32_t revision;    // release revision ID
+	uint32_t mincylinder; // lowest cylinder number
+	uint32_t maxcylinder; // highest cylinder number
+	uint32_t minhead;     // lowest head number
+	uint32_t maxhead;     // highest head number
 	struct CapsDateTimeExt crdt; // image creation date.time
-	UDWORD platform[CAPS_MAXPLATFORM]; // intended platform(s)
+	uint32_t platform[CAPS_MAXPLATFORM]; // intended platform(s)
 };
 
 typedef struct CapsImageInfo *PCAPSIMAGEINFO;
 
 // disk track information block
 struct CapsTrackInfo {
-	UDWORD type;       // track type
-	UDWORD cylinder;   // cylinder#
-	UDWORD head;       // head#
-	UDWORD sectorcnt;  // available sectors
-	UDWORD sectorsize; // sector size
-	UDWORD trackcnt;   // track variant count
-	PUBYTE trackbuf;   // track buffer memory 
-	UDWORD tracklen;   // track buffer memory length
-	PUBYTE trackdata[CAPS_MTRS]; // track data pointer if available
-	UDWORD tracksize[CAPS_MTRS]; // track data size
-	UDWORD timelen;  // timing buffer length
-	PUDWORD timebuf; // timing buffer
+	uint32_t type;       // track type
+	uint32_t cylinder;   // cylinder#
+	uint32_t head;       // head#
+	uint32_t sectorcnt;  // available sectors
+	uint32_t sectorsize; // sector size
+	uint32_t trackcnt;   // track variant count
+	uint8_t *trackbuf;   // track buffer memory 
+	uint32_t tracklen;   // track buffer memory length
+	uint8_t *trackdata[CAPS_MTRS]; // track data pointer if available
+	uint32_t tracksize[CAPS_MTRS]; // track data size
+	uint32_t timelen;  // timing buffer length
+	uint32_t *timebuf; // timing buffer
 };
 
 typedef struct CapsTrackInfo *PCAPSTRACKINFO;
 
 // disk track information block
 struct CapsTrackInfoT1 {
-	UDWORD type;       // track type
-	UDWORD cylinder;   // cylinder#
-	UDWORD head;       // head#
-	UDWORD sectorcnt;  // available sectors
-	UDWORD sectorsize; // sector size
-	PUBYTE trackbuf;   // track buffer memory 
-	UDWORD tracklen;   // track buffer memory length
-	UDWORD timelen;    // timing buffer length
-	PUDWORD timebuf;   // timing buffer
-	SDWORD overlap;    // overlap position
+	uint32_t type;       // track type
+	uint32_t cylinder;   // cylinder#
+	uint32_t head;       // head#
+	uint32_t sectorcnt;  // available sectors
+	uint32_t sectorsize; // sector size
+	uint8_t *trackbuf;   // track buffer memory 
+	uint32_t tracklen;   // track buffer memory length
+	uint32_t timelen;    // timing buffer length
+	uint32_t *timebuf;   // timing buffer
+	int32_t overlap;    // overlap position
 };
 
 typedef struct CapsTrackInfoT1 *PCAPSTRACKINFOT1;
 
 // disk track information block
 struct CapsTrackInfoT2 {
-	UDWORD type;       // track type
-	UDWORD cylinder;   // cylinder#
-	UDWORD head;       // head#
-	UDWORD sectorcnt;  // available sectors
-	UDWORD sectorsize; // sector size, unused
-	PUBYTE trackbuf;   // track buffer memory 
-	UDWORD tracklen;   // track buffer memory length
-	UDWORD timelen;    // timing buffer length
-	PUDWORD timebuf;   // timing buffer
-	SDWORD overlap;    // overlap position
-	UDWORD startbit;   // start position of the decoding
-	UDWORD wseed;      // weak bit generator data
-	UDWORD weakcnt;    // number of weak data areas
+	uint32_t type;       // track type
+	uint32_t cylinder;   // cylinder#
+	uint32_t head;       // head#
+	uint32_t sectorcnt;  // available sectors
+	uint32_t sectorsize; // sector size, unused
+	uint8_t *trackbuf;   // track buffer memory 
+	uint32_t tracklen;   // track buffer memory length
+	uint32_t timelen;    // timing buffer length
+	uint32_t *timebuf;   // timing buffer
+	int32_t overlap;    // overlap position
+	uint32_t startbit;   // start position of the decoding
+	uint32_t wseed;      // weak bit generator data
+	uint32_t weakcnt;    // number of weak data areas
 };
 
 typedef struct CapsTrackInfoT2 *PCAPSTRACKINFOT2;
 
 // disk sector information block
 struct CapsSectorInfo {
-	UDWORD descdatasize; // data size in bits from IPF descriptor
-	UDWORD descgapsize;  // gap size in bits from IPF descriptor
-	UDWORD datasize;     // data size in bits from decoder
-	UDWORD gapsize;      // gap size in bits from decoder
-	UDWORD datastart;    // data start position in bits from decoder
-	UDWORD gapstart;     // gap start position in bits from decoder
-	UDWORD gapsizews0;   // gap size before write splice
-	UDWORD gapsizews1;   // gap size after write splice
-	UDWORD gapws0mode;   // gap size mode before write splice
-	UDWORD gapws1mode;   // gap size mode after write splice
-	UDWORD celltype;     // bitcell type
-	UDWORD enctype;      // encoder type
+	uint32_t descdatasize; // data size in bits from IPF descriptor
+	uint32_t descgapsize;  // gap size in bits from IPF descriptor
+	uint32_t datasize;     // data size in bits from decoder
+	uint32_t gapsize;      // gap size in bits from decoder
+	uint32_t datastart;    // data start position in bits from decoder
+	uint32_t gapstart;     // gap start position in bits from decoder
+	uint32_t gapsizews0;   // gap size before write splice
+	uint32_t gapsizews1;   // gap size after write splice
+	uint32_t gapws0mode;   // gap size mode before write splice
+	uint32_t gapws1mode;   // gap size mode after write splice
+	uint32_t celltype;     // bitcell type
+	uint32_t enctype;      // encoder type
 };
 
 typedef struct CapsSectorInfo *PCAPSSECTORINFO;
 
 // disk data information block
 struct CapsDataInfo {
-	UDWORD type;  // data type
-	UDWORD start; // start position
-	UDWORD size;  // size in bits
+	uint32_t type;  // data type
+	uint32_t start; // start position
+	uint32_t size;  // size in bits
 };
 
 typedef struct CapsDataInfo *PCAPSDATAINFO;
 
 // disk data information block
 struct CapsRevolutionInfo {
-	SDWORD next; // the revolution number used by the next track lock call
-	SDWORD last; // the revolution number used by the lack track lock call
-	SDWORD real; // the real revolution number used by the last track lock call
-	SDWORD max; // the maximum revolution available for the selected track, <0 unlimited/randomized, 0 empty
+	int32_t next; // the revolution number used by the next track lock call
+	int32_t last; // the revolution number used by the lack track lock call
+	int32_t real; // the real revolution number used by the last track lock call
+	int32_t max; // the maximum revolution available for the selected track, <0 unlimited/randomized, 0 empty
 };
 
 typedef struct CapsRevolutionInfo *PCAPSREVOLUTIONINFO;
@@ -176,13 +176,13 @@ typedef struct CapsRevolutionInfo *PCAPSREVOLUTIONINFO;
 
 // CapsImageInfo.image type
 enum {
-	ciitNA=0, // invalid image type
+	ciitNA = 0, // invalid image type
 	ciitFDD   // floppy disk
 };
 
 // CapsImageInfo.platform IDs, not about configuration, but intended use
 enum {
-	ciipNA=0, // invalid platform (dummy entry)
+	ciipNA = 0, // invalid platform (dummy entry)
 	ciipAmiga,
 	ciipAtariST,
 	ciipPC,
@@ -196,7 +196,7 @@ enum {
 
 // CapsTrackInfo.track type
 enum {
-	ctitNA=0,  // invalid type
+	ctitNA = 0,  // invalid type
 	ctitNoise, // cells are unformatted (random size)
 	ctitAuto,  // automatic cell size, according to track size
 	ctitVar    // variable density
@@ -204,33 +204,33 @@ enum {
 
 // CapsSectorInfo.bitcell type
 enum {
-	csicNA=0, // invalid cell type
+	csicNA = 0, // invalid cell type
 	csic2us   // 2us cells
 };
 
 // CapsSectorInfo.encoder type
 enum {
-	csieNA=0, // undefined encoder
+	csieNA = 0, // undefined encoder
 	csieMFM,  // MFM
 	csieRaw   // no encoder used, test data only
 };
 
 // CapsSectorInfo.gap size mode
 enum {
-	csiegmFixed=0,  // fixed size, can't be changed
+	csiegmFixed = 0,  // fixed size, can't be changed
 	csiegmAuto,     // size can be changed, resize information calculated automatically
 	csiegmResize    // size can be changed, resize information is scripted
 };
 
 // CapsDataInfo.data type
 enum {
-	cditNA=0, // undefined
+	cditNA = 0, // undefined
 	cditWeak  // weak bits
 };
 
 // CAPSGetInfo inftype
 enum {
-	cgiitNA=0,      // illegal
+	cgiitNA = 0,      // illegal
 	cgiitSector,    // CapsSectorInfo
 	cgiitWeak,      // CapsDataInfo, weak bits
 	cgiitRevolution // CapsRevolutionInfo
@@ -238,7 +238,7 @@ enum {
 
 // recognized image types
 enum {
-	citError=0,     // error preventing the type identification
+	citError = 0,     // error preventing the type identification
 	citUnknown,     // unknown image type
 	citIPF,         // IPF image
 	citCTRaw,       // CT Raw image
@@ -249,7 +249,7 @@ enum {
 
 // image error status
 enum {
-	imgeOk=0,
+	imgeOk = 0,
 	imgeUnsupported,
 	imgeGeneric,
 	imgeOutOfRange,

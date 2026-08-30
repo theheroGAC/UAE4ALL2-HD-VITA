@@ -5,51 +5,123 @@
 
 #pragma once
 
-// OS compatiblity
-//#include "targetver.h"		//-- Linux changes
+// default to little-endian platform, unless specified otherwise
+#if !defined(__BYTE_ORDER__) || (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#define LITTLE_ENDIAN
+#endif
+
+#ifdef _WIN32
+
+// OS compatibility
+#include "targetver.h"
 
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
-
-// Windows specific
-//#include <windows.h>			//-- Linux changes
 
 // detect memory leaks in debug builds
 #define _CRTDBG_MAP_ALLOC
 
-// standard C/C++ includes
-#include <stdlib.h>
-//#include <crtdbg.h>			//-- Linux changes
-#include <stdint.h>
-#include <stdio.h>
-#include <assert.h>
-#include <vector>
-//#include <io.h>			//-- Linux changes
-//#include <direct.h>			//-- Linux changes
-#include <dirent.h>
+// don't define min-max macros
+#define NOMINMAX
 
-//-- Linux changes
-#include <stddef.h>			// offsetof
-#include <string.h>
-#include <ctype.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <time.h>			// localtime
-#define MAX_PATH ( 260 )
-#ifndef __cdecl
-#define __cdecl
+// Windows specific
+#include <windows.h>
+#include <crtdbg.h>
 #endif
-#define _lrotl(x,n) (((x) << (n)) | ((x) >> (sizeof(x)*8-(n))))
-#define _lrotr(x,n) (((x) >> (n)) | ((x) << (sizeof(x)*8-(n))))
-typedef const char *LPCSTR;
-typedef const char *LPCTSTR;
-//-- Linux changes
+
+// standard C/C++ includes
+#include <cstdlib>
+#include <cstdint>
+#include <cstdio>
+#include <cassert>
+#include <unordered_map>
+#include <string_view>
+#include <string>
+#include <string.h> //memcpy & co
+#include <limits>
+#include <vector>
+#include <algorithm>
+#include <memory>
+#ifdef __APPLE__
+#include <sys/syslimits.h>
+#include <sys/stat.h>
+#include <iostream>
+#include <unistd.h>
+#define off64_t off_t
+#define fopen64 fopen
+#define fseeko64 fseeko
+#define ftello64 ftello
+#endif // __APPLE__
+
+#ifdef ANDROID
+#if __ANDROID_API__ < 24
+#define fopen64 fopen
+#define fseeko64 fseeko
+#define ftello64 ftello
+#endif
+#endif
+
+#ifndef _WIN32
+
+#define __cdecl
+#define DllImport
+typedef uint16_t WORD;
+typedef const char* LPCSTR;
+typedef char* LPSTR;
+typedef uint32_t DWORD;
+typedef uint8_t BYTE;
+typedef int BOOL;
+
+typedef struct _SYSTEMTIME {
+	WORD wYear;
+	WORD wMonth;
+	WORD wDayOfWeek;
+	WORD wDay;
+	WORD wHour;
+	WORD wMinute;
+	WORD wSecond;
+	WORD wMilliseconds;
+} SYSTEMTIME, *LPSYSTEMTIME;
+
+#include <time.h>
+
+static inline void GetLocalTime(LPSYSTEMTIME lpSystemTime)
+{
+	if (!lpSystemTime) return;
+	time_t t = time(NULL);
+	struct tm *tm_info = localtime(&t);
+	if (tm_info) {
+		lpSystemTime->wYear = (WORD)(tm_info->tm_year + 1900);
+		lpSystemTime->wMonth = (WORD)(tm_info->tm_mon + 1);
+		lpSystemTime->wDayOfWeek = (WORD)tm_info->tm_wday;
+		lpSystemTime->wDay = (WORD)tm_info->tm_mday;
+		lpSystemTime->wHour = (WORD)tm_info->tm_hour;
+		lpSystemTime->wMinute = (WORD)tm_info->tm_min;
+		lpSystemTime->wSecond = (WORD)tm_info->tm_sec;
+		lpSystemTime->wMilliseconds = 0;
+	} else {
+		memset(lpSystemTime, 0, sizeof(*lpSystemTime));
+	}
+}
+
+#endif // !_WIN32
+
+#ifndef COMMONTYPES_LEGACY
+#define COMMONTYPES_LEGACY
+#endif
 
 
-#define INTEL
-#define MAX_FILENAMELEN (MAX_PATH*2)
+
+// add missing 64 bit stream functions to stdio
+// MinGW already provides fopen64/fseeko64/ftello64 and off64_t natively
+#if defined(_WIN32) && !defined(__MINGW32__)
+#include <stream64.h>
+#endif
 
 // external definitions
 #include "CommonTypes.h"
+
+// IPF library public definitions
+#include "CapsLibAll.h"
 
 // Core components
 #include "BaseFile.h"
@@ -57,9 +129,6 @@ typedef const char *LPCTSTR;
 #include "MemoryFile.h"
 #include "CRC.h"
 #include "BitBuffer.h"
-
-// IPF library public definitions
-#include "CapsLibAll.h"
 
 // CODECs
 #include "DiskEncoding.h"
@@ -77,36 +146,10 @@ typedef const char *LPCTSTR;
 #include "DiskImageFactory.h"
 
 // Device access
+#define C2_APP_ACCESS
 #include "C2Comm.h"
 
 // system
 #include "CapsCore.h"
 #include "CapsFDCEmulator.h"
 #include "CapsFormatMFM.h"
-
-
-//-- Linux changes
-#define _access access
-#ifndef __MINGW32__
-#define _mkdir(x) mkdir(x,0)
-#else
-#define _mkdir(x) mkdir(x)
-#endif
-#define d_namlen d_reclen
-#define __assume(cond) do { if (!(cond)) __builtin_unreachable(); } while (0)
-#define min(x, y) (((x) < (y)) ? (x) : (y))
-
-typedef struct _SYSTEMTIME {
-        WORD wYear;
-        WORD wMonth;
-        WORD wDayOfWeek;
-        WORD wDay;
-        WORD wHour;
-        WORD wMinute;
-        WORD wSecond;
-        WORD wMilliseconds;
-} SYSTEMTIME, *LPSYSTEMTIME;
-extern "C" void GetLocalTime(LPSYSTEMTIME lpSystemTime);
-//-- Linux changes
-
-
