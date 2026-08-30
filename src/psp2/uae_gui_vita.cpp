@@ -29,6 +29,7 @@
 
 #include "uae_gui_vita.h"
 #include "ftp_server.h"
+#include "psp2_kbdvita.h"
 
 static void ttf_shutdown_cleanup(void);
 
@@ -71,19 +72,7 @@ static void vita_gui_free_screen(void)
         return;
 
     write_log("[VITA] vita_gui_free_screen: freeing %dx%d\n", prSDLScreen->w, prSDLScreen->h);
-    if (prSDLScreen->hwdata != NULL) {
-        private_hwdata *hw = (private_hwdata *)prSDLScreen->hwdata;
-        write_log("[VITA] vita_gui_free_screen: wait rendering\n");
-        vita2d_wait_rendering_done();
-        write_log("[VITA] vita_gui_free_screen: rendering done\n");
-        if (hw->texture != NULL) {
-            vita2d_free_texture(hw->texture);
-            hw->texture = NULL;
-        }
-        SDL_free(prSDLScreen->hwdata);
-        prSDLScreen->hwdata = NULL;
-        prSDLScreen->pixels = NULL;
-    }
+    vita2d_wait_rendering_done();
     SDL_FreeSurface(prSDLScreen);
     prSDLScreen = NULL;
     write_log("[VITA] vita_gui_free_screen: done\n");
@@ -93,6 +82,13 @@ static bool s_gui_initialized = false;
 static float s_boing_angle = 0.0f;
 static VitaGuiTab s_active_tab = VITA_TAB_FLOPPY;
 static int s_tab_selected_item[VITA_TAB_COUNT] = {0};
+static int s_save_as_ime_active = 0;
+static int s_save_as_ime_result = 0;
+static char s_save_as_ime_name[100];
+void vita_gui_save_as_started(void) { s_save_as_ime_active = 1; }
+extern char *config_filename;
+extern const char *config_save_as_name;
+extern int buttonSelect[4];
 
 static const unsigned char s_font_8x8[96][8] = {
     {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
@@ -260,16 +256,10 @@ void vita_gui_shutdown_final(void)
 
 void vita_gui_prepare_exit(void)
 {
-    if (prSDLScreen && prSDLScreen->hwdata) {
-        private_hwdata *hw = (private_hwdata *)prSDLScreen->hwdata;
+    if (prSDLScreen) {
         vita2d_wait_rendering_done();
-        if (hw->texture) {
-            vita2d_free_texture(hw->texture);
-            hw->texture = NULL;
-        }
-        SDL_free(prSDLScreen->hwdata);
-        prSDLScreen->hwdata = NULL;
-        prSDLScreen->pixels = NULL;
+        SDL_FreeSurface(prSDLScreen);
+        prSDLScreen = NULL;
     }
     s_gui_initialized = false;
     displaying_menu = 0;
@@ -1049,6 +1039,32 @@ void vita_draw_button_item(float x, float y, float w, float h, const char *title
     vita_draw_button_item_custom(x, y, w, h, title, subtitle, badge, badge_col, focused, active);
 }
 
+int vita_list_visible_rows(float start_y, float item_h, float gap)
+{
+    float available = VITA_LIST_BOTTOM_Y - start_y;
+    if (available < item_h)
+        return 1;
+    int rows = (int)((available + gap) / (item_h + gap));
+    if (rows < 1)
+        rows = 1;
+    while (rows > 1) {
+        float used = (float)rows * item_h + (float)(rows - 1) * gap;
+        if (start_y + used <= VITA_LIST_BOTTOM_Y)
+            break;
+        rows--;
+    }
+    return rows;
+}
+
+void vita_draw_list_page_indicator(int selected_item, int total_items, int visible_items)
+{
+    if (total_items <= visible_items)
+        return;
+    char page_buf[24];
+    snprintf(page_buf, sizeof(page_buf), "%d / %d", selected_item + 1, total_items);
+    vita_draw_text_right(VITA_SCREEN_W - 20.0f, VITA_LIST_BOTTOM_Y - 18.0f, VITA_COLOR_TEXT_MUTED, 0.80f, page_buf);
+}
+
 void vita_draw_selector_item(float x, float y, float w, float h, const char *title, const char *current_value, bool focused)
 {
     vita_draw_card(x, y, w, h, focused, false);
@@ -1261,7 +1277,7 @@ void vita_show_about_box(void)
 {
     static const CreditLine credits[] = {
         { "UAE4ALL2 HD Vita", CR_TITLE },
-        { "Version 1.06 - Amiga Emulator for PS Vita", CR_SUBTITLE },
+        { "Version 1.07 - Amiga Emulator for PS Vita", CR_SUBTITLE },
         { "", CR_EMPTY },
         { "A high-definition port of the classic UAE4ALL Amiga emulator,", CR_TEXT },
         { "now with WHDLoad, HDF, IPF and CD32 support on the Vita.", CR_TEXT },
@@ -1614,7 +1630,9 @@ int run_overlay_vita(void)
     int selected = 0;
     int frame_count = 0;
     memset(&input, 0, sizeof(input));
+    sceCtrlPeekBufferPositive(0, &input.prev_pad, 1);
     memset(&sysinfo, 0, sizeof(sysinfo));
+    buttonSelect[0] = 0;
     inside_menu = 1;
 
     while (1) {
@@ -1698,8 +1716,10 @@ int run_mainMenu_vita(void)
 
     VitaInputState input;
     memset(&input, 0, sizeof(input));
+    sceCtrlPeekBufferPositive(0, &input.prev_pad, 1);
     VitaSystemInfo sysinfo;
     memset(&sysinfo, 0, sizeof(sysinfo));
+    buttonSelect[0] = 0;
 
     mainMenu_case = -1;
     int menu_frame = 0;
@@ -1714,6 +1734,22 @@ int run_mainMenu_vita(void)
         if (menu_frame <= 3)
             write_log("[VITA] menu: frame %d input begin\n", menu_frame);
         vita_gui_update_input(&input);
+        if (s_save_as_ime_active) {
+            s_save_as_ime_result = kbdvita_update();
+            if (s_save_as_ime_result == 2 || s_save_as_ime_result == 3) {
+                const char *ime_name = kbdvita_result();
+                if (s_save_as_ime_result == 2 && ime_name && ime_name[0]) {
+                    strncpy(s_save_as_ime_name, ime_name, sizeof(s_save_as_ime_name) - 1);
+                    s_save_as_ime_name[sizeof(s_save_as_ime_name) - 1] = '\0';
+                    config_save_as_name = s_save_as_ime_name;
+                    saveconfig(4);
+                    config_save_as_name = NULL;
+                }
+                s_save_as_ime_active = 0;
+                input.pressed = 0;
+            }
+            continue;
+        }
         if (menu_frame <= 3)
             write_log("[VITA] menu: frame %d input done buttons=0x%08x\n", menu_frame, input.pressed);
         vita_gui_update_system_info(&sysinfo);
@@ -1794,14 +1830,7 @@ int run_mainMenu_vita(void)
                 vita_view_savestates(&input, cur_sel);
                 break;
             case VITA_TAB_SYSTEM:
-                if (*cur_sel == 5 && (input.pressed & SCE_CTRL_CROSS)) {
-                    s_active_tab = VITA_TAB_SYSTEM;
-                    vita_view_ftp(&input, cur_sel);
-                } else if (*cur_sel == 5 && vita_ftp_is_running()) {
-                    vita_view_ftp(&input, cur_sel);
-                } else {
-                    vita_view_system(&input, cur_sel);
-                }
+                vita_view_system(&input, cur_sel);
                 break;
             default:
                 break;

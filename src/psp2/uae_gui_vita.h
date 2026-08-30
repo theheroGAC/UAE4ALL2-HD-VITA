@@ -16,6 +16,11 @@ extern "C" {
 
 #define VITA_SCREEN_W 960
 #define VITA_SCREEN_H 544
+#define VITA_FOOTER_H 42.0f
+#define VITA_LIST_START_Y 90.0f
+#define VITA_LIST_ITEM_H 48.0f
+#define VITA_LIST_ITEM_GAP 6.0f
+#define VITA_LIST_BOTTOM_Y ((float)VITA_SCREEN_H - VITA_FOOTER_H - 4.0f)
 
 #ifndef RGBA8
 #define RGBA8(r,g,b,a) ((((a)&0xFF)<<24) | (((b)&0xFF)<<16) | (((g)&0xFF)<<8) | (((r)&0xFF)<<0))
@@ -82,6 +87,7 @@ void vita_gui_shutdown_final(void);
 void vita_gui_prepare_exit(void);
 void vita_gui_update_input(VitaInputState *input);
 void vita_gui_update_system_info(VitaSystemInfo *sysinfo);
+void vita_gui_save_as_started(void);
 
 void vita_draw_rounded_rect(float x, float y, float w, float h, float r, unsigned int color);
 void vita_draw_rounded_rect_outline(float x, float y, float w, float h, float r, float thickness, unsigned int color);
@@ -121,6 +127,8 @@ void vita_draw_led(float x, float y, const char *label, bool state, unsigned int
 void vita_draw_button_item(float x, float y, float w, float h, const char *title, const char *subtitle, const char *badge, bool focused, bool active);
 void vita_draw_button_item_custom(float x, float y, float w, float h, const char *title, const char *subtitle, const char *badge, unsigned int badge_col, bool focused, bool active);
 void vita_draw_selector_item(float x, float y, float w, float h, const char *title, const char *current_value, bool focused);
+int vita_list_visible_rows(float start_y, float item_h, float gap);
+void vita_draw_list_page_indicator(int selected_item, int total_items, int visible_items);
 void vita_draw_switch_item(float x, float y, float w, float h, const char *title, bool enabled, bool focused);
 void vita_draw_slider_item(float x, float y, float w, float h, const char *title, int val, int min, int max, const char *suffix, bool focused);
 

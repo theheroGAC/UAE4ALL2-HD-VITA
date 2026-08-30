@@ -68,7 +68,14 @@ int vita_ftp_start(void)
     if (!ftp_network_init())
         return -1;
 
-    s_ip[0] = '\0';
+    SceNetCtlInfo net_info;
+    memset(&net_info, 0, sizeof(net_info));
+    if (sceNetCtlInetGetInfo(SCE_NETCTL_INFO_GET_IP_ADDRESS, &net_info) < 0 || net_info.ip_address[0] == '\0') {
+        ftp_network_term();
+        return -1;
+    }
+    strncpy(s_ip, net_info.ip_address, sizeof(s_ip) - 1);
+    s_ip[sizeof(s_ip) - 1] = '\0';
     s_port = 1337;
     ftpvita_set_info_log_cb(ftp_info_log_callback);
     if (ftpvita_init(s_ip, &s_port) < 0) {
@@ -77,9 +84,20 @@ int vita_ftp_start(void)
         return -1;
     }
 
+    ftpvita_add_device("app0:");
     ftpvita_add_device("ux0:");
     ftpvita_add_device("ur0:");
     ftpvita_add_device("uma0:");
+    ftpvita_add_device("gro0:");
+    ftpvita_add_device("grw0:");
+    ftpvita_add_device("os0:");
+    ftpvita_add_device("pd0:");
+    ftpvita_add_device("sa0:");
+    ftpvita_add_device("tm0:");
+    ftpvita_add_device("ud0:");
+    ftpvita_add_device("vd0:");
+    ftpvita_add_device("vs0:");
+    ftpvita_set_file_buf_size(512 * 1024);
     s_ftp_active = 1;
     return 0;
 }

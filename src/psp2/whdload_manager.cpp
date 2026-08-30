@@ -13,6 +13,7 @@
 #include <archive_entry.h>
 
 #include "whdload_manager.h"
+#include "menu_config.h"
 
 static int path_exists(const char *path, int *is_dir)
 {
@@ -1012,7 +1013,10 @@ int vita_whdload_prepare_launch(const char *game_name)
     }
 
     char launch_line[640];
-    snprintf(launch_line, sizeof(launch_line), "CD \"%s\"\nC:WHDLoad \"%s\" PRELOAD\n", amiga_dir, slave_file);
+    if (mainMenu_whdload_args[0])
+        snprintf(launch_line, sizeof(launch_line), "CD \"%s\"\nC:WHDLoad \"%s\" %s PRELOAD\n", amiga_dir, slave_file, mainMenu_whdload_args);
+    else
+        snprintf(launch_line, sizeof(launch_line), "CD \"%s\"\nC:WHDLoad \"%s\" PRELOAD\n", amiga_dir, slave_file);
 
     char *updated_startup = (char *)calloc(1, 66000);
     if (!updated_startup) {
@@ -1032,7 +1036,7 @@ int vita_whdload_prepare_launch(const char *game_name)
             strcat(updated_startup, launch_line);
         }
     } else {
-        snprintf(updated_startup, 66000, "CD \"%s\"\nC:WHDLoad \"%s\" PRELOAD\n", amiga_dir, slave_file);
+        snprintf(updated_startup, 66000, "%s", launch_line);
     }
 
     write_text_file(startup_path, updated_startup);

@@ -64,6 +64,8 @@ extern int mainMenu_showStatus;
 extern int mainMenu_leftStickMouse;
 extern int mainMenu_touchControls;
 extern int mainMenu_autofire;
+extern int mainMenu_autofireRate;
+extern bool switch_autofire;
 extern int mainMenu_pinballMode;
 extern int moveY;
 extern int mainMenu_soundStereo;
@@ -76,10 +78,261 @@ extern char *savestate_filename;
 extern char *screenshot_filename;
 extern int savestate_state;
 extern int presetModeId;
+extern int mainMenu_frameskip;
+extern int mainMenu_floppyWriteProtect[4];
+extern int mainMenu_cycleExact;
+extern int mainMenu_joyPort;
+extern int mainMenu_mouseEmulation;
+extern int mainMenu_deadZone;
+extern int mainMenu_scanlines;
+extern int mainMenu_autosave;
+extern char mainMenu_whdload_args[256];
+extern void disk_set_write_protect(int num, int enabled);
+extern int disk_get_write_protect(int num);
+extern int mainMenu_cutLeft;
+extern int mainMenu_cutRight;
+extern int mainMenu_footerSize;
+extern int mainMenu_screenOffsetY;
+extern int mainMenu_screenOffsetX;
+extern int visibleAreaWidth;
+extern int mainMenu_displayHires;
 extern int mainMenu_case;
 extern int emulating;
 extern int kickstart_warning;
 extern volatile int vita_screenshot_request;
+extern int mainMenu_sound;
+extern int mainMenu_CPU_speed;
+extern int mainMenu_spriteCollisions;
+extern int mainMenu_customControls;
+extern int mainMenu_custom_currentlyEditingControllerNr;
+extern int mainMenu_custom_controlSet;
+extern int mainMenu_custom_up[MAX_NUM_CONTROLLERS];
+extern int mainMenu_custom_down[MAX_NUM_CONTROLLERS];
+extern int mainMenu_custom_left[MAX_NUM_CONTROLLERS];
+extern int mainMenu_custom_right[MAX_NUM_CONTROLLERS];
+extern int mainMenu_custom_stickup[MAX_NUM_CONTROLLERS];
+extern int mainMenu_custom_stickdown[MAX_NUM_CONTROLLERS];
+extern int mainMenu_custom_stickleft[MAX_NUM_CONTROLLERS];
+extern int mainMenu_custom_stickright[MAX_NUM_CONTROLLERS];
+extern int mainMenu_custom_A[MAX_NUM_CONTROLLERS];
+extern int mainMenu_custom_B[MAX_NUM_CONTROLLERS];
+extern int mainMenu_custom_X[MAX_NUM_CONTROLLERS];
+extern int mainMenu_custom_Y[MAX_NUM_CONTROLLERS];
+extern int mainMenu_custom_L[MAX_NUM_CONTROLLERS];
+extern int mainMenu_custom_R[MAX_NUM_CONTROLLERS];
+extern int mainMenu_customPreset_up[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
+extern int mainMenu_customPreset_down[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
+extern int mainMenu_customPreset_left[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
+extern int mainMenu_customPreset_right[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
+extern int mainMenu_customPreset_stickup[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
+extern int mainMenu_customPreset_stickdown[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
+extern int mainMenu_customPreset_stickleft[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
+extern int mainMenu_customPreset_stickright[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
+extern int mainMenu_customPreset_A[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
+extern int mainMenu_customPreset_B[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
+extern int mainMenu_customPreset_X[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
+extern int mainMenu_customPreset_Y[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
+extern int mainMenu_customPreset_L[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
+extern int mainMenu_customPreset_R[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
+extern int mainMenu_mouseMultiplier;
+extern int mainMenu_vkbdLanguage;
+extern int mainMenu_vkbdStyle;
+extern int mainMenu_vkbdTransparency;
+extern int mainMenu_vkbdPosition;
+extern char config_load_filename[300];
+extern char save_import_filename[300];
+extern int saveconfig(int general);
+extern const char *config_save_as_name;
+extern void loadconfig(int general);
+extern void SetDefaultMenuSettings(int general);
+extern void remap_custom_controls(void);
+extern void mapback_custom_controls(void);
+extern void check_all_prefs(void);
+extern void update_display(void);
+extern void getChanges(void);
+extern "C" char *kbdvita_get(char *title, const char *initial_text, int maxLen, int multiline);
+extern "C" int kbdvita_start(char *title, const char *initial_text, int maxLen, int multiline);
+extern void stateFilenameToThumbFilename(char *src, char *dst);
+extern void make_savestate_filenames(char *save, char *thumb);
+extern int vkbd_init(void);
+extern void vkbd_quit(void);
+
+typedef struct {
+    int id;
+    const char *name;
+} CustomActionInfo;
+
+static const CustomActionInfo s_custom_actions[] = {
+    { 0, "None (Disabled)" },
+    { -3, "Joy Fire 1 (Primary)" },
+    { -4, "Joy Fire 2 (Secondary)" },
+    { -5, "Joy UP (Jump)" },
+    { -6, "Joy DOWN" },
+    { -7, "Joy LEFT" },
+    { -8, "Joy RIGHT" },
+    { -1, "Mouse Left Click" },
+    { -2, "Mouse Right Click" },
+    { -25, "Slow Down Mouse (Hold)" },
+    { -26, "Speed Up Mouse (Hold)" },
+    { -27, "Quick Save State" },
+    { -28, "Quick Load State" },
+    { -9, "Joy 2 UP" },
+    { -10, "Joy 2 DOWN" },
+    { -11, "Joy 2 LEFT" },
+    { -12, "Joy 2 RIGHT" },
+    { -13, "Joy 3 Fire 1" },
+    { -14, "Joy 3 Fire 2" },
+    { -15, "Joy 3 UP" },
+    { -16, "Joy 3 DOWN" },
+    { -17, "Joy 3 LEFT" },
+    { -18, "Joy 3 RIGHT" },
+    { -19, "Joy 4 Fire 1" },
+    { -20, "Joy 4 Fire 2" },
+    { -21, "Joy 4 UP" },
+    { -22, "Joy 4 DOWN" },
+    { -23, "Joy 4 LEFT" },
+    { -24, "Joy 4 RIGHT" },
+    { 23, "Amiga SPACE" },
+    { 26, "Amiga RETURN" },
+    { 27, "Amiga ESCAPE" },
+    { 24, "Amiga BACKSPACE" },
+    { 25, "Amiga TAB" },
+    { 37, "Amiga HELP" },
+    { 28, "Amiga DELETE" },
+    { 29, "Amiga Left SHIFT" },
+    { 30, "Amiga Right SHIFT" },
+    { 31, "Amiga CAPS LOCK" },
+    { 32, "Amiga CTRL" },
+    { 33, "Amiga Left ALT" },
+    { 34, "Amiga Right ALT" },
+    { 35, "Amiga Left AMIGA" },
+    { 36, "Amiga Right AMIGA" },
+    { 1, "Amiga Arrow UP" },
+    { 2, "Amiga Arrow DOWN" },
+    { 3, "Amiga Arrow LEFT" },
+    { 4, "Amiga Arrow RIGHT" },
+    { 87, "Amiga F1" },
+    { 88, "Amiga F2" },
+    { 89, "Amiga F3" },
+    { 90, "Amiga F4" },
+    { 91, "Amiga F5" },
+    { 92, "Amiga F6" },
+    { 93, "Amiga F7" },
+    { 94, "Amiga F8" },
+    { 95, "Amiga F9" },
+    { 96, "Amiga F10" },
+    { 77, "Amiga 1" },
+    { 78, "Amiga 2" },
+    { 79, "Amiga 3" },
+    { 80, "Amiga 4" },
+    { 81, "Amiga 5" },
+    { 82, "Amiga 6" },
+    { 83, "Amiga 7" },
+    { 84, "Amiga 8" },
+    { 85, "Amiga 9" },
+    { 86, "Amiga 0" },
+    { 51, "Amiga A" },
+    { 52, "Amiga B" },
+    { 53, "Amiga C" },
+    { 54, "Amiga D" },
+    { 55, "Amiga E" },
+    { 56, "Amiga F" },
+    { 57, "Amiga G" },
+    { 58, "Amiga H" },
+    { 59, "Amiga I" },
+    { 60, "Amiga J" },
+    { 61, "Amiga K" },
+    { 62, "Amiga L" },
+    { 63, "Amiga M" },
+    { 64, "Amiga N" },
+    { 65, "Amiga O" },
+    { 66, "Amiga P" },
+    { 67, "Amiga Q" },
+    { 68, "Amiga R" },
+    { 69, "Amiga S" },
+    { 70, "Amiga T" },
+    { 71, "Amiga U" },
+    { 72, "Amiga V" },
+    { 73, "Amiga W" },
+    { 74, "Amiga X" },
+    { 75, "Amiga Y" },
+    { 76, "Amiga Z" },
+    { 5, "Numpad 0" },
+    { 6, "Numpad 1" },
+    { 7, "Numpad 2" },
+    { 8, "Numpad 3" },
+    { 9, "Numpad 4" },
+    { 10, "Numpad 5" },
+    { 11, "Numpad 6" },
+    { 12, "Numpad 7" },
+    { 13, "Numpad 8" },
+    { 14, "Numpad 9" },
+    { 15, "Numpad ENTER" },
+    { 16, "Numpad /" },
+    { 17, "Numpad *" },
+    { 18, "Numpad -" },
+    { 19, "Numpad +" },
+    { 20, "Numpad DEL" },
+    { 21, "Numpad (" },
+    { 22, "Numpad )" },
+    { 38, "Amiga [" },
+    { 39, "Amiga ]" },
+    { 40, "Amiga ;" },
+    { 41, "Amiga ," },
+    { 42, "Amiga ." },
+    { 43, "Amiga /" },
+    { 44, "Amiga \\" },
+    { 45, "Amiga '" },
+    { 46, "Amiga #" },
+    { 47, "Amiga <>" },
+    { 48, "Amiga `" },
+    { 49, "Amiga -" },
+    { 50, "Amiga =" }
+};
+
+static const int s_num_custom_actions = sizeof(s_custom_actions) / sizeof(s_custom_actions[0]);
+
+static const char *vita_get_custom_action_name(int action_id)
+{
+    for (int i = 0; i < s_num_custom_actions; i++) {
+        if (s_custom_actions[i].id == action_id)
+            return s_custom_actions[i].name;
+    }
+    return "Custom / None";
+}
+
+static int vita_cycle_custom_action(int current_id, int direction)
+{
+    int current_idx = 0;
+    for (int i = 0; i < s_num_custom_actions; i++) {
+        if (s_custom_actions[i].id == current_id) {
+            current_idx = i;
+            break;
+        }
+    }
+    current_idx = (current_idx + direction + s_num_custom_actions) % s_num_custom_actions;
+    return s_custom_actions[current_idx].id;
+}
+
+static bool vita_copy_file(const char *src_path, const char *dst_path)
+{
+    if (!src_path || !dst_path || src_path[0] == '\0' || dst_path[0] == '\0') return false;
+    FILE *src = fopen(src_path, "rb");
+    if (!src) return false;
+    FILE *dst = fopen(dst_path, "wb");
+    if (!dst) {
+        fclose(src);
+        return false;
+    }
+    char buf[8192];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), src)) > 0) {
+        fwrite(buf, 1, n, dst);
+    }
+    fclose(src);
+    fclose(dst);
+    return true;
+}
 
 static void copy_drive_path(char *destination, const char *source)
 {
@@ -176,7 +429,13 @@ int vita_set_kickstart(int index, int load_rom)
 
 void vita_view_floppy(VitaInputState *input, int *selected_item)
 {
-    const int total_items = 6;
+    static bool s_swap_active = false;
+    static int s_circle_cooldown = 0;
+    if (s_circle_cooldown > 0)
+        s_circle_cooldown--;
+    for (int i = 0; i < 4; i++)
+        disk_set_write_protect(i, mainMenu_floppyWriteProtect[i]);
+    const int total_items = 7;
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
 
@@ -197,6 +456,8 @@ void vita_view_floppy(VitaInputState *input, int *selected_item)
             char new_file[512];
             new_file[0] = '\0';
             int res = vita_gui_run_browser(new_file, currentDir, *selected_item);
+            input->pressed = 0;
+            s_circle_cooldown = 3;
             if (res == 1) {
                 write_log("[VITA] floppy: selected DF%d path=%s\n", *selected_item, new_file);
                 if (*selected_item == 0) copy_drive_path(uae4all_image_file0, new_file);
@@ -213,6 +474,13 @@ void vita_view_floppy(VitaInputState *input, int *selected_item)
                 if (*selected_item == 3) uae4all_image_file3[0] = '\0';
                 gui_update();
             }
+        } else if (*selected_item == 6) {
+            char temp[256];
+            strncpy(temp, uae4all_image_file0, 255); temp[255] = '\0';
+            strncpy(uae4all_image_file0, uae4all_image_file1, 255); uae4all_image_file0[255] = '\0';
+            strncpy(uae4all_image_file1, temp, 255); uae4all_image_file1[255] = '\0';
+            s_swap_active = !s_swap_active;
+            gui_update();
         } else if (*selected_item == 4) {
             if (mainMenu_floppyspeed == 100) mainMenu_floppyspeed = 200;
             else if (mainMenu_floppyspeed == 200) mainMenu_floppyspeed = 400;
@@ -235,13 +503,20 @@ void vita_view_floppy(VitaInputState *input, int *selected_item)
         gui_update();
     }
 
+    if ((input->pressed & SCE_CTRL_CIRCLE) && s_circle_cooldown == 0) {
+        if (*selected_item >= 0 && *selected_item <= 3) {
+            mainMenu_floppyWriteProtect[*selected_item] = !mainMenu_floppyWriteProtect[*selected_item];
+            disk_set_write_protect(*selected_item, mainMenu_floppyWriteProtect[*selected_item]);
+        }
+    }
+
     if (input->pressed & SCE_CTRL_SQUARE) {
         mainMenu_case = MAIN_MENU_CASE_RESET;
     }
 
     float card_x = 20.0f;
     float card_w = VITA_SCREEN_W - 40.0f;
-    float start_y = 90.0f;
+    const float start_y = VITA_LIST_START_Y;
     float slot_h = 56.0f;
 
     char *drive_files[4] = { uae4all_image_file0, uae4all_image_file1, uae4all_image_file2, uae4all_image_file3 };
@@ -265,6 +540,8 @@ void vita_view_floppy(VitaInputState *input, int *selected_item)
         unsigned int file_col = has_disk ? (focused ? VITA_COLOR_TEXT_WHITE : RGBA8(230, 240, 255, 255)) : VITA_COLOR_TEXT_DIM;
         vita_draw_text(card_x + 64.0f, cy + 28.0f, file_col, 1.00f, filename_buf);
 
+        vita_draw_led(card_x + card_w - 180.0f, cy + 18.0f, mainMenu_floppyWriteProtect[i] ? "PROT" : "RW", true, mainMenu_floppyWriteProtect[i] ? VITA_COLOR_AMIGA_RED : VITA_COLOR_AMIGA_GREEN);
+
         vita_draw_led(card_x + card_w - 110.0f, cy + 18.0f, has_disk ? "LOADED" : "EMPTY", has_disk, VITA_COLOR_AMIGA_ORANGE);
     }
 
@@ -274,6 +551,9 @@ void vita_view_floppy(VitaInputState *input, int *selected_item)
     vita_draw_selector_item(card_x, spd_y, (card_w * 0.5f) - 6.0f, 44.0f, "Floppy Speed", spd_str, *selected_item == 4);
 
     vita_draw_button_item(card_x + (card_w * 0.5f) + 6.0f, spd_y, (card_w * 0.5f) - 6.0f, 44.0f, "Eject All Disks", NULL, "EJECT", *selected_item == 5, false);
+
+    float swap_y = spd_y + 50.0f;
+    vita_draw_switch_item(card_x, swap_y, card_w, 38.0f, "Swap DF0 / DF1", s_swap_active, *selected_item == 6);
 }
 
 static int s_hdf_mgr_slot = -1;
@@ -615,7 +895,7 @@ void vita_view_hard_disk(VitaInputState *input, int *selected_item)
 
     float card_x = 20.0f;
     float card_w = VITA_SCREEN_W - 40.0f;
-    float start_y = 90.0f;
+    const float start_y = VITA_LIST_START_Y;
     float item_h = 56.0f;
 
     for (int i = 0; i < 4; i++) {
@@ -696,7 +976,7 @@ static void whdload_install_flow(void)
     char installed_path[512];
     archive_path[0] = '\0';
     installed_path[0] = '\0';
-    int result = vita_gui_run_browser(archive_path, currentDir, 9);
+    int result = vita_gui_run_browser(archive_path, currentDir, 11);
     if (result == 1) {
         if (vita_whdload_install_lha(archive_path, installed_path, sizeof(installed_path))) {
             vita_show_message_box("WHDLoad Installed", "The LHA archive was extracted to the WHDLoad library.", "OK (X)");
@@ -916,7 +1196,7 @@ void vita_view_whdload(VitaInputState *input, int *selected_item)
             vis_index[vis_count++] = k;
     }
 
-    const int total_items = 4 + vis_count;
+    const int total_items = 5 + vis_count;
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
     if (total_items <= 0) return;
@@ -930,8 +1210,8 @@ void vita_view_whdload(VitaInputState *input, int *selected_item)
         if (*selected_item >= total_items) *selected_item = 0;
     }
 
-    if (*selected_item >= 4) {
-        const char *game = games[vis_index[*selected_item - 4]];
+    if (*selected_item >= 5) {
+        const char *game = games[vis_index[*selected_item - 5]];
         strncpy(s_whdload_last_game, game, sizeof(s_whdload_last_game) - 1);
         s_whdload_last_game[sizeof(s_whdload_last_game) - 1] = '\0';
         strncpy(mainMenu_whdload_game, game, sizeof(mainMenu_whdload_game) - 1);
@@ -942,7 +1222,7 @@ void vita_view_whdload(VitaInputState *input, int *selected_item)
         whdload_cover_unload();
     }
 
-    if ((input->pressed & (SCE_CTRL_LEFT | SCE_CTRL_RIGHT)) && *selected_item == 3) {
+    if ((input->pressed & (SCE_CTRL_LEFT | SCE_CTRL_RIGHT)) && *selected_item == 4) {
         s_whdload_filter = (s_whdload_filter + ((input->pressed & SCE_CTRL_RIGHT) ? 1 : -1) + 3) % 3;
     }
 
@@ -966,6 +1246,16 @@ void vita_view_whdload(VitaInputState *input, int *selected_item)
         } else if (*selected_item == 1) {
             whdload_install_flow();
         } else if (*selected_item == 2) {
+            char *args = kbdvita_get("WHDLoad Arguments:", mainMenu_whdload_args, 200, 0);
+            if (args) {
+                strncpy(mainMenu_whdload_args, args, sizeof(mainMenu_whdload_args) - 1);
+                mainMenu_whdload_args[sizeof(mainMenu_whdload_args) - 1] = '\0';
+                if (mainMenu_whdload_args[0])
+                    vita_show_message_box("WHDLoad Arguments", mainMenu_whdload_args, "OK (X)");
+                else
+                    vita_show_message_box("WHDLoad Arguments", "Arguments cleared. Using default.", "OK (X)");
+            }
+        } else if (*selected_item == 3) {
             strncpy(uae4all_hard_dir, vita_whdload_root(), 255);
             uae4all_hard_dir[255] = '\0';
             mainMenu_bootHD = 1;
@@ -973,10 +1263,10 @@ void vita_view_whdload(VitaInputState *input, int *selected_item)
             gui_update();
             mainMenu_whdload_game[0] = '\0';
             vita_show_message_box("WHDLoad Directory", "The WHDLoad library is selected as the HD directory. A Workbench environment is required.", "OK (X)");
-        } else if (*selected_item == 3) {
+        } else if (*selected_item == 4) {
             s_whdload_filter = (s_whdload_filter + 1) % 3;
         } else {
-            const char *game_name = games[vis_index[*selected_item - 4]];
+            const char *game_name = games[vis_index[*selected_item - 5]];
             if (vita_whdload_prepare_launch(game_name)) {
                 if (!vita_confirm_eject_for_whdload_launch())
                     return;
@@ -1007,21 +1297,22 @@ void vita_view_whdload(VitaInputState *input, int *selected_item)
         mainMenu_case = MAIN_MENU_CASE_RESET;
     }
 
-    if ((input->pressed & SCE_CTRL_SELECT) && *selected_item >= 4) {
-        whdload_toggle_favorite(games[vis_index[*selected_item - 4]]);
+    if ((input->pressed & SCE_CTRL_SELECT) && *selected_item >= 5) {
+        whdload_toggle_favorite(games[vis_index[*selected_item - 5]]);
     }
 
     float card_x = 20.0f;
     float card_w = 560.0f;
-    float start_y = 90.0f;
-    float item_h = 56.0f;
-    int visible_items = 6;
+    const float start_y = VITA_LIST_START_Y;
+    const float item_h = 56.0f;
+    const float item_gap = 8.0f;
+    const int visible_items = vita_list_visible_rows(start_y, item_h, item_gap);
     int first_item = *selected_item >= visible_items ? *selected_item - visible_items + 1 : 0;
 
     for (int i = 0; i < visible_items; i++) {
         int item = first_item + i;
         if (item >= total_items) break;
-        float y = start_y + (float)i * (item_h + 8.0f);
+        float y = start_y + (float)i * (item_h + item_gap);
         const char *title;
         const char *subtitle;
         const char *badge;
@@ -1037,16 +1328,21 @@ void vita_view_whdload(VitaInputState *input, int *selected_item)
             subtitle = "Extract a WHDLoad archive into the Vita game library";
             badge = "INSTALL";
         } else if (item == 2) {
+            title = "WHDLoad Arguments";
+            subtitle = mainMenu_whdload_args[0] ? mainMenu_whdload_args : "Custom Slave parameters (e.g. CUSTOM1=1 QUITKEY=$5D)";
+            badge = mainMenu_whdload_args[0] ? "ARGS" : "DEFAULT";
+            badge_col = mainMenu_whdload_args[0] ? VITA_COLOR_AMIGA_BLUE : VITA_COLOR_TEXT_MUTED;
+        } else if (item == 3) {
             title = "Use WHDLoad Directory";
             subtitle = "Select the library as the Amiga HD directory";
             badge = "HD DIR";
-        } else if (item == 3) {
+        } else if (item == 4) {
             title = "Library Filter";
             subtitle = "All games / favorites only / recently played";
             badge = (s_whdload_filter == 1) ? "FAVORITES" : (s_whdload_filter == 2) ? "RECENT" : "ALL GAMES";
             badge_col = VITA_COLOR_AMIGA_ORANGE;
         } else {
-            int orig = vis_index[item - 4];
+            int orig = vis_index[item - 5];
             bool fav = whdload_is_favorite(games[orig]);
             bool rec = whdload_is_recent(games[orig]);
             title = games[orig];
@@ -1057,25 +1353,27 @@ void vita_view_whdload(VitaInputState *input, int *selected_item)
         }
         vita_draw_button_item_custom(card_x, y, card_w, item_h, title, subtitle, badge, badge_col, *selected_item == item, false);
     }
+    vita_draw_list_page_indicator(*selected_item, total_items, visible_items);
 
     if (game_count == 0) {
-        vita_draw_text(card_x + 16.0f, 470.0f, VITA_COLOR_TEXT_MUTED, 0.85f, "No LHA games installed");
+        vita_draw_text(card_x + 16.0f, VITA_LIST_BOTTOM_Y - 22.0f, VITA_COLOR_TEXT_MUTED, 0.85f, "No LHA games installed");
     } else if (vis_count == 0) {
-        vita_draw_text(card_x + 16.0f, 470.0f, VITA_COLOR_TEXT_MUTED, 0.85f, "No games match the current filter");
+        vita_draw_text(card_x + 16.0f, VITA_LIST_BOTTOM_Y - 22.0f, VITA_COLOR_TEXT_MUTED, 0.85f, "No games match the current filter");
     }
 
     float preview_x = 596.0f;
     float preview_w = VITA_SCREEN_W - 20.0f - preview_x;
-    float preview_y = 90.0f;
-    float preview_h = 392.0f;
+    float preview_y = VITA_LIST_START_Y;
+    float preview_h = VITA_LIST_BOTTOM_Y - preview_y;
     vita_draw_card_custom(preview_x, preview_y, preview_w, preview_h, VITA_COLOR_CARD, VITA_COLOR_CARD_BORDER);
 
-    bool is_game = (*selected_item >= 4);
-    const char *preview_title = is_game ? games[vis_index[*selected_item - 4]]
+    bool is_game = (*selected_item >= 5);
+    const char *preview_title = is_game ? games[vis_index[*selected_item - 5]]
                               : (*selected_item == 0 ? "Download Cover Art"
                                   : (*selected_item == 1 ? "Install Game from LHA"
-                                      : (*selected_item == 2 ? "Use WHDLoad Directory" : "Library Filter")));
-    bool preview_fav = is_game && whdload_is_favorite(games[vis_index[*selected_item - 4]]);
+                                      : (*selected_item == 2 ? "WHDLoad Arguments"
+                                          : (*selected_item == 3 ? "Use WHDLoad Directory" : "Library Filter"))));
+    bool preview_fav = is_game && whdload_is_favorite(games[vis_index[*selected_item - 5]]);
 
     vita_draw_badge(preview_x + 14.0f, preview_y + 12.0f,
         is_game ? "WHDLOAD GAME" : "WHDLOAD LIBRARY",
@@ -1242,8 +1540,9 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
     
     float card_x = 20.0f;
     float card_w = VITA_SCREEN_W - 40.0f;
-    float start_y = 90.0f;
-    float item_h = 78.0f;
+    const float start_y = VITA_LIST_START_Y;
+    const float item_h = 78.0f;
+    const float item_gap = 10.0f;
 
     struct PresetInfo {
         const char *title;
@@ -1258,13 +1557,13 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
         { "Amiga CD32 (Console CD Mode)", "68020 14MHz | Kickstart 3.1 CD32 | 2MB Chip RAM + Akiko", "CD32", "Recommended for Amiga CD32 ISO and CUE disc images" }
     };
 
-    const int visible_items = 4;
+    const int visible_items = vita_list_visible_rows(start_y, item_h, item_gap);
     int first_item = *selected_item >= visible_items ? *selected_item - visible_items + 1 : 0;
 
     for (int i = 0; i < visible_items; i++) {
         int item = first_item + i;
         if (item >= total_items) break;
-        float cy = start_y + (float)i * (item_h + 10.0f);
+        float cy = start_y + (float)i * (item_h + item_gap);
         bool focused = (*selected_item == item);
 
         vita_draw_card(card_x, cy, card_w, item_h, focused, false);
@@ -1287,11 +1586,12 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
             vita_draw_hint_item(card_x + card_w - 140.0f, cy + 28.0f, VITA_BTN_CROSS, "Apply");
         }
     }
+    vita_draw_list_page_indicator(*selected_item, total_items, visible_items);
 }
 
 void vita_view_hardware(VitaInputState *input, int *selected_item)
 {
-    const int total_items = 8;
+    const int total_items = 15;
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
 
@@ -1304,7 +1604,7 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
         if (*selected_item >= total_items) *selected_item = 0;
     }
 
-    if (input->pressed & SCE_CTRL_CROSS && *selected_item == 6) {
+    if (input->pressed & SCE_CTRL_CROSS && *selected_item == 13) {
         char new_file[512];
         new_file[0] = '\0';
         int res = vita_gui_run_browser(new_file, currentDir, 8);
@@ -1318,7 +1618,7 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
                 vita_show_message_box("CD32 Image Error", "The selected image could not be opened.", "OK (X)");
         }
     }
-    if (input->pressed & SCE_CTRL_TRIANGLE && *selected_item == 6) {
+    if (input->pressed & SCE_CTRL_TRIANGLE && *selected_item == 13) {
         cdrom_close_image();
         vita_show_message_box("CD32 Image", "CD image ejected.", "OK (X)");
     }
@@ -1340,26 +1640,76 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
                 UpdateCPUModelSettings();
                 break;
             case 2:
-                mainMenu_chipset = (mainMenu_chipset + dir + 3) % 3;
+                mainMenu_CPU_speed = (mainMenu_CPU_speed + dir + 4) % 4;
+                break;
+            case 3: {
+                int cs = mainMenu_chipset & 0x00ff;
+                cs = (cs + dir + 3) % 3;
+                mainMenu_chipset = (mainMenu_chipset & 0xff00) | cs;
                 bReloadKickstart = 1;
                 UpdateChipsetSettings();
                 break;
-            case 3:
+            }
+            case 4: {
+                int blit = (mainMenu_chipset & 0xff00) >> 8;
+                blit = (blit + dir + 3) % 3;
+                mainMenu_chipset = (mainMenu_chipset & 0x00ff) | (blit << 8);
+                UpdateChipsetSettings();
+                break;
+            }
+            case 5:
+                mainMenu_cycleExact = 1 - mainMenu_cycleExact;
+                UpdateChipsetSettings();
+                break;
+            case 6:
+                mainMenu_spriteCollisions = (mainMenu_spriteCollisions + dir + 2) % 2;
+                break;
+            case 7:
                 mainMenu_chipMemory = (mainMenu_chipMemory + dir + 4) % 4;
                 bReloadKickstart = 1;
                 UpdateMemorySettings();
                 break;
-            case 4:
+            case 8:
                 mainMenu_fastMemory = (mainMenu_fastMemory + dir + 5) % 5;
                 bReloadKickstart = 1;
                 UpdateMemorySettings();
                 break;
-            case 5:
+            case 9:
                 mainMenu_slowMemory = (mainMenu_slowMemory + dir + 4) % 4;
                 bReloadKickstart = 1;
                 UpdateMemorySettings();
                 break;
-            case 7:
+            case 10: {
+                int s_idx = 0;
+                if (!mainMenu_sound) s_idx = 0;
+                else if (sound_rate == 22050) s_idx = 1;
+                else if (sound_rate == 48000) s_idx = 3;
+                else s_idx = 2;
+                s_idx = (s_idx + dir + 4) % 4;
+                if (s_idx == 0) {
+                    mainMenu_sound = 0;
+                } else if (s_idx == 1) {
+                    mainMenu_sound = 1;
+                    sound_rate = 22050;
+                } else if (s_idx == 2) {
+                    mainMenu_sound = 1;
+                    sound_rate = 44100;
+                } else {
+                    mainMenu_sound = 1;
+                    sound_rate = 48000;
+                }
+                getChanges();
+                break;
+            }
+            case 11:
+                mainMenu_soundStereo = 1 - mainMenu_soundStereo;
+                getChanges();
+                break;
+            case 12:
+                mainMenu_soundStereoSep = (mainMenu_soundStereoSep + dir + 4) % 4;
+                getChanges();
+                break;
+            case 14:
                 mainMenu_midiSynth = 1 - mainMenu_midiSynth;
                 midi_synth_set_enabled(mainMenu_midiSynth);
                 if (mainMenu_midiSynth)
@@ -1370,8 +1720,11 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
 
     float card_x = 20.0f;
     float card_w = VITA_SCREEN_W - 40.0f;
-    float start_y = 90.0f;
-    float item_h = 44.0f;
+    const float start_y = VITA_LIST_START_Y;
+    const float item_h = 44.0f;
+    const float item_gap = 6.0f;
+    const int visible_items = vita_list_visible_rows(start_y, item_h, item_gap);
+    int first_item = *selected_item >= visible_items ? *selected_item - visible_items + 1 : 0;
 
     const char *ks_names[KICKSTART_ROM_COUNT] = {
         "Kickstart 1.2 (A500/A2000)", "Kickstart 1.3 (A500/A2000)", "Kickstart 2.04 (A500+)",
@@ -1381,26 +1734,94 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
         "Kickstart 3.0 (A1200)", "Kickstart 3.1 (A1200)", "Kickstart 3.0 (A4000)",
         "Kickstart 3.1 (A4000)", "Kickstart 1.3 + CDTV Extended ROM"
     };
-    const char *cpu_names[2] = { "Motorola 68000 (7 MHz)", "Motorola 68020 (14 MHz AGA)" };
+    const char *cpu_names[2] = { "Motorola 68000 (7 MHz base)", "Motorola 68020 (14 MHz AGA base)" };
+    const char *cpu_speeds[4] = { "Standard 7 MHz (1x)", "Turbo 14 MHz (2x - WHDLoad recommended)", "Turbo 28 MHz (4x)", "Max 56 MHz (8x)" };
     const char *chipset_names[3] = { "OCS (Original Chip Set)", "ECS (Enhanced Chip Set)", "AGA (Advanced Graphics)" };
+    const char *blitter_names[3] = { "Normal (Accurate)", "Immediate (Fast / Fixes Golden Axe, Spindizzy...)", "Improved (Partial)" };
+    const char *sprite_col_names[2] = { "Disabled (Fast)", "Enabled (Space Taxi 3, etc.)" };
     const char *chip_ram_names[4] = { "512 KB (Standard)", "1 MB", "2 MB (Expanded)", "None" };
     const char *fast_ram_names[5] = { "None", "1 MB", "2 MB", "4 MB (AGA recommended)", "8 MB" };
     const char *slow_ram_names[4] = { "None", "512 KB (Trapdoor)", "1 MB", "1.5 MB" };
+    const char *sound_out_names[4] = { "Disabled (Mute)", "22050 Hz (Low)", "44100 Hz (Standard Quality)", "48000 Hz (High Quality)" };
+    const char *sound_stereo_names[2] = { "Mono", "Stereo" };
+    const char *stereo_sep_names[4] = { "25% Separation", "50% (Recommended for Headphones)", "75% Separation", "100% (Hard Amiga L/R)" };
     const char *cd_image_name = current_cd_image[0] ? get_filename_only(current_cd_image) : "No image selected";
 
-    vita_draw_selector_item(card_x, start_y + 0.0f * (item_h + 6.0f), card_w, item_h, "Kickstart ROM", ks_names[kickstart % KICKSTART_ROM_COUNT], *selected_item == 0);
-    vita_draw_selector_item(card_x, start_y + 1.0f * (item_h + 6.0f), card_w, item_h, "CPU Architecture", cpu_names[mainMenu_CPU_model % 2], *selected_item == 1);
-    vita_draw_selector_item(card_x, start_y + 2.0f * (item_h + 6.0f), card_w, item_h, "Amiga Chipset", chipset_names[mainMenu_chipset % 3], *selected_item == 2);
-    vita_draw_selector_item(card_x, start_y + 3.0f * (item_h + 6.0f), card_w, item_h, "Chip RAM", chip_ram_names[mainMenu_chipMemory % 4], *selected_item == 3);
-    vita_draw_selector_item(card_x, start_y + 4.0f * (item_h + 6.0f), card_w, item_h, "Fast RAM", fast_ram_names[mainMenu_fastMemory % 5], *selected_item == 4);
-    vita_draw_selector_item(card_x, start_y + 5.0f * (item_h + 6.0f), card_w, item_h, "Slow / Trapdoor RAM", slow_ram_names[mainMenu_slowMemory % 4], *selected_item == 5);
-    vita_draw_selector_item(card_x, start_y + 6.0f * (item_h + 6.0f), card_w, item_h, "CD32 CD Image", cd_image_name, *selected_item == 6);
-    vita_draw_switch_item(card_x, start_y + 7.0f * (item_h + 6.0f), card_w, item_h, "MIDI / MT-32 Synth Emulation", mainMenu_midiSynth == 1, *selected_item == 7);
+    int curr_sound_idx = 0;
+    if (!mainMenu_sound) curr_sound_idx = 0;
+    else if (sound_rate == 22050) curr_sound_idx = 1;
+    else if (sound_rate == 48000) curr_sound_idx = 3;
+    else curr_sound_idx = 2;
+
+    int curr_chipset_idx = mainMenu_chipset & 0x00ff;
+    if (curr_chipset_idx < 0 || curr_chipset_idx > 2) curr_chipset_idx = 0;
+
+    int curr_blitter_idx = (mainMenu_chipset & 0xff00) >> 8;
+    if (curr_blitter_idx < 0 || curr_blitter_idx > 2) curr_blitter_idx = 0;
+
+    for (int i = 0; i < visible_items; i++) {
+        int item = first_item + i;
+        if (item >= total_items) break;
+        float y = start_y + (float)i * (item_h + item_gap);
+        bool focused = (*selected_item == item);
+        switch (item) {
+            case 0:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Kickstart ROM", ks_names[kickstart % KICKSTART_ROM_COUNT], focused);
+                break;
+            case 1:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "CPU Architecture", cpu_names[mainMenu_CPU_model % 2], focused);
+                break;
+            case 2:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "CPU Clock Speed", cpu_speeds[mainMenu_CPU_speed % 4], focused);
+                break;
+            case 3:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Amiga Chipset", chipset_names[curr_chipset_idx], focused);
+                break;
+            case 4:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Blitter Mode", blitter_names[curr_blitter_idx], focused);
+                break;
+            case 5:
+                vita_draw_switch_item(card_x, y, card_w, item_h, "Cycle-Exact (Accurate Blitter)", mainMenu_cycleExact == 1, focused);
+                break;
+            case 6:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Sprite Collisions", sprite_col_names[mainMenu_spriteCollisions % 2], focused);
+                break;
+            case 7:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Chip RAM", chip_ram_names[mainMenu_chipMemory % 4], focused);
+                break;
+            case 8:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Fast RAM", fast_ram_names[mainMenu_fastMemory % 5], focused);
+                break;
+            case 9:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Slow / Trapdoor RAM", slow_ram_names[mainMenu_slowMemory % 4], focused);
+                break;
+            case 10:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Audio Output", sound_out_names[curr_sound_idx], focused);
+                break;
+            case 11:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Audio Channels", sound_stereo_names[mainMenu_soundStereo % 2], focused);
+                break;
+            case 12:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Stereo Separation", stereo_sep_names[mainMenu_soundStereoSep % 4], focused);
+                break;
+            case 13:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "CD32 CD Image", cd_image_name, focused);
+                break;
+            case 14:
+                vita_draw_switch_item(card_x, y, card_w, item_h, "MIDI / MT-32 Synth Emulation", mainMenu_midiSynth == 1, focused);
+                break;
+        }
+    }
+    vita_draw_list_page_indicator(*selected_item, total_items, visible_items);
 }
 
 void vita_view_display(VitaInputState *input, int *selected_item)
 {
-    const int total_items = 7;
+    const int total_items = 12;
+    const float start_y = VITA_LIST_START_Y;
+    const float item_h = VITA_LIST_ITEM_H;
+    const float item_gap = VITA_LIST_ITEM_GAP;
+    const int visible_items = vita_list_visible_rows(start_y, item_h, item_gap);
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
 
@@ -1420,7 +1841,7 @@ void vita_view_display(VitaInputState *input, int *selected_item)
     if (dir != 0) {
         switch (*selected_item) {
             case 0:
-                mainMenu_shader = (mainMenu_shader + dir + 9) % 9;
+                mainMenu_shader = vita_shader_cycle(mainMenu_shader, dir);
                 break;
             case 1:
                 mainMenu_ntsc = (mainMenu_ntsc + dir + 2) % 2;
@@ -1429,41 +1850,68 @@ void vita_view_display(VitaInputState *input, int *selected_item)
                 mainMenu_showStatus = (mainMenu_showStatus + dir + 4) % 4;
                 break;
             case 3: {
+                int width_group = (presetModeId / 10 + dir + 6) % 6;
+                int height_mode = presetModeId % 10;
+                SetPresetMode(width_group * 10 + height_mode);
+                break;
+            }
+            case 4: {
                 int width_group = (presetModeId / 10) * 10;
                 int height_mode = (presetModeId % 10 + dir + 9) % 9;
                 SetPresetMode(width_group + height_mode);
                 break;
             }
-            case 4:
+            case 5:
+                mainMenu_frameskip += dir;
+                if (mainMenu_frameskip < 0) mainMenu_frameskip = 8;
+                if (mainMenu_frameskip > 8) mainMenu_frameskip = 0;
+                break;
+            case 6:
+                mainMenu_cutLeft += dir;
+                if (mainMenu_cutLeft < 0) mainMenu_cutLeft = 0;
+                if (mainMenu_cutLeft > 100) mainMenu_cutLeft = 100;
+                break;
+            case 7:
+                mainMenu_cutRight += dir;
+                if (mainMenu_cutRight < 0) mainMenu_cutRight = 0;
+                if (mainMenu_cutRight > 100) mainMenu_cutRight = 100;
+                break;
+            case 8:
                 moveY += dir;
                 if (moveY < -26) moveY = -26;
                 if (moveY > 128) moveY = 128;
                 break;
-            case 5:
+            case 9:
                 mainMenu_footerSize += dir * 8;
                 if (mainMenu_footerSize < -64) mainMenu_footerSize = -64;
                 if (mainMenu_footerSize > 160) mainMenu_footerSize = 160;
                 break;
-            case 6:
+            case 10:
                 mainMenu_screenOffsetY += dir * 8;
                 if (mainMenu_screenOffsetY < -128) mainMenu_screenOffsetY = -128;
                 if (mainMenu_screenOffsetY > 128) mainMenu_screenOffsetY = 128;
                 break;
+            case 11:
+                mainMenu_screenOffsetX += dir * 8;
+                if (mainMenu_screenOffsetX < -128) mainMenu_screenOffsetX = -128;
+                if (mainMenu_screenOffsetX > 128) mainMenu_screenOffsetX = 128;
+                break;
         }
+        getChanges();
+        check_all_prefs();
     }
 
     float card_x = 20.0f;
     float card_w = VITA_SCREEN_W - 40.0f;
-    float start_y = 90.0f;
-    float item_h = 48.0f;
+    int first_item = *selected_item >= visible_items ? *selected_item - visible_items + 1 : 0;
 
-    const char *shader_names[9] = { "None / Raw", "Sharp Bilinear", "Sharp Bilinear Simple", "CRT Easymode (Scanlines)", "LCD 3x (Grid)", "FXAA", "Advanced AA", "Bicubic", "GTU" };
     const char *ntsc_names[2] = { "PAL (50 Hz European Standard)", "NTSC (60 Hz US Standard)" };
     const char *status_names[4] = { "Bottom Bar (Floppy LED & FPS)", "Top Bar (LED blocks)", "Disabled (Clean Screen)", "Vertical Bar" };
+    const char *width_names[6] = {
+        "320 px (Low-Res)", "640 px (Hi-Res)", "352 px (Low-Res)",
+        "704 px (Hi-Res)", "384 px (Low-Res)", "768 px (Hi-Res)"
+    };
 
-    vita_draw_selector_item(card_x, start_y + 0.0f * (item_h + 6.0f), card_w, item_h, "Hardware Vita Shader", shader_names[mainMenu_shader % 9], *selected_item == 0);
-    vita_draw_selector_item(card_x, start_y + 1.0f * (item_h + 6.0f), card_w, item_h, "Screen Refresh & Region", ntsc_names[mainMenu_ntsc % 2], *selected_item == 1);
-    vita_draw_selector_item(card_x, start_y + 2.0f * (item_h + 6.0f), card_w, item_h, "Status Bar (Floppy LED/FPS)", status_names[mainMenu_showStatus % 4], *selected_item == 2);
     char aspect_mode[64];
     if (presetModeId % 10 == 7)
         snprintf(aspect_mode, sizeof(aspect_mode), "Fullscreen 16:9 - %s", presetMode);
@@ -1471,11 +1919,9 @@ void vita_view_display(VitaInputState *input, int *selected_item)
         snprintf(aspect_mode, sizeof(aspect_mode), "5:4 Correct - %s", presetMode);
     else
         snprintf(aspect_mode, sizeof(aspect_mode), "4:3 Correct - %s", presetMode);
-    vita_draw_selector_item(card_x, start_y + 3.0f * (item_h + 6.0f), card_w, item_h, "Aspect Ratio / Scaling", aspect_mode, *selected_item == 3);
 
     char vertical_position[32];
     snprintf(vertical_position, sizeof(vertical_position), "%d (higher = up)", moveY);
-    vita_draw_selector_item(card_x, start_y + 4.0f * (item_h + 6.0f), card_w, item_h, "Vertical Position", vertical_position, *selected_item == 4);
 
     char footer_size[64];
     if (mainMenu_footerSize > 0)
@@ -1484,21 +1930,302 @@ void vita_view_display(VitaInputState *input, int *selected_item)
         snprintf(footer_size, sizeof(footer_size), "%d px crop (top fixed)", mainMenu_footerSize);
     else
         snprintf(footer_size, sizeof(footer_size), "0 px (full height)");
-    vita_draw_selector_item(card_x, start_y + 5.0f * (item_h + 6.0f), card_w, item_h, "Game Footer Height", footer_size, *selected_item == 5);
 
-    char screen_offset[64];
+    char screen_offset_y[64];
     if (mainMenu_screenOffsetY < 0)
-        snprintf(screen_offset, sizeof(screen_offset), "%d px up", mainMenu_screenOffsetY);
+        snprintf(screen_offset_y, sizeof(screen_offset_y), "%d px up", mainMenu_screenOffsetY);
     else if (mainMenu_screenOffsetY > 0)
-        snprintf(screen_offset, sizeof(screen_offset), "+%d px down", mainMenu_screenOffsetY);
+        snprintf(screen_offset_y, sizeof(screen_offset_y), "+%d px down", mainMenu_screenOffsetY);
     else
-        snprintf(screen_offset, sizeof(screen_offset), "0 px (centered at top)");
-    vita_draw_selector_item(card_x, start_y + 6.0f * (item_h + 6.0f), card_w, item_h, "Game Screen Offset", screen_offset, *selected_item == 6);
+        snprintf(screen_offset_y, sizeof(screen_offset_y), "0 px (centered at top)");
+
+    char screen_offset_x[64];
+    if (mainMenu_screenOffsetX < 0)
+        snprintf(screen_offset_x, sizeof(screen_offset_x), "%d px left", mainMenu_screenOffsetX);
+    else if (mainMenu_screenOffsetX > 0)
+        snprintf(screen_offset_x, sizeof(screen_offset_x), "+%d px right", mainMenu_screenOffsetX);
+    else
+        snprintf(screen_offset_x, sizeof(screen_offset_x), "0 px (centered)");
+
+    char frameskip_value[16];
+    snprintf(frameskip_value, sizeof(frameskip_value), "%d", mainMenu_frameskip);
+
+    char cut_left_value[16];
+    snprintf(cut_left_value, sizeof(cut_left_value), "%d px", mainMenu_cutLeft);
+
+    char cut_right_value[16];
+    snprintf(cut_right_value, sizeof(cut_right_value), "%d px", mainMenu_cutRight);
+
+    const char *item_titles[12] = {
+        "Hardware Vita Shader",
+        "Screen Refresh & Region",
+        "Status Bar (Floppy LED/FPS)",
+        "Horizontal Resolution",
+        "Vertical Lines & Aspect",
+        "Frameskip",
+        "Overscan Cut Left",
+        "Overscan Cut Right",
+        "Vertical Position",
+        "Game Footer Height",
+        "Game Screen Offset Y",
+        "Game Screen Offset X"
+    };
+    const char *item_values[12] = {
+        vita_shader_label(mainMenu_shader),
+        ntsc_names[mainMenu_ntsc % 2],
+        status_names[mainMenu_showStatus % 4],
+        width_names[(presetModeId / 10) % 6],
+        aspect_mode,
+        frameskip_value,
+        cut_left_value,
+        cut_right_value,
+        vertical_position,
+        footer_size,
+        screen_offset_y,
+        screen_offset_x
+    };
+
+    for (int i = 0; i < visible_items; i++) {
+        int item = first_item + i;
+        if (item >= total_items) break;
+        vita_draw_selector_item(card_x, start_y + (float)i * (item_h + item_gap), card_w, item_h,
+            item_titles[item], item_values[item], *selected_item == item);
+    }
+
+    vita_draw_list_page_indicator(*selected_item, total_items, visible_items);
 }
+
+static bool s_custom_controls_modal_open = false;
+static int s_custom_modal_selected = 0;
 
 void vita_view_controls(VitaInputState *input, int *selected_item)
 {
-    const int total_items = 7;
+    static const int s_mouse_mult_table[] = { 25, 50, 75, 100, 125, 150, 200, 300, 400 };
+    static const int s_num_mouse_mults = sizeof(s_mouse_mult_table) / sizeof(s_mouse_mult_table[0]);
+
+    if (s_custom_controls_modal_open) {
+        const int m_total_items = 18;
+        if (s_custom_modal_selected < 0) s_custom_modal_selected = 0;
+        if (s_custom_modal_selected >= m_total_items) s_custom_modal_selected = m_total_items - 1;
+
+        if (input->pressed & SCE_CTRL_UP) {
+            s_custom_modal_selected--;
+            if (s_custom_modal_selected < 0) s_custom_modal_selected = m_total_items - 1;
+        }
+        if (input->pressed & SCE_CTRL_DOWN) {
+            s_custom_modal_selected++;
+            if (s_custom_modal_selected >= m_total_items) s_custom_modal_selected = 0;
+        }
+
+        int c = mainMenu_custom_currentlyEditingControllerNr;
+        if (c < 0 || c >= MAX_NUM_CONTROLLERS) c = 0;
+
+        if (input->pressed & SCE_CTRL_CIRCLE) {
+            s_custom_controls_modal_open = false;
+            mapback_custom_controls();
+            remap_custom_controls();
+            return;
+        }
+
+        if (input->pressed & SCE_CTRL_CROSS && s_custom_modal_selected == 17) {
+            mainMenu_custom_up[c] = -5;
+            mainMenu_custom_down[c] = -6;
+            mainMenu_custom_left[c] = -7;
+            mainMenu_custom_right[c] = -8;
+            mainMenu_custom_stickup[c] = -5;
+            mainMenu_custom_stickdown[c] = -6;
+            mainMenu_custom_stickleft[c] = -7;
+            mainMenu_custom_stickright[c] = -8;
+            mainMenu_custom_A[c] = -3;
+            mainMenu_custom_B[c] = -4;
+            mainMenu_custom_X[c] = 23;
+            mainMenu_custom_Y[c] = 27;
+            mainMenu_custom_L[c] = 0;
+            mainMenu_custom_R[c] = 0;
+            mapback_custom_controls();
+            remap_custom_controls();
+            vita_show_message_box("Controls Reset", "Controller mappings reset to default Amiga layout.", "OK (X)");
+        }
+
+        int dir = 0;
+        if (input->pressed & (SCE_CTRL_RIGHT | SCE_CTRL_CROSS)) dir = 1;
+        if (input->pressed & SCE_CTRL_LEFT) dir = -1;
+
+        if (dir != 0) {
+            switch (s_custom_modal_selected) {
+                case 0:
+                    mainMenu_customControls = 1 - mainMenu_customControls;
+                    break;
+                case 1:
+                    mainMenu_custom_currentlyEditingControllerNr = (mainMenu_custom_currentlyEditingControllerNr + dir + 4) % 4;
+                    break;
+                case 2:
+                    mainMenu_custom_controlSet = (mainMenu_custom_controlSet + dir + 6) % 6;
+                    remap_custom_controls();
+                    break;
+                case 3:
+                    mainMenu_custom_up[c] = vita_cycle_custom_action(mainMenu_custom_up[c], dir);
+                    mapback_custom_controls();
+                    remap_custom_controls();
+                    break;
+                case 4:
+                    mainMenu_custom_down[c] = vita_cycle_custom_action(mainMenu_custom_down[c], dir);
+                    mapback_custom_controls();
+                    remap_custom_controls();
+                    break;
+                case 5:
+                    mainMenu_custom_left[c] = vita_cycle_custom_action(mainMenu_custom_left[c], dir);
+                    mapback_custom_controls();
+                    remap_custom_controls();
+                    break;
+                case 6:
+                    mainMenu_custom_right[c] = vita_cycle_custom_action(mainMenu_custom_right[c], dir);
+                    mapback_custom_controls();
+                    remap_custom_controls();
+                    break;
+                case 7:
+                    mainMenu_custom_stickup[c] = vita_cycle_custom_action(mainMenu_custom_stickup[c], dir);
+                    mapback_custom_controls();
+                    remap_custom_controls();
+                    break;
+                case 8:
+                    mainMenu_custom_stickdown[c] = vita_cycle_custom_action(mainMenu_custom_stickdown[c], dir);
+                    mapback_custom_controls();
+                    remap_custom_controls();
+                    break;
+                case 9:
+                    mainMenu_custom_stickleft[c] = vita_cycle_custom_action(mainMenu_custom_stickleft[c], dir);
+                    mapback_custom_controls();
+                    remap_custom_controls();
+                    break;
+                case 10:
+                    mainMenu_custom_stickright[c] = vita_cycle_custom_action(mainMenu_custom_stickright[c], dir);
+                    mapback_custom_controls();
+                    remap_custom_controls();
+                    break;
+                case 11:
+                    mainMenu_custom_A[c] = vita_cycle_custom_action(mainMenu_custom_A[c], dir);
+                    mapback_custom_controls();
+                    remap_custom_controls();
+                    break;
+                case 12:
+                    mainMenu_custom_B[c] = vita_cycle_custom_action(mainMenu_custom_B[c], dir);
+                    mapback_custom_controls();
+                    remap_custom_controls();
+                    break;
+                case 13:
+                    mainMenu_custom_X[c] = vita_cycle_custom_action(mainMenu_custom_X[c], dir);
+                    mapback_custom_controls();
+                    remap_custom_controls();
+                    break;
+                case 14:
+                    mainMenu_custom_Y[c] = vita_cycle_custom_action(mainMenu_custom_Y[c], dir);
+                    mapback_custom_controls();
+                    remap_custom_controls();
+                    break;
+                case 15:
+                    mainMenu_custom_L[c] = vita_cycle_custom_action(mainMenu_custom_L[c], dir);
+                    mapback_custom_controls();
+                    remap_custom_controls();
+                    break;
+                case 16:
+                    mainMenu_custom_R[c] = vita_cycle_custom_action(mainMenu_custom_R[c], dir);
+                    mapback_custom_controls();
+                    remap_custom_controls();
+                    break;
+            }
+        }
+
+        c = mainMenu_custom_currentlyEditingControllerNr;
+        if (c < 0 || c >= MAX_NUM_CONTROLLERS) c = 0;
+
+        const char *controller_names[4] = { "Controller 1 (Primary / Vita Controls)", "Controller 2 (External / DualShock)", "Controller 3", "Controller 4" };
+        const char *profile_names[6] = { "Profile 1", "Profile 2", "Profile 3", "Profile 4", "Profile 5", "Profile 6" };
+
+        /* Modal Overlay Window */
+        vita_draw_rounded_rect(20.0f, 20.0f, VITA_SCREEN_W - 40.0f, VITA_SCREEN_H - 40.0f, 12.0f, RGBA8(14, 18, 26, 250));
+        vita_draw_card_custom(20.0f, 20.0f, VITA_SCREEN_W - 40.0f, VITA_SCREEN_H - 40.0f, RGBA8(14, 18, 26, 250), VITA_COLOR_FOCUS_BORDER);
+
+        vita_draw_badge(40.0f, 32.0f, "CONTROLLERS", VITA_COLOR_AMIGA_RED, VITA_COLOR_TEXT_WHITE);
+        vita_draw_text_centered(VITA_SCREEN_W * 0.5f, 35.0f, VITA_COLOR_TEXT_WHITE, 1.15f, "CUSTOM CONTROLS REMAPPING (4 PAD)");
+        vita_draw_text_centered(VITA_SCREEN_W * 0.5f, 62.0f, VITA_COLOR_TEXT_MUTED, 0.72f, "Press O to Close and Save  |  D-PAD Left/Right to Cycle Actions");
+
+        float m_card_x = 40.0f;
+        float m_card_w = VITA_SCREEN_W - 80.0f;
+        const float m_start_y = 88.0f;
+        const float m_item_h = 40.0f;
+        const float m_item_gap = 4.0f;
+        const int m_visible = 8;
+        int m_first = s_custom_modal_selected >= m_visible ? s_custom_modal_selected - m_visible + 1 : 0;
+
+        for (int i = 0; i < m_visible; i++) {
+            int item = m_first + i;
+            if (item >= m_total_items) break;
+            float y = m_start_y + (float)i * (m_item_h + m_item_gap);
+            bool focused = (s_custom_modal_selected == item);
+            switch (item) {
+                case 0:
+                    vita_draw_switch_item(m_card_x, y, m_card_w, m_item_h, "Custom Controls Master Toggle", mainMenu_customControls == 1, focused);
+                    break;
+                case 1:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Active Controller to Edit", controller_names[c], focused);
+                    break;
+                case 2:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Active Control Profile", profile_names[mainMenu_custom_controlSet % 6], focused);
+                    break;
+                case 3:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map D-Pad UP", vita_get_custom_action_name(mainMenu_custom_up[c]), focused);
+                    break;
+                case 4:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map D-Pad DOWN", vita_get_custom_action_name(mainMenu_custom_down[c]), focused);
+                    break;
+                case 5:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map D-Pad LEFT", vita_get_custom_action_name(mainMenu_custom_left[c]), focused);
+                    break;
+                case 6:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map D-Pad RIGHT", vita_get_custom_action_name(mainMenu_custom_right[c]), focused);
+                    break;
+                case 7:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map Left Stick UP", vita_get_custom_action_name(mainMenu_custom_stickup[c]), focused);
+                    break;
+                case 8:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map Left Stick DOWN", vita_get_custom_action_name(mainMenu_custom_stickdown[c]), focused);
+                    break;
+                case 9:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map Left Stick LEFT", vita_get_custom_action_name(mainMenu_custom_stickleft[c]), focused);
+                    break;
+                case 10:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map Left Stick RIGHT", vita_get_custom_action_name(mainMenu_custom_stickright[c]), focused);
+                    break;
+                case 11:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map CROSS (Fire 1 / A)", vita_get_custom_action_name(mainMenu_custom_A[c]), focused);
+                    break;
+                case 12:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map CIRCLE (Fire 2 / B)", vita_get_custom_action_name(mainMenu_custom_B[c]), focused);
+                    break;
+                case 13:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map SQUARE (Space / X)", vita_get_custom_action_name(mainMenu_custom_X[c]), focused);
+                    break;
+                case 14:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map TRIANGLE (VKBD / Y)", vita_get_custom_action_name(mainMenu_custom_Y[c]), focused);
+                    break;
+                case 15:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map L Trigger", vita_get_custom_action_name(mainMenu_custom_L[c]), focused);
+                    break;
+                case 16:
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map R Trigger", vita_get_custom_action_name(mainMenu_custom_R[c]), focused);
+                    break;
+                case 17:
+                    vita_draw_button_item(m_card_x, y, m_card_w, m_item_h, "Reset Controller Mappings to Default", "Restore standard Amiga layout for this controller", "RESET", focused, false);
+                    break;
+            }
+        }
+        vita_draw_list_page_indicator(s_custom_modal_selected, m_total_items, m_visible);
+        return;
+    }
+
+    /* Main Controls Tab View */
+    const int total_items = 16;
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
 
@@ -1511,6 +2238,12 @@ void vita_view_controls(VitaInputState *input, int *selected_item)
         if (*selected_item >= total_items) *selected_item = 0;
     }
 
+    if (input->pressed & SCE_CTRL_CROSS && *selected_item == 0) {
+        s_custom_controls_modal_open = true;
+        s_custom_modal_selected = 0;
+        return;
+    }
+
     int dir = 0;
     if (input->pressed & (SCE_CTRL_RIGHT | SCE_CTRL_CROSS)) dir = 1;
     if (input->pressed & SCE_CTRL_LEFT) dir = -1;
@@ -1518,26 +2251,78 @@ void vita_view_controls(VitaInputState *input, int *selected_item)
     if (dir != 0) {
         switch (*selected_item) {
             case 0:
-                mainMenu_leftStickMouse = 1 - mainMenu_leftStickMouse;
+                s_custom_controls_modal_open = true;
+                s_custom_modal_selected = 0;
                 break;
             case 1:
-                mainMenu_touchControls = (mainMenu_touchControls + dir + 3) % 3;
+                mainMenu_joyPort = (mainMenu_joyPort == 1) ? 2 : 1;
                 break;
             case 2:
-                mainMenu_autofire = (mainMenu_autofire + dir + 4) % 4;
+                mainMenu_mouseEmulation = 1 - mainMenu_mouseEmulation;
                 break;
             case 3:
+                mainMenu_leftStickMouse = 1 - mainMenu_leftStickMouse;
+                break;
+            case 4: {
+                int cur_idx = 3;
+                for (int m = 0; m < s_num_mouse_mults; m++) {
+                    if (s_mouse_mult_table[m] == mainMenu_mouseMultiplier) {
+                        cur_idx = m;
+                        break;
+                    }
+                }
+                cur_idx = (cur_idx + dir + s_num_mouse_mults) % s_num_mouse_mults;
+                mainMenu_mouseMultiplier = s_mouse_mult_table[cur_idx];
+                break;
+            }
+            case 5:
+                mainMenu_touchControls = (mainMenu_touchControls + dir + 3) % 3;
+                break;
+            case 6:
+                mainMenu_vkbdLanguage = (mainMenu_vkbdLanguage + dir + 4) % 4;
+                vkbd_quit();
+                vkbd_init();
+                break;
+            case 7:
+                mainMenu_vkbdStyle = (mainMenu_vkbdStyle + dir + 4) % 4;
+                vkbd_quit();
+                vkbd_init();
+                break;
+            case 8:
+                mainMenu_vkbdTransparency = (mainMenu_vkbdTransparency + dir + 4) % 4;
+                vkbd_quit();
+                vkbd_init();
+                break;
+            case 9:
+                mainMenu_vkbdPosition = (mainMenu_vkbdPosition + dir + 3) % 3;
+                vkbd_quit();
+                vkbd_init();
+                break;
+            case 10:
+                mainMenu_autofire = (mainMenu_autofire + dir + 4) % 4;
+                if (mainMenu_autofire == 1) mainMenu_autofireRate = 12;
+                else if (mainMenu_autofire == 2) mainMenu_autofireRate = 8;
+                else if (mainMenu_autofire == 3) mainMenu_autofireRate = 4;
+                switch_autofire = (mainMenu_autofire > 0);
+                break;
+            case 11:
+                mainMenu_autofireMode = 1 - mainMenu_autofireMode;
+                break;
+            case 12:
                 mainMenu_pinballMode = (mainMenu_pinballMode + dir + 3) % 3;
                 break;
-            case 4:
-                break;
-            case 5:
+            case 13:
                 mainMenu_diskSoundVolume += dir * 10;
                 if (mainMenu_diskSoundVolume < 0) mainMenu_diskSoundVolume = 0;
                 if (mainMenu_diskSoundVolume > 100) mainMenu_diskSoundVolume = 100;
                 disk_sound_set_volume(mainMenu_diskSoundVolume);
                 break;
-            case 6:
+            case 14:
+                mainMenu_deadZone += dir * 500;
+                if (mainMenu_deadZone < 0) mainMenu_deadZone = 0;
+                if (mainMenu_deadZone > 8000) mainMenu_deadZone = 8000;
+                break;
+            case 15:
                 mainMenu_autoEjectFloppy = 1 - mainMenu_autoEjectFloppy;
                 break;
         }
@@ -1545,24 +2330,84 @@ void vita_view_controls(VitaInputState *input, int *selected_item)
 
     float card_x = 20.0f;
     float card_w = VITA_SCREEN_W - 40.0f;
-    float start_y = 90.0f;
-    float item_h = 48.0f;
+    const float start_y = VITA_LIST_START_Y;
+    const float item_h = 44.0f;
+    const float item_gap = 6.0f;
+    const int visible_items = vita_list_visible_rows(start_y, item_h, item_gap);
+    int first_item = *selected_item >= visible_items ? *selected_item - visible_items + 1 : 0;
 
-    const char *touch_modes[3] = { "Direct Touchscreen (Finger)", "Relative Trackpad Cursor", "Disabled" };
+    const char *touch_modes[3] = { "Disabled", "Front Touchscreen Only", "Both (Front Touch + Rear Trackpad)" };
+    const char *vkbd_lang_names[4] = { "US (QWERTY Standard)", "UK (English)", "German (QWERTZ)", "French (AZERTY)" };
+    const char *vkbd_style_names[4] = { "Original (Classic Amiga Gray)", "Warm (Beige Classic)", "Cool (Modern Blue)", "Dark (Midnight Slate)" };
+    const char *vkbd_trans_names[4] = { "25% Transparency", "50% (Balanced)", "75% (Subtle)", "100% (Solid Opaque)" };
+    const char *vkbd_pos_names[3] = { "Bottom of Screen", "Top of Screen", "Center of Screen" };
     const char *autofire_names[4] = { "Off", "Slow (1)", "Medium (2)", "Turbo (3)" };
     const char *pinball_names[3] = { "Disabled", "L1 / R1 Flippers", "Dual (L1/Left + R1/Circle)" };
 
-    const char *layout_desc = (mainMenu_pinballMode != 0)
-        ? "Pinball: L1 = Left Flipper | R1 = Right Flipper | Cross = Plunger | []/O/D-Pad = Tilt"
-        : "Cross = Fire 1 | Circle = Fire 2 | Square = Space | Triangle = Virtual Keyboard";
+    char mouse_speed_buf[32];
+    snprintf(mouse_speed_buf, sizeof(mouse_speed_buf), "%.2fx Speed (%d%%)", (float)mainMenu_mouseMultiplier / 100.0f, mainMenu_mouseMultiplier);
 
-    vita_draw_switch_item(card_x, start_y + 0.0f * (item_h + 6.0f), card_w, item_h, "Right Analog Stick as Amiga Mouse", mainMenu_leftStickMouse == 1, *selected_item == 0);
-    vita_draw_selector_item(card_x, start_y + 1.0f * (item_h + 6.0f), card_w, item_h, "PS Vita Touchscreen Mode", touch_modes[mainMenu_touchControls % 3], *selected_item == 1);
-    vita_draw_selector_item(card_x, start_y + 2.0f * (item_h + 6.0f), card_w, item_h, "Autofire Rate", autofire_names[mainMenu_autofire % 4], *selected_item == 2);
-    vita_draw_selector_item(card_x, start_y + 3.0f * (item_h + 6.0f), card_w, item_h, "Pinball Flippers (L1/R1)", pinball_names[mainMenu_pinballMode % 3], *selected_item == 3);
-    vita_draw_button_item(card_x, start_y + 4.0f * (item_h + 6.0f), card_w, item_h, "Physical Controller Layout", layout_desc, "LAYOUT", *selected_item == 4, false);
-    vita_draw_slider_item(card_x, start_y + 5.0f * (item_h + 6.0f), card_w, item_h, "Floppy / HDF Sound Volume", mainMenu_diskSoundVolume, 0, 100, "%", *selected_item == 5);
-    vita_draw_switch_item(card_x, start_y + 6.0f * (item_h + 6.0f), card_w, item_h, "WHDLoad Auto-Eject Floppy on Launch", mainMenu_autoEjectFloppy == 1, *selected_item == 6);
+    char custom_status_buf[64];
+    snprintf(custom_status_buf, sizeof(custom_status_buf), "%s (Profile %d, Controller %d)",
+        mainMenu_customControls ? "Active" : "Disabled", mainMenu_custom_controlSet + 1, mainMenu_custom_currentlyEditingControllerNr + 1);
+
+    for (int i = 0; i < visible_items; i++) {
+        int item = first_item + i;
+        if (item >= total_items) break;
+        float y = start_y + (float)i * (item_h + item_gap);
+        bool focused = (*selected_item == item);
+        switch (item) {
+            case 0:
+                vita_draw_button_item(card_x, y, card_w, item_h, "Custom Controls (4 Pad Remap)", custom_status_buf, "REMAP", focused, false);
+                break;
+            case 1:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Joystick Port", (mainMenu_joyPort == 1) ? "Amiga Port 0 (Mouse Port)" : "Amiga Port 1 (Joystick Port)", focused);
+                break;
+            case 2:
+                vita_draw_switch_item(card_x, y, card_w, item_h, "Amiga Mouse Emulation", mainMenu_mouseEmulation == 1, focused);
+                break;
+            case 3:
+                vita_draw_switch_item(card_x, y, card_w, item_h, "Left Analog Stick as Amiga Mouse", mainMenu_leftStickMouse == 1, focused);
+                break;
+            case 4:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Mouse Speed / Sensitivity", mouse_speed_buf, focused);
+                break;
+            case 5:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "PS Vita Touch & Trackpad Mode", touch_modes[mainMenu_touchControls % 3], focused);
+                break;
+            case 6:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Virtual Keyboard Language", vkbd_lang_names[mainMenu_vkbdLanguage % 4], focused);
+                break;
+            case 7:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Virtual Keyboard Style", vkbd_style_names[mainMenu_vkbdStyle % 4], focused);
+                break;
+            case 8:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Virtual Keyboard Transparency", vkbd_trans_names[mainMenu_vkbdTransparency % 4], focused);
+                break;
+            case 9:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Virtual Keyboard Position", vkbd_pos_names[mainMenu_vkbdPosition % 3], focused);
+                break;
+            case 10:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Autofire Rate", autofire_names[mainMenu_autofire % 4], focused);
+                break;
+            case 11:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Autofire Trigger", (mainMenu_autofireMode == 1) ? "Continuous (Automatic / Always-On)" : "Hold Fire Button (X)", focused);
+                break;
+            case 12:
+                vita_draw_selector_item(card_x, y, card_w, item_h, "Pinball Flippers (L1/R1)", pinball_names[mainMenu_pinballMode % 3], focused);
+                break;
+            case 13:
+                vita_draw_slider_item(card_x, y, card_w, item_h, "Floppy / HDF Sound Volume", mainMenu_diskSoundVolume, 0, 100, "%", focused);
+                break;
+            case 14:
+                vita_draw_slider_item(card_x, y, card_w, item_h, "Analog Stick Dead Zone", mainMenu_deadZone, 0, 8000, "", focused);
+                break;
+            case 15:
+                vita_draw_switch_item(card_x, y, card_w, item_h, "WHDLoad Auto-Eject Floppy on Launch", mainMenu_autoEjectFloppy == 1, focused);
+                break;
+        }
+    }
+    vita_draw_list_page_indicator(*selected_item, total_items, visible_items);
 }
 
 static bool vita_savestate_file_exists(const char *path)
@@ -1587,7 +2432,7 @@ static const char *vita_get_active_game_path(void)
     if (uae4all_image_file1[0] != '\0') return uae4all_image_file1;
     if (uae4all_image_file2[0] != '\0') return uae4all_image_file2;
     if (uae4all_image_file3[0] != '\0') return uae4all_image_file3;
-    return NULL;
+    return "";
 }
 
 static void vita_get_game_label(char *destination, size_t destination_size)
@@ -1615,9 +2460,11 @@ static void vita_get_savestate_paths(int slot, char *state_path, char *thumb_pat
 
 void vita_view_savestates(VitaInputState *input, int *selected_item)
 {
-    const int total_items = 4;
+    const int total_items = 11;
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
+
+    static int s_savestate_subaction = 0;
 
     if (input->pressed & SCE_CTRL_LEFT) {
         (*selected_item)--;
@@ -1628,9 +2475,29 @@ void vita_view_savestates(VitaInputState *input, int *selected_item)
         if (*selected_item >= total_items) *selected_item = 0;
     }
 
-    if (input->pressed & SCE_CTRL_CROSS) {
+    if (input->pressed & SCE_CTRL_UP) {
+        s_savestate_subaction--;
+        if (s_savestate_subaction < 0) s_savestate_subaction = 4;
+    }
+    if (input->pressed & SCE_CTRL_DOWN) {
+        s_savestate_subaction++;
+        if (s_savestate_subaction > 4) s_savestate_subaction = 0;
+    }
+
+    int active_slot = (*selected_item < 10) ? (*selected_item + 1) : 0;
+
+    static SDL_Surface *s_slot_thumbs[11] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
+    static char s_slot_thumb_paths[11][256] = { {0}, {0}, {0}, {0}, {0}, {0}, {0}, {0}, {0}, {0}, {0} };
+
+    bool do_save = (input->pressed & SCE_CTRL_CROSS && s_savestate_subaction == 0);
+    bool do_load = (input->pressed & SCE_CTRL_SQUARE) || (input->pressed & SCE_CTRL_CROSS && s_savestate_subaction == 1);
+    bool do_export = (input->pressed & SCE_CTRL_TRIANGLE) || (input->pressed & SCE_CTRL_CROSS && s_savestate_subaction == 2);
+    bool do_import = (input->pressed & SCE_CTRL_SELECT) || (input->pressed & SCE_CTRL_CROSS && s_savestate_subaction == 3);
+    bool do_delete = (input->pressed & SCE_CTRL_CROSS && s_savestate_subaction == 4);
+
+    if (do_save) {
         if (emulating) {
-            saveMenu_n_savestate = *selected_item + 1;
+            saveMenu_n_savestate = active_slot;
             make_savestate_filenames(savestate_filename, screenshot_filename);
             savestate_state = STATE_DOSAVE;
             vita_show_message_box("Save State", "Save queued. The state will be written when the game resumes.", "Resume (X)");
@@ -1640,9 +2507,9 @@ void vita_view_savestates(VitaInputState *input, int *selected_item)
         }
     }
 
-    if (input->pressed & SCE_CTRL_SQUARE) {
+    if (do_load) {
         if (emulating) {
-            saveMenu_n_savestate = *selected_item + 1;
+            saveMenu_n_savestate = active_slot;
             make_savestate_filenames(savestate_filename, screenshot_filename);
             if (!vita_savestate_file_exists(savestate_filename)) {
                 vita_show_message_box("Load State", "No save state exists in this slot.", "OK (X)");
@@ -1656,6 +2523,79 @@ void vita_view_savestates(VitaInputState *input, int *selected_item)
         }
     }
 
+    /* Export state */
+    if (do_export) {
+        char state_path[256];
+        char thumb_path[256];
+        vita_get_savestate_paths(active_slot, state_path, thumb_path);
+        if (!vita_savestate_file_exists(state_path)) {
+            vita_show_message_box("Export State", "No save state found in this slot to export.", "OK (X)");
+        } else {
+            char *exp_name = kbdvita_get("Enter savestate export name:", "", 64, 0);
+            if (exp_name && exp_name[0] != '\0') {
+                char out_asf[300];
+                char out_png[300];
+                snprintf(out_asf, sizeof(out_asf), "ux0:/data/uae4all/saves/%s.asf", exp_name);
+                snprintf(out_png, sizeof(out_png), "ux0:/data/uae4all/saves/%s.png", exp_name);
+                vita_copy_file(state_path, out_asf);
+                if (vita_savestate_file_exists(thumb_path))
+                    vita_copy_file(thumb_path, out_png);
+                vita_show_message_box("Export Complete", "Save state and preview exported to ux0:/data/uae4all/saves/", "OK (X)");
+            }
+        }
+    }
+
+    /* Import state */
+    if (do_import) {
+        char import_path[512];
+        import_path[0] = '\0';
+        int res = vita_gui_run_browser(import_path, "ux0:/data/uae4all/saves", 10);
+        if (res == 1 && import_path[0] != '\0') {
+            char state_path[256];
+            char thumb_path[256];
+            vita_get_savestate_paths(active_slot, state_path, thumb_path);
+            vita_copy_file(import_path, state_path);
+
+            char import_thumb[512];
+            strncpy(import_thumb, import_path, sizeof(import_thumb) - 1);
+            import_thumb[sizeof(import_thumb) - 1] = '\0';
+            char *dot = strrchr(import_thumb, '.');
+            if (dot) strcpy(dot, ".png");
+            else strcat(import_thumb, ".png");
+            if (vita_savestate_file_exists(import_thumb))
+                vita_copy_file(import_thumb, thumb_path);
+
+            if (s_slot_thumbs[*selected_item]) {
+                SDL_FreeSurface(s_slot_thumbs[*selected_item]);
+                s_slot_thumbs[*selected_item] = NULL;
+            }
+            s_slot_thumb_paths[*selected_item][0] = '\0';
+            vita_show_message_box("Import Complete", "Save state imported into current slot successfully.", "OK (X)");
+        }
+    }
+
+    /* Delete state */
+    if (do_delete) {
+        char state_path[256];
+        char thumb_path[256];
+        vita_get_savestate_paths(active_slot, state_path, thumb_path);
+        if (!vita_savestate_file_exists(state_path)) {
+            vita_show_message_box("Delete State", "No save state exists in this slot to delete.", "OK (X)");
+        } else {
+            if (vita_show_confirm_box("Delete Save State", "Delete save state and thumbnail for this slot?", "Delete", "Cancel")) {
+                remove(state_path);
+                if (vita_savestate_file_exists(thumb_path))
+                    remove(thumb_path);
+                if (s_slot_thumbs[*selected_item]) {
+                    SDL_FreeSurface(s_slot_thumbs[*selected_item]);
+                    s_slot_thumbs[*selected_item] = NULL;
+                }
+                s_slot_thumb_paths[*selected_item][0] = '\0';
+                vita_show_message_box("State Deleted", "Save state deleted successfully.", "OK (X)");
+            }
+        }
+    }
+
     char game_label[128];
     if (mainMenu_whdload_game[0] != '\0') {
         strncpy(game_label, mainMenu_whdload_game, sizeof(game_label) - 1);
@@ -1664,26 +2604,36 @@ void vita_view_savestates(VitaInputState *input, int *selected_item)
         vita_get_game_label(game_label, sizeof(game_label));
     }
 
-    static SDL_Surface *s_slot_thumbs[4] = { NULL, NULL, NULL, NULL };
-    static char s_slot_thumb_paths[4][256] = { {0}, {0}, {0}, {0} };
-
     float slot_w = (VITA_SCREEN_W - 40.0f - 36.0f) / 4.0f;
-    float slot_h = 320.0f;
+    float slot_h = VITA_LIST_BOTTOM_Y - VITA_LIST_START_Y - 4.0f;
+    if (slot_h > 320.0f) slot_h = 320.0f;
+    if (slot_h < 260.0f) slot_h = 260.0f;
     float start_x = 20.0f;
-    float start_y = 94.0f;
+    const float start_y = VITA_LIST_START_Y;
+
+    int first_slot = *selected_item >= 4 ? *selected_item - 3 : 0;
+    if (first_slot > total_items - 4) first_slot = total_items - 4;
+    if (first_slot < 0) first_slot = 0;
 
     for (int i = 0; i < 4; i++) {
+        int slot_idx = first_slot + i;
+        if (slot_idx >= total_items) break;
         float sx = start_x + (float)i * (slot_w + 12.0f);
-        bool focused = (*selected_item == i);
+        bool focused = (*selected_item == slot_idx);
+        int slot_num = (slot_idx < 10) ? (slot_idx + 1) : 0;
         char state_path[256];
         char thumb_path[256];
-        vita_get_savestate_paths(i + 1, state_path, thumb_path);
+        vita_get_savestate_paths(slot_num, state_path, thumb_path);
         bool saved = vita_savestate_file_exists(state_path);
 
         vita_draw_card(sx, start_y, slot_w, slot_h, focused, saved);
 
         char slot_tag[32];
-        snprintf(slot_tag, sizeof(slot_tag), "SLOT %d", i + 1);
+        if (slot_idx < 10)
+            snprintf(slot_tag, sizeof(slot_tag), "SLOT %d", slot_idx + 1);
+        else
+            snprintf(slot_tag, sizeof(slot_tag), "AUTO-SAVE");
+
         vita_draw_badge(sx + 14.0f, start_y + 14.0f, slot_tag, focused ? VITA_COLOR_AMIGA_RED : RGBA8(40, 50, 70, 255), VITA_COLOR_TEXT_WHITE);
 
         char game_label_buf[128];
@@ -1694,35 +2644,35 @@ void vita_view_savestates(VitaInputState *input, int *selected_item)
         float thumb_x = sx + 12.0f;
         float thumb_y = start_y + 56.0f;
         float thumb_w = slot_w - 24.0f;
-        float thumb_h = 148.0f;
+        float thumb_h = 80.0f;
 
         vita_draw_rounded_rect(thumb_x, thumb_y, thumb_w, thumb_h, 6.0f, RGBA8(12, 15, 22, 255));
 
         if (saved && thumb_path[0] != '\0' &&
-            (s_slot_thumb_paths[i][0] == '\0' || strcmp(s_slot_thumb_paths[i], thumb_path) != 0)) {
-            if (s_slot_thumbs[i]) {
-                SDL_FreeSurface(s_slot_thumbs[i]);
-                s_slot_thumbs[i] = NULL;
+            (s_slot_thumb_paths[slot_idx][0] == '\0' || strcmp(s_slot_thumb_paths[slot_idx], thumb_path) != 0)) {
+            if (s_slot_thumbs[slot_idx]) {
+                SDL_FreeSurface(s_slot_thumbs[slot_idx]);
+                s_slot_thumbs[slot_idx] = NULL;
             }
-            strncpy(s_slot_thumb_paths[i], thumb_path, 255);
-            s_slot_thumb_paths[i][255] = '\0';
+            strncpy(s_slot_thumb_paths[slot_idx], thumb_path, 255);
+            s_slot_thumb_paths[slot_idx][255] = '\0';
             FILE *tf = fopen(thumb_path, "rb");
             if (tf) {
                 fclose(tf);
-                s_slot_thumbs[i] = IMG_Load(thumb_path);
+                s_slot_thumbs[slot_idx] = IMG_Load(thumb_path);
             }
         }
         if (!saved) {
-            if (s_slot_thumbs[i]) {
-                SDL_FreeSurface(s_slot_thumbs[i]);
-                s_slot_thumbs[i] = NULL;
+            if (s_slot_thumbs[slot_idx]) {
+                SDL_FreeSurface(s_slot_thumbs[slot_idx]);
+                s_slot_thumbs[slot_idx] = NULL;
             }
-            s_slot_thumb_paths[i][0] = '\0';
+            s_slot_thumb_paths[slot_idx][0] = '\0';
         }
 
-        if (s_slot_thumbs[i]) {
-            float surf_w = (float)s_slot_thumbs[i]->w;
-            float surf_h = (float)s_slot_thumbs[i]->h;
+        if (s_slot_thumbs[slot_idx]) {
+            float surf_w = (float)s_slot_thumbs[slot_idx]->w;
+            float surf_h = (float)s_slot_thumbs[slot_idx]->h;
             float scale_x = thumb_w / surf_w;
             float scale_y = thumb_h / surf_h;
             float final_scale = (scale_x < scale_y) ? scale_x : scale_y;
@@ -1735,29 +2685,52 @@ void vita_view_savestates(VitaInputState *input, int *selected_item)
             int draw_y = (int)(thumb_y + (thumb_h - draw_h) * 0.5f);
 
             SDL_Rect dst_r = { (Sint16)draw_x, (Sint16)draw_y, (Uint16)draw_w, (Uint16)draw_h };
-            SDL_SoftStretch(s_slot_thumbs[i], NULL, prSDLScreen, &dst_r);
+            SDL_SoftStretch(s_slot_thumbs[slot_idx], NULL, prSDLScreen, &dst_r);
         } else {
-            vita_draw_boing_ball_icon(thumb_x + (thumb_w * 0.5f), thumb_y + 58.0f, 26.0f, 0.0f);
-            vita_draw_text_centered(thumb_x + (thumb_w * 0.5f), thumb_y + 105.0f,
-                saved ? VITA_COLOR_SUCCESS : VITA_COLOR_TEXT_MUTED, 0.90f,
+            vita_draw_boing_ball_icon(thumb_x + (thumb_w * 0.5f), thumb_y + 40.0f, 22.0f, 0.0f);
+            vita_draw_text_centered(thumb_x + (thumb_w * 0.5f), thumb_y + 66.0f,
+                saved ? VITA_COLOR_SUCCESS : VITA_COLOR_TEXT_MUTED, 0.80f,
                 saved ? "SAVED" : "EMPTY");
         }
 
-        float action_x = sx + 10.0f;
-        float action_w = slot_w - 20.0f;
-        float save_y = start_y + 215.0f;
-        float load_y = start_y + 260.0f;
+        float act_x = sx + 8.0f;
+        float act_w = slot_w - 16.0f;
+        float half_w = (act_w - 6.0f) * 0.5f;
+        float row1_y = start_y + 142.0f;
+        float row2_y = start_y + 176.0f;
+        float row3_y = start_y + 210.0f;
+        float btn_h = 30.0f;
 
-        vita_draw_card(action_x, save_y, action_w, 38.0f, focused, false);
-        vita_draw_button_glyph(action_x + 12.0f, save_y + 8.0f, VITA_BTN_CROSS);
-        vita_draw_text(action_x + 48.0f, save_y + 11.0f,
-            focused ? VITA_COLOR_TEXT_WHITE : VITA_COLOR_TEXT_MUTED, 0.90f, "SAVE STATE");
+        /* Row 1: SAVE (X) and LOAD ([]) */
+        bool f_save = (focused && s_savestate_subaction == 0);
+        bool f_load = (focused && s_savestate_subaction == 1);
+        vita_draw_card(act_x, row1_y, half_w, btn_h, f_save, false);
+        vita_draw_button_glyph(act_x + 6.0f, row1_y + 5.0f, VITA_BTN_CROSS);
+        vita_draw_text(act_x + 28.0f, row1_y + 7.0f, f_save ? VITA_COLOR_TEXT_WHITE : VITA_COLOR_TEXT_MUTED, 0.70f, "SAVE");
 
-        vita_draw_card(action_x, load_y, action_w, 38.0f, false, false);
-        vita_draw_button_glyph(action_x + 12.0f, load_y + 8.0f, VITA_BTN_SQUARE);
-        vita_draw_text(action_x + 48.0f, load_y + 11.0f,
-            VITA_COLOR_TEXT_MUTED, 0.90f, "LOAD STATE");
+        vita_draw_card(act_x + half_w + 6.0f, row1_y, half_w, btn_h, f_load, false);
+        vita_draw_button_glyph(act_x + half_w + 8.0f, row1_y + 5.0f, VITA_BTN_SQUARE);
+        vita_draw_text(act_x + half_w + 30.0f, row1_y + 7.0f, f_load ? VITA_COLOR_TEXT_WHITE : VITA_COLOR_TEXT_MUTED, 0.70f, "LOAD");
+
+        /* Row 2: EXPORT (TRI) and IMPORT (SEL) */
+        bool f_exp = (focused && s_savestate_subaction == 2);
+        bool f_imp = (focused && s_savestate_subaction == 3);
+        vita_draw_card(act_x, row2_y, half_w, btn_h, f_exp, false);
+        vita_draw_button_glyph(act_x + 6.0f, row2_y + 5.0f, VITA_BTN_TRIANGLE);
+        vita_draw_text(act_x + 28.0f, row2_y + 7.0f, f_exp ? VITA_COLOR_TEXT_WHITE : VITA_COLOR_TEXT_MUTED, 0.70f, "EXP");
+
+        vita_draw_card(act_x + half_w + 6.0f, row2_y, half_w, btn_h, f_imp, false);
+        vita_draw_text_centered(act_x + half_w + 6.0f + (half_w * 0.5f), row2_y + 7.0f,
+            f_imp ? VITA_COLOR_TEXT_WHITE : VITA_COLOR_TEXT_MUTED, 0.70f, "IMP (SEL)");
+
+        /* Row 3: DELETE STATE */
+        bool f_del = (focused && s_savestate_subaction == 4);
+        vita_draw_card(act_x, row3_y, act_w, btn_h, f_del, false);
+        vita_draw_text_centered(act_x + (act_w * 0.5f), row3_y + 7.0f,
+            f_del ? VITA_COLOR_AMIGA_RED : VITA_COLOR_TEXT_MUTED, 0.72f, "DELETE STATE");
     }
+
+    vita_draw_list_page_indicator(*selected_item, total_items, 4);
 }
 
 void vita_view_ftp(VitaInputState *input, int *selected_item)
@@ -1788,7 +2761,33 @@ void vita_view_ftp(VitaInputState *input, int *selected_item)
 
 void vita_view_system(VitaInputState *input, int *selected_item)
 {
-    const int total_items = 6;
+    static bool s_ftp_modal_open = false;
+
+    if (s_ftp_modal_open) {
+        char ip[32];
+        char endpoint[128];
+        vita_ftp_get_ip(ip, sizeof(ip));
+        snprintf(endpoint, sizeof(endpoint), "ftp://%s:%d", ip, vita_ftp_get_port());
+
+        if (input->pressed & (SCE_CTRL_CIRCLE | SCE_CTRL_CROSS)) {
+            vita_ftp_stop();
+            s_ftp_modal_open = false;
+            return;
+        }
+
+        vita_draw_card_custom(80.0f, 95.0f, 800.0f, 330.0f, VITA_COLOR_CARD, VITA_COLOR_FOCUS_BORDER);
+        vita_draw_text_centered(480.0f, 130.0f, VITA_COLOR_TEXT_WHITE, 1.30f, "FTP FILE TRANSFER");
+        vita_draw_text_centered(480.0f, 175.0f, VITA_COLOR_SUCCESS, 1.15f, "FTP SERVER ACTIVE");
+        vita_draw_text_centered(480.0f, 220.0f, VITA_COLOR_AMIGA_BLUE, 1.25f, endpoint);
+        vita_draw_text_centered(480.0f, 265.0f, VITA_COLOR_TEXT_WHITE, 0.90f, "User: anonymous   Password: (empty)   Port: 1337");
+        vita_draw_text_centered(480.0f, 295.0f, VITA_COLOR_TEXT_MUTED, 0.85f, "Full access to all partitions: ux0: / ur0: / uma0: / app0: / gro0:");
+        vita_draw_text_centered(480.0f, 330.0f, VITA_COLOR_TEXT_MUTED, 0.85f, "Transfer your ADF, HDF, IPF and WHDLoad files via PC/Phone");
+        vita_draw_text_centered(480.0f, 380.0f, VITA_COLOR_TEXT_WHITE, 0.95f, "Press O or X to Stop FTP Server and Close");
+        vita_draw_footer("FTP SERVER RUNNING", "CIRCLE / CROSS STOP & CLOSE");
+        return;
+    }
+
+    const int total_items = 11;
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
 
@@ -1810,13 +2809,60 @@ void vita_view_system(VitaInputState *input, int *selected_item)
                 } else {
                     saveconfig(1);
                 }
-                vita_show_message_box("Config Saved", "Configuration saved successfully to ux0:/data/uae4all/conf/", "OK (X)");
+                vita_show_message_box("Config Saved", "Configuration saved successfully for current game.", "OK (X)");
                 break;
-            case 1:
+            case 1: {
+                int res = saveconfig(4);
+                if (res == 1)
+                    vita_show_message_box("Config Saved", "Configuration saved successfully as custom file.", "OK (X)");
+                break;
+            }
+            case 2: {
+                char load_path[512];
+                load_path[0] = '\0';
+                int res = vita_gui_run_browser(load_path, "ux0:/data/uae4all/conf", 9);
+                if (res == 1 && load_path[0] != '\0') {
+                    strncpy(config_load_filename, load_path, sizeof(config_load_filename) - 1);
+                    config_load_filename[sizeof(config_load_filename) - 1] = '\0';
+                    loadconfig(5);
+                    vita_set_kickstart(kickstart, 1);
+                    bReloadKickstart = 1;
+                    UpdateChipsetSettings();
+                    UpdateCPUModelSettings();
+                    UpdateMemorySettings();
+                    getChanges();
+                    check_all_prefs();
+                    gui_update();
+                    vita_show_message_box("Config Loaded", "Configuration loaded and applied successfully.", "OK (X)");
+                }
+                break;
+            }
+            case 3:
+                saveconfig(1);
+                vita_show_message_box("Default Saved", "Configuration saved as default (uaeconfig.conf).", "OK (X)");
+                break;
+            case 4:
+                loadconfig(1);
+                vita_set_kickstart(kickstart, 1);
+                bReloadKickstart = 1;
+                UpdateChipsetSettings();
+                UpdateCPUModelSettings();
+                UpdateMemorySettings();
+                getChanges();
+                check_all_prefs();
+                gui_update();
+                vita_show_message_box("Default Loaded", "Default configuration reloaded from uaeconfig.conf.", "OK (X)");
+                break;
+            case 5:
                 if (vita_show_confirm_box("Reset Settings", "Restore default settings for all parameters?", "Yes", "No")) {
                     SetDefaultMenuSettings(1);
                     int default_kickstart_loaded = vita_set_kickstart(kickstart, 1);
                     bReloadKickstart = 1;
+                    UpdateChipsetSettings();
+                    UpdateCPUModelSettings();
+                    UpdateMemorySettings();
+                    getChanges();
+                    check_all_prefs();
                     gui_update();
                     if (default_kickstart_loaded)
                         vita_show_message_box("Settings Reset", "Default settings restored successfully.", "OK (X)");
@@ -1824,10 +2870,13 @@ void vita_view_system(VitaInputState *input, int *selected_item)
                         vita_show_message_box("Settings Reset", "Defaults restored, but the default Kickstart ROM is missing.", "OK (X)");
                 }
                 break;
-            case 2:
+            case 6:
+                mainMenu_autosave = 1 - mainMenu_autosave;
+                break;
+            case 7:
                 mainMenu_case = MAIN_MENU_CASE_RESET;
                 break;
-            case 3:
+            case 8:
                 if (emulating) {
                     vita_screenshot_request = 1;
                     mainMenu_case = MAIN_MENU_CASE_RUN;
@@ -1835,27 +2884,74 @@ void vita_view_system(VitaInputState *input, int *selected_item)
                     vita_show_message_box("Screenshot", "Launch a game before taking a screenshot.", "OK (X)");
                 }
                 break;
-            case 4:
+            case 9:
+                if (vita_ftp_start() == 0) {
+                    s_ftp_modal_open = true;
+                } else {
+                    vita_show_message_box("FTP Server", "Unable to start FTP service. Check Wi-Fi connection.", "OK (X)");
+                }
+                break;
+            case 10:
                 if (vita_show_confirm_box("About", "Open UAE4All2 and credits?", "Yes", "No")) {
                     vita_show_about_box();
                 }
                 break;
-            case 5:
-                return;
         }
     }
 
     float card_x = 20.0f;
     float card_w = VITA_SCREEN_W - 40.0f;
-    float start_y = 90.0f;
-    float item_h = 56.0f;
+    const float start_y = VITA_LIST_START_Y;
+    const float item_h = 44.0f;
+    const float item_gap = 6.0f;
+    const int visible_items = vita_list_visible_rows(start_y, item_h, item_gap);
+    int first_item = *selected_item >= visible_items ? *selected_item - visible_items + 1 : 0;
 
-    vita_draw_button_item(card_x, start_y + 0.0f * (item_h + 12.0f), card_w, item_h, "Save Game Configuration", "Save all disk, display, and hardware settings for current game", "SAVE", *selected_item == 0, false);
-    vita_draw_button_item(card_x, start_y + 1.0f * (item_h + 12.0f), card_w, item_h, "Restore Default Settings", "Reset all emulator configurations to factory defaults", "RESET", *selected_item == 1, false);
-    vita_draw_button_item(card_x, start_y + 2.0f * (item_h + 12.0f), card_w, item_h, "Reboot Amiga Emulation", "Hard reset the Amiga virtual machine with current settings", "REBOOT", *selected_item == 2, false);
-    vita_draw_button_item(card_x, start_y + 3.0f * (item_h + 12.0f), card_w, item_h, "Take Screenshot", "Capture the next emulated frame as a PNG in the screenshots folder", "SHOT", *selected_item == 3, false);
-    vita_draw_button_item(card_x, start_y + 4.0f * (item_h + 12.0f), card_w, item_h, "About UAE4All2", "Credits, original authors, contributors and project acknowledgements", "ABOUT", *selected_item == 4, false);
-    vita_draw_button_item(card_x, start_y + 5.0f * (item_h + 12.0f), card_w, item_h, "FTP File Transfer", vita_ftp_is_running() ? "Anonymous upload server active" : "Start anonymous upload server", vita_ftp_is_running() ? "ON" : "OFF", *selected_item == 5, vita_ftp_is_running());
+    static const char *system_titles[11] = {
+        "Save Game Configuration",
+        "Save Configuration As...",
+        "Load Configuration...",
+        "Save Default Configuration",
+        "Load Default Configuration",
+        "Restore Default Settings",
+        "Auto-save on Exit",
+        "Reboot Amiga Emulation",
+        "Take Screenshot",
+        "FTP File Transfer",
+        "About UAE4All2"
+    };
+    static const char *system_subtitles[11] = {
+        "Save all disk, display, and hardware settings for current game",
+        "Save current configuration with a custom filename via on-screen keyboard",
+        "Browse and load custom configuration from ux0:/data/uae4all/conf/",
+        "Save current settings as emulator default (uaeconfig.conf)",
+        "Reload default settings from uaeconfig.conf",
+        "Reset all emulator configurations to factory defaults",
+        "Automatically save state when exiting the emulator",
+        "Hard reset the Amiga virtual machine with current settings",
+        "Capture the next emulated frame as a PNG in the screenshots folder",
+        "Anonymous background FTP server for wireless file transfer",
+        "Credits, original authors, contributors and project acknowledgements"
+    };
+    static const char *system_badges[11] = { "SAVE", "SAVE AS", "LOAD", "SAVE DEF", "LOAD DEF", "RESET", "AUTO", "REBOOT", "SHOT", "FTP", "ABOUT" };
+
+    for (int i = 0; i < visible_items; i++) {
+        int item = first_item + i;
+        if (item >= total_items) break;
+        float y = start_y + (float)i * (item_h + item_gap);
+        bool focused = (*selected_item == item);
+        if (item == 6) {
+            vita_draw_switch_item(card_x, y, card_w, item_h, system_titles[item], mainMenu_autosave == 1, focused);
+        } else if (item == 9) {
+            vita_draw_button_item(card_x, y, card_w, item_h, system_titles[item],
+                vita_ftp_is_running() ? "Anonymous upload server active" : "Start anonymous upload server",
+                vita_ftp_is_running() ? "ON" : "OFF", focused, vita_ftp_is_running());
+        } else {
+            vita_draw_button_item(card_x, y, card_w, item_h, system_titles[item],
+                system_subtitles[item], system_badges[item], focused, false);
+        }
+    }
+    vita_draw_list_page_indicator(*selected_item, total_items, visible_items);
 }
 
 #endif

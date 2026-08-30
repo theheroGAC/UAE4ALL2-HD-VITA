@@ -45,6 +45,9 @@ static int s_num_entries = 0;
 static char s_current_dir[MAX_PATH_LEN] = "ux0:/data/uae4all/roms";
 static bool s_hdf_mode = false;
 static bool s_cd_mode = false;
+static bool s_conf_mode = false;
+static bool s_lha_mode = false;
+static bool s_state_mode = false;
 static SDL_Surface *s_cover_surf = NULL;
 static char s_cover_loaded_path[MAX_PATH_LEN] = "";
 
@@ -52,6 +55,33 @@ static bool is_supported_ext(const char *name)
 {
     const char *ext = strrchr(name, '.');
     if (!ext) return false;
+
+    if (s_conf_mode) {
+        return (strcasecmp(ext, ".conf") == 0);
+    }
+    if (s_lha_mode) {
+        return (strcasecmp(ext, ".lha") == 0 || strcasecmp(ext, ".lzh") == 0);
+    }
+    if (s_state_mode) {
+        return (strcasecmp(ext, ".asf") == 0);
+    }
+    if (s_cd_mode) {
+        return (strcasecmp(ext, ".iso") == 0 ||
+                strcasecmp(ext, ".cue") == 0 ||
+                strcasecmp(ext, ".chd") == 0 ||
+                strcasecmp(ext, ".bin") == 0 ||
+                strcasecmp(ext, ".zip") == 0 ||
+                strcasecmp(ext, ".7z") == 0);
+    }
+    if (s_hdf_mode) {
+        return (strcasecmp(ext, ".hdf") == 0 ||
+                strcasecmp(ext, ".hda") == 0 ||
+                strcasecmp(ext, ".vhd") == 0 ||
+                strcasecmp(ext, ".zip") == 0 ||
+                strcasecmp(ext, ".7z") == 0 ||
+                strcasecmp(ext, ".gz") == 0 ||
+                strcasecmp(ext, ".xz") == 0);
+    }
 
     if (strcasecmp(ext, ".adf") == 0 ||
         strcasecmp(ext, ".adz") == 0 ||
@@ -207,6 +237,9 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
 {
     s_hdf_mode = (disk_drive_idx >= 4 && disk_drive_idx < 8);
     s_cd_mode = (disk_drive_idx == 8);
+    s_conf_mode = (disk_drive_idx == 9);
+    s_lha_mode = (disk_drive_idx == 11);
+    s_state_mode = (disk_drive_idx == 10);
     if (start_dir && strlen(start_dir) > 0) {
         strncpy(s_current_dir, start_dir, sizeof(s_current_dir) - 1);
     }
@@ -491,6 +524,8 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
                     else if (!strcasecmp(ext, ".lha") || !strcasecmp(ext, ".lzh")) type_desc = "LHA Archive";
                     else if (!strcasecmp(ext, ".zip")) type_desc = "ZIP Archive";
                     else if (!strcasecmp(ext, ".hdf")) type_desc = "Hard Disk Image";
+                    else if (!strcasecmp(ext, ".conf")) type_desc = "UAE4All Configuration";
+                    else if (!strcasecmp(ext, ".asf")) type_desc = "Amiga Save State";
                 }
                 snprintf(size_txt, sizeof(size_txt), "Size: %u KB (%s)", (unsigned int)(sel_entry->size / 1024), type_desc);
                 vita_truncate_text(size_txt, preview_w - 32.0f, 0.85f, size_buf, sizeof(size_buf));

@@ -9,6 +9,9 @@
 #include "vkbd.h"
 
 #include "keyboard.h"
+#if defined(__PSP2__)
+#include "menu_config.h"
+#endif
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 
@@ -24,6 +27,8 @@ extern int presetModeId;
 extern int visibleAreaWidth;
 extern int mainMenu_vkbdLanguage;
 extern int mainMenu_vkbdStyle;
+extern int mainMenu_vkbdTransparency;
+extern int mainMenu_vkbdPosition;
 
 static int vkbd_x=VKBD_X;
 static int vkbd_y=VKBD_Y;
@@ -655,7 +660,8 @@ int vkbd_init(void)
 	ksurShiftHires=SDL_DisplayFormat(tmp);
 	SDL_FreeSurface(tmp);
 
-	vkbd_transparency=128; //default transparency is 128 for keyboard
+	const int alpha_table[4] = { 64, 128, 192, 255 };
+	vkbd_transparency = alpha_table[mainMenu_vkbdTransparency % 4];
 	SDL_SetAlpha(canvas, SDL_SRCALPHA | SDL_RLEACCEL, vkbd_transparency);
 	SDL_SetAlpha(canvasHires, SDL_SRCALPHA | SDL_RLEACCEL, vkbd_transparency);
 
@@ -668,7 +674,12 @@ int vkbd_init(void)
 		vkbd_sticky_key[i].stuck=false;
 	}
 	vkbd_x=(prSDLScreen->w-ksur->w)/2;
-	vkbd_y=prSDLScreen->h-ksur->h;
+	if (mainMenu_vkbdPosition == 1)
+		vkbd_y = 0;
+	else if (mainMenu_vkbdPosition == 2)
+		vkbd_y = (prSDLScreen->h - ksur->h) / 2;
+	else
+		vkbd_y = prSDLScreen->h - ksur->h;
 	vkbd_mode=0;
 	vkbd_move=0;
 	vkbd_last_press_time=0;
@@ -849,45 +860,7 @@ int vkbd_touch_xy_to_actual(float touch_x, float touch_y)
 #ifdef __PSP2__
 	int display_width = 960;
 	int display_height = 544;
-	/* Keep touch coordinates in exactly the same viewport as update_display().
-	   Vita preset 7 is the intentional full-screen stretch; all other presets
-	   use the Amiga-correct 4:3 viewport. */
-	int preset_variant = presetModeId % 10;
-	if (preset_variant == 7)
-	{
-		scaled_width = (float)display_width;
-		scaled_height = (float)display_height;
-		x_offset = 0;
-		y_offset = 0;
-	}
-	else if (preset_variant == 8 && mainMenu_shader != 0)
-	{
-		scaled_height = (float)display_height;
-		scaled_width = scaled_height * (5.0f / 4.0f);
-		x_offset = (display_width - scaled_width) / 2;
-		y_offset = 0;
-	}
-	else if (mainMenu_shader != 0)
-	{
-		scaled_height = (float)display_height;
-		scaled_width = scaled_height * (4.0f / 3.0f);
-		x_offset = (display_width - scaled_width) / 2;
-		y_offset = 0;
-	}
-	else if (preset_variant == 8)
-	{
-		scaled_width = 675.0f;
-		scaled_height = 540.0f;
-		x_offset = (display_width - scaled_width) / 2;
-		y_offset = (display_height - scaled_height) / 2;
-	}
-	else
-	{
-		scaled_width = 720.0f;
-		scaled_height = 540.0f;
-		x_offset = (display_width - scaled_width) / 2;
-		y_offset = (display_height - scaled_height) / 2;
-	}
+	vita_get_display_geometry(&x_offset, &y_offset, &scaled_width, &scaled_height);
 #else
 	int display_width = 1280;
 	int display_height = 720;
