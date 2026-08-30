@@ -1898,7 +1898,6 @@ void vita_view_display(VitaInputState *input, int *selected_item)
                 break;
         }
         getChanges();
-        check_all_prefs();
     }
 
     float card_x = 20.0f;
