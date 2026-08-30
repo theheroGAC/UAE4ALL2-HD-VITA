@@ -348,36 +348,45 @@ void update_display() {
 #if defined(__PSP2__)
     write_log("[VITA] update_display: hardware SDL_SetVideoMode returned %p\n", (void *)prSDLScreen);
     if (prSDLScreen == NULL) {
-        /* Some SDL-Vita builds reject a small hardware surface after the
-           960x544 menu surface was released. Retry as a software surface. */
+        write_log("[VITA] update_display: retrying hardware surface without doublebuf\n");
+        prSDLScreen = SDL_SetVideoMode(visibleAreaWidth, mainMenu_displayedLines, 16, SDL_HWSURFACE);
+    }
+    if (prSDLScreen == NULL) {
         write_log("[VITA] update_display: retrying software framebuffer\n");
-        prSDLScreen = SDL_SetVideoMode(visibleAreaWidth, mainMenu_displayedLines, 16, SDL_SWSURFACE | SDL_DOUBLEBUF);
+        prSDLScreen = SDL_SetVideoMode(visibleAreaWidth, mainMenu_displayedLines, 16, SDL_SWSURFACE);
         write_log("[VITA] update_display: software SDL_SetVideoMode returned %p\n", (void *)prSDLScreen);
     }
-#endif
-    if (prSDLScreen == NULL) {
-#if defined(__PSP2__)
-        /* The SDL-Vita version shipped with some VitaSDK releases does not
-           advertise 320x240, although UAE's default Amiga mode requests it.
-           320x200 is a supported native Vita SDL mode and is safe for the
-           classic low-resolution ADF path. */
-        if (visibleAreaWidth == 320 && mainMenu_displayedLines != 200) {
-            write_log("[VITA] update_display: retrying supported 320x200 mode\n");
-            mainMenu_displayedLines = 200;
-            prSDLScreen = SDL_SetVideoMode(320, 200, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
-            if (prSDLScreen == NULL) {
-                prSDLScreen = SDL_SetVideoMode(320, 200, 16, SDL_SWSURFACE | SDL_DOUBLEBUF);
-            }
-            write_log("[VITA] update_display: 320x200 framebuffer returned %p\n", (void *)prSDLScreen);
-        }
-#endif
+    if (prSDLScreen == NULL && visibleAreaWidth != 320) {
+        write_log("[VITA] update_display: resolution unsupported by SDL driver, falling back to 320x%d\n", mainMenu_displayedLines);
+        visibleAreaWidth = 320;
+        mainMenu_displayHires = 0;
+        prSDLScreen = SDL_SetVideoMode(320, mainMenu_displayedLines, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
+        if (prSDLScreen == NULL)
+            prSDLScreen = SDL_SetVideoMode(320, mainMenu_displayedLines, 16, SDL_SWSURFACE);
+    }
+    if (prSDLScreen == NULL && mainMenu_displayedLines != 240) {
+        write_log("[VITA] update_display: lines unsupported, falling back to 320x240\n");
+        mainMenu_displayedLines = 240;
+        visibleAreaWidth = 320;
+        mainMenu_displayHires = 0;
+        prSDLScreen = SDL_SetVideoMode(320, 240, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
+        if (prSDLScreen == NULL)
+            prSDLScreen = SDL_SetVideoMode(320, 240, 16, SDL_SWSURFACE);
     }
     if (prSDLScreen == NULL) {
-#if defined(__PSP2__)
+        write_log("[VITA] update_display: fallback to 320x200\n");
+        mainMenu_displayedLines = 200;
+        visibleAreaWidth = 320;
+        mainMenu_displayHires = 0;
+        prSDLScreen = SDL_SetVideoMode(320, 200, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
+        if (prSDLScreen == NULL)
+            prSDLScreen = SDL_SetVideoMode(320, 200, 16, SDL_SWSURFACE);
+    }
+    if (prSDLScreen == NULL) {
         write_log("[VITA] update_display: SDL_SetVideoMode failed: %s\n", SDL_GetError());
-#endif
         return;
     }
+#endif
 
     float sh;
     float sw;
