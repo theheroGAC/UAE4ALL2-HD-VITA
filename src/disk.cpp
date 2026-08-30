@@ -997,6 +997,17 @@ void DISK_ersatz_read (int tr, int sec, uaecptr dest)
     zfile_fread (dptr, 1, 512, floppy[0].diskfile);
 }
 
+void disk_set_write_protect (int num, int enabled)
+{
+    if (num >= 0 && num < 4)
+        floppy[num].wrprot = enabled ? 1 : 0;
+}
+
+int disk_get_write_protect (int num)
+{
+    return (num >= 0 && num < 4) ? floppy[num].wrprot : 1;
+}
+
 void disk_eject (int num)
 {
     if (num<mainMenu_drives)

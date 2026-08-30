@@ -296,7 +296,7 @@ void remap_custom_controls() // assign custom 1-3 to currently used custom set
 }		
 #endif
 
-static void getChanges(void)
+void getChanges(void)
 {
 	if (mainMenu_sound)
 	{
@@ -320,9 +320,6 @@ int gui_init (void)
 	SDL_JoystickOpen(0);
 #endif
 #if defined(__PSP2__)
-	/* The Vita menu owns its own 960x544 surface. Do not call update_display()
-	   here: that function creates the game framebuffer and its Vita SDL path
-	   is not safe before the menu has initialized the Vita renderer. */
 	emulating=0;
 	write_log("[VITA] gui_init: init sound\n");
 	uae4all_init_sound();
@@ -330,7 +327,6 @@ int gui_init (void)
 	init_kickstart();
 	write_log("[VITA] gui_init: kickstart done\n");
 
-	/* Lock PS Button to prevent file corruption */
 	sceShellUtilLock(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN);
 	scePowerSetArmClockFrequency(444);
 	scePowerSetBusClockFrequency(222);
@@ -343,8 +339,6 @@ int gui_init (void)
 	disk_sound_reset();
 	write_log("[VITA] gui_init: vita menu returned result=%d\n", initial_menu_result);
 	if (initial_menu_result == 0) {
-		/* Exit was selected before emulation started. There is no game surface
-		   to restore, so release the menu framebuffer directly. */
 		vita_gui_shutdown_final();
 		return -2;
 	}
@@ -356,9 +350,6 @@ int gui_init (void)
 	write_log("[VITA] gui_init: game display ready\n");
 
 #ifdef USE_UAE4ALL_VKBD
-	/* The Vita virtual keyboard needs a valid game framebuffer. The custom
-	   menu owns a separate surface, so initialize the keyboard after returning
-	   from the menu and after update_display(). */
 	vkbd_init();
 	write_log("[VITA] gui_init: vkbd done\n");
 #endif
@@ -469,6 +460,7 @@ static void goMenu(void)
 #endif
 #endif
 	getChanges();
+	check_all_prefs();
 #ifdef USE_UAE4ALL_VKBD
 	vkbd_init_button2();
 #endif

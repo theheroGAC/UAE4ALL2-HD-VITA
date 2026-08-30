@@ -243,48 +243,43 @@ void read_joystick(int nr, unsigned int *dir, int *button)
 // regular button controls without custom remapping
 	if (usingRegularControls && !(gp2xMouseEmuOn) && !(gp2xButtonRemappingOn))
 	{
-		if (
-			(mainMenu_autofire & switch_autofire & delay>mainMenu_autofireRate)
-			||
-				(
-					(
-						(mainMenu_autofireButton1==GP2X_BUTTON_B && buttonA[0])
-						||
-						(mainMenu_autofireButton1==GP2X_BUTTON_X && buttonX[0])
-						||
-						(mainMenu_autofireButton1==GP2X_BUTTON_Y && buttonY[0])
-					)
-					& delay>mainMenu_autofireRate
-				)
-			)
+		bool fire1_pressed = ((mainMenu_button1==GP2X_BUTTON_B && buttonA[0]) || (mainMenu_button1==GP2X_BUTTON_X && buttonX[0]) || (mainMenu_button1==GP2X_BUTTON_Y && buttonY[0])) != 0;
+		if (mainMenu_autofire > 0)
 		{
-			if(!buttonB[0])
-				*button=1;
-			delay=0;
-			*button |= (buttonB[0] & 1) << 1;
+			int period = (mainMenu_autofire == 1) ? 9 : (mainMenu_autofire == 2 ? 6 : 3);
+			if (mainMenu_autofireMode == 1)
+			{
+				if ((delay % period) == 0)
+					*button = 1;
+				else
+					*button = 0;
+				delay++;
+			}
+			else
+			{
+				if (fire1_pressed)
+				{
+					if ((delay % period) == 0)
+						*button = 1;
+					else
+						*button = 0;
+					delay++;
+				}
+				else
+				{
+					*button = 0;
+					delay = 0;
+				}
+			}
 		}
 		else
 		{
-#if defined(__PSP2__) || defined(__SWITCH__)
-			*button = ((mainMenu_button1==GP2X_BUTTON_B && buttonA[0]) || (mainMenu_button1==GP2X_BUTTON_X && buttonX[0]) || (mainMenu_button1==GP2X_BUTTON_Y && buttonY[0])) & 1;
-#else
-#if !(defined(ANDROIDSDL) || defined(AROS))
-			*button = ((mainMenu_button1==GP2X_BUTTON_B && buttonA[0]) || (mainMenu_button1==GP2X_BUTTON_X && buttonX[0]) || (mainMenu_button1==GP2X_BUTTON_Y && buttonY[0]) || SDL_JoystickGetButton(joy, mainMenu_button1)) & 1;
-#else
-			*button = ((mainMenu_button1==GP2X_BUTTON_B && buttonA[0]) || (mainMenu_button1==GP2X_BUTTON_X && buttonX[0]) || (mainMenu_button1==GP2X_BUTTON_Y && buttonY[0])) & 1;
-#endif
-#endif //__PSP2__
-			delay++;
-#if defined(__PSP2__) || defined(__SWITCH__)
-			*button |= ((buttonB[0]) & 1) << 1;
-#else
-#if defined(PANDORA) && !defined(AROS)
-			*button |= ((buttonB[0] || SDL_JoystickGetButton(joy, mainMenu_button2)) & 1) << 1;
-#else
-			*button |= ((buttonB[0]) & 1) << 1;
-#endif
-#endif //__PSP2__
+			*button = fire1_pressed ? 1 : 0;
+			delay = 0;
 		}
+
+		if (buttonB[0])
+			*button |= (1 << 1);
 	}
 
 //Analog Mouse on PSP2, only update once per frame (when nr==1)
@@ -647,6 +642,35 @@ void read_joystick(int nr, unsigned int *dir, int *button)
 						*button |= 1 << 1;
 				}
 			}
+			if (mainMenu_autofire > 0)
+			{
+				int period = (mainMenu_autofire == 1) ? 9 : (mainMenu_autofire == 2 ? 6 : 3);
+				if (mainMenu_autofireMode == 1)
+				{
+					if ((delay % period) == 0)
+						*button |= 1;
+					else
+						*button &= ~1;
+					delay++;
+				}
+				else
+				{
+					if (*button & 1)
+					{
+						if ((delay % period) != 0)
+							*button &= ~1;
+						delay++;
+					}
+					else
+					{
+						delay = 0;
+					}
+				}
+			}
+			else if (!(*button & 1))
+			{
+				delay = 0;
+			}
 		}
 	}
 
@@ -792,34 +816,38 @@ void read_joystick(int nr, unsigned int *dir, int *button)
 				top = 1;
 			else if (dpadDown[joynum])
 				bot = 1;
-			if (
-				(mainMenu_autofire & switch_autofire & delay2[joynum-1]>mainMenu_autofireRate)
-				||
-					(
-						(
-							(mainMenu_autofireButton1==GP2X_BUTTON_B && buttonA[joynum])
-							||
-							(mainMenu_autofireButton1==GP2X_BUTTON_X && buttonX[joynum])
-							||
-							(mainMenu_autofireButton1==GP2X_BUTTON_Y && buttonY[joynum])
-						)
-						& delay2[joynum-1]>mainMenu_autofireRate
-					)
-				)
+			bool fire1_pressed = ((mainMenu_button1==GP2X_BUTTON_B && buttonA[joynum]) || (mainMenu_button1==GP2X_BUTTON_X && buttonX[joynum]) || (mainMenu_button1==GP2X_BUTTON_Y && buttonY[joynum])) != 0;
+			if (mainMenu_autofire > 0)
 			{
-				if(!buttonB[joynum])
-					*button=1;
-				delay2[joynum-1]=0;
-				*button |= (buttonB[joynum] & 1) << 1;
+				int period = (mainMenu_autofire == 1) ? 9 : (mainMenu_autofire == 2 ? 6 : 3);
+				if (mainMenu_autofireMode == 1)
+				{
+					if ((delay2[joynum-1] % period) == 0)
+						*button |= 0x01;
+					delay2[joynum-1]++;
+				}
+				else
+				{
+					if (fire1_pressed)
+					{
+						if ((delay2[joynum-1] % period) == 0)
+							*button |= 0x01;
+						delay2[joynum-1]++;
+					}
+					else
+					{
+						delay2[joynum-1] = 0;
+					}
+				}
 			}
 			else
 			{
-				if ((mainMenu_button1==GP2X_BUTTON_B && buttonA[joynum]) || (mainMenu_button1==GP2X_BUTTON_X && buttonX[joynum]) || (mainMenu_button1==GP2X_BUTTON_Y && buttonY[joynum]))
+				if (fire1_pressed)
 					*button |= 0x01;
-				if (buttonB[joynum])
-					*button |= (0x01 << 1);
-				delay2[joynum-1]++;
+				delay2[joynum-1] = 0;
 			}
+			if (buttonB[joynum])
+				*button |= (0x01 << 1);
 		}
 #endif //__PSP2__
 		// normal joystick movement
