@@ -1,4 +1,4 @@
-# UAE4LL2 HD — PlayStation Vita 1.06
+# UAE4LL2 HD — PlayStation Vita 1.07
 
 A cleaned PlayStation Vita build of UAE4ALL2 HD, an Amiga emulator based on the UAE4ALL2 project.
 
@@ -15,20 +15,22 @@ uae4all2hd.vpk
 - Amiga OCS, ECS and AGA emulation
 - 68000 and 68020 CPU modes
 - ADF, ADZ, DMS, IPF and ZIP floppy images
-- IPF floppy images through the bundled CAPS decoder
+- IPF floppy images through the latest upstream CAPS decoder
 - ZIP, LHA and LZH archives containing Amiga disk images
 - HDF hard-disk images and HD directories (4 HDF slots, boot order selection)
 - Integrated HDF Manager (create, format, and prepare FFS hard-disk images from 50 MB to 4000 MB)
 - Dedicated WHDLoad tab with one-click game launch and automatic A1200 AGA preset configuration
+- Custom WHDLoad Arguments editor with native PS Vita OSK keyboard support
 - High-performance, bit-perfect native LHA decompressor (-lh5-, -lh4-, -lh0-) with real-time UI progress bar
 - Pre-bundled official WHDLoad binaries (C:WHDLoad, CD32, DIC, Patcher, RawDIC, WArc, VFS, S:WHDLoad.prefs)
 - Automatic Amiga directory navigation (CD) into game folders for full resource locking
 - Hidden system directories (S, C, Libs, Devs, L, etc.) from the WHDLoad game browser
 - Savestates and thumbnails, savestate slots 1-4 with per-game naming
 - Virtual keyboard, touch controls and analog mouse
+- Advanced Autofire with configurable speeds (Slow, Medium, Turbo) and Trigger modes (Hold Fire Button / Continuous)
 - Vita shaders and aspect-ratio scaling
 - Vita menu with floppy, hard disk, WHDLoad, presets, hardware, display, controls, savestates and system tabs
-- About screen with version 1.06 and automatic scrolling credits
+- About screen with version 1.07 and automatic scrolling credits
 - CD32 Akiko CD controller with ISO, raw BIN and multi-track CUE images
 - CD32 data tracks, CD audio playback, subcode data, DMA and controller state
 - CD32-aware savestates including the mounted image and playback position
@@ -38,11 +40,11 @@ uae4all2hd.vpk
 - Live DF0-DF3 and HDF activity lights with synthesized disk-access sounds
 - Quick Menu (L trigger in-game) with resume, save/load state, eject DF0, eject CD32 and screenshot
 - Presets saved to memory only: configuration is written only from `System -> Save Game Configuration`
-- FTP file transfer using the VitaSDK `ftpvita` service used by VitaArchive/VitaShell-compatible clients
+- FTP file transfer using the VitaSDK `ftpvita` service with 512 KB buffer size and full filesystem access
 - Dedicated FTP screen showing the Vita IP address and port `1337`
-- FTP starts when entering the FTP screen and stops automatically with Circle when leaving it
-- FTP exposes `ux0:`, `ur0:` and `uma0:` for transferring ROMs, HDFs, configurations and backups
-- This HD release uses the separate Title ID `UAE4ALLHD` and does not overwrite the legacy UAE4ALL2
+- FTP starts when entering the FTP screen and stops automatically with Circle or Cross when leaving it
+- Full FTP access to all PS Vita partitions (`ux0:`, `ur0:`, `uma0:`, `app0:`, `gro0:`, etc.)
+- This HD release uses the separate Title ID `UAE4ALLHD` and does not overwrite legacy UAE4ALL2 installations
 
 ## Installation
 
@@ -61,7 +63,7 @@ ux0:/data/uae4all/kickstarts/
 
 Open the **System** tab and select **FTP File Transfer**. The dedicated FTP screen starts the VitaSDK `ftpvita` service and displays the connection address. Connect from a PC with FileZilla or another FTP client using the displayed IP address and port `1337`.
 
-The service exposes `ux0:`, `ur0:` and `uma0:`. It remains active only while the FTP screen is open; press **Circle** to stop FTP and return to the System tab. Use standard FTP only on a trusted local network because it does not encrypt traffic.
+The service exposes all partitions (`ux0:`, `ur0:`, `uma0:`, `app0:`, etc.). It remains active while the FTP screen is open; press **Circle** or **Cross** to stop FTP and return to the System tab. Use standard FTP only on a trusted local network because it does not encrypt traffic.
 
 ### WHDLoad relocation files
 
@@ -187,7 +189,7 @@ The browser recognizes common Amiga disk formats including ADF, ADZ, DMS, IPF, Z
 - Touch screen: mouse emulation (one finger = left button, two fingers = right button)
 - START: boot / resume
 
-The Controls tab covers joystick port, autofire, mouse multiplier, mouse emulation, stylus offset, tap delay, custom control sets (including the Pinball Dreams / Slam Tilt presets) and the Floppy/HDF sound volume.
+The Controls tab covers joystick port, autofire rate (Slow, Medium, Turbo), autofire trigger mode (Hold Button / Continuous), mouse multiplier, mouse emulation, stylus offset, tap delay, custom control sets (including the Pinball Dreams / Slam Tilt presets) and the Floppy/HDF sound volume.
 
 ## Display
 

@@ -222,11 +222,11 @@ if(BUILD_PSP2)
   target_compile_options(${PROJECT_NAME} PRIVATE ${FLAGS})
   target_link_libraries(${PROJECT_NAME} ${LDFLAGS})
 
-  vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME} ${UNSAFE_FLAG})
+  vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME} UNSAFE)
   add_custom_target(${PROJECT_NAME}.vpk
           DEPENDS ${PROJECT_NAME}.self-self
           COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Generating param.sfo"
-          COMMAND ${VITASDK}/bin/vita-mksfoex -s TITLE_ID=${TITLEID} -s APP_VER=01.06 "UAE4All2 HD" param.sfo
+          COMMAND ${VITASDK}/bin/vita-mksfoex -d ATTRIBUTE2=12 -s TITLE_ID=${TITLEID} -s APP_VER=01.07 "UAE4All2 HD" param.sfo
           COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Packaging uae4all2hd.vpk"
           COMMAND ${VITASDK}/bin/vita-pack-vpk -s param.sfo -b ${PROJECT_NAME}.self -a ${CMAKE_SOURCE_DIR}/psp2data/data=data -a ${CMAKE_SOURCE_DIR}/psp2data/sce_sys=sce_sys uae4all2hd.vpk
   )
