@@ -870,6 +870,7 @@ static int load_extendedkickstart (void)
   }
   extendedkickmem_bank.baseaddr = 0;
   extendedkickmem_size = 0;
+  extendedkickmem_mask = 0;
 
   int combined = 0;
   f = 0;
@@ -892,12 +893,14 @@ static int load_extendedkickstart (void)
        * map a NULL-baseaddr bank over 0xE00000/0xF00000 -> crash. */
       fclose (f);
       extendedkickmem_size = 0;
+      extendedkickmem_mask = 0;
       return 0;
   }
   if (size > 300000)
 	  extendedkickmem_size = 524288;
   else
 	  extendedkickmem_size = 262144;
+  extendedkickmem_mask = extendedkickmem_size ? extendedkickmem_size - 1 : 0;
   fseek (f, combined ? 524288 : 0, SEEK_SET);
 
   switch (extromtype ()) 
@@ -921,6 +924,7 @@ static int load_extendedkickstart (void)
 	  extendedkickmemory = 0;
 	  extendedkickmem_bank.baseaddr = 0;
 	  extendedkickmem_size = 0;
+	  extendedkickmem_mask = 0;
 	  fclose (f);
 	  return 0;
   }

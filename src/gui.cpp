@@ -102,15 +102,10 @@ extern int nr_joysticks;
 
 extern struct gui_info gui_data;
 
-static char _show_message_str[40]={
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-};
+static char _show_message_str[128] = { 0 };
 
-int show_message=0;
-char *show_message_str=(char *)&_show_message_str[0];
+int show_message = 0;
+char *show_message_str = (char *)&_show_message_str[0];
 
 extern SDL_Surface *prSDLScreen;
 
@@ -120,28 +115,28 @@ extern SDL_Joystick *uae4all_joy0, *uae4all_joy1, *uae4all_joy2, *uae4all_joy3, 
 //Predefined quick switch resolutions to select via TRIGGER R+START+DPAD LEFT/RIGHT
 static int can_change_quickSwitchModeID = 1;
 static int can_change_custom_controlSet = 1;
-static int quickSwitchModeID=1;
+static int quickSwitchModeID=7;
 struct myRes
 {
 		int num_lines;
 		int top_pos;
 };
 static myRes quickSwitchModes[] = {
-	{192, 18},
-	{200, 18},
-	{216, 18},
-	{224, 18},
-	{240, 18},
-	{256, 18},
-	{270, 18},
+	{192, 0},
+	{200, 0},
+	{216, 0},
+	{224, 0},
+	{240, 0},
+	{256, 0},
+	{270, 0},
 	{286, 0},
-	{192, 30},
-	{200, 30},
-	{216, 30},
-	{224, 30},
-	{240, 30},
-	{256, 30},
-	{270, 30},
+	{192, 0},
+	{200, 0},
+	{216, 0},
+	{224, 0},
+	{240, 0},
+	{256, 0},
+	{270, 0},
 };
 extern int moveY;
 
@@ -1148,12 +1143,22 @@ if(!vkbd_mode)
 		{
 			moveVertical(1);
 			moved_y += 2;
+#if defined(__PSP2__) || defined(__SWITCH__)
+			char msg[64];
+			snprintf(msg, sizeof(msg), "Offset Y: %+d", moveY);
+			gui_set_message(msg, 45);
+#endif
 		}
 		//down
 		else if(dpadDown[0])
 		{
 			moveVertical(-1);
 			moved_y -= 2;
+#if defined(__PSP2__) || defined(__SWITCH__)
+			char msg[64];
+			snprintf(msg, sizeof(msg), "Offset Y: %+d", moveY);
+			gui_set_message(msg, 45);
+#endif
 		}
 		//left
 		else if(dpadLeft[0])
@@ -1163,22 +1168,26 @@ if(!vkbd_mode)
 // quickSwitch resolution presets
 			if (can_change_quickSwitchModeID)
 			{			
-				if (quickSwitchModeID==sizeof(quickSwitchModes)/sizeof(quickSwitchModes[0])-1)
-				{
-					quickSwitchModeID=0;
+				static const int vita_quick_presets[] = { 0, 1, 2, 3, 4, 5, 7, 8 };
+				const int preset_count = (int)(sizeof(vita_quick_presets) / sizeof(vita_quick_presets[0]));
+				int width_group = (presetModeId / 10) * 10;
+				int cur_var = presetModeId % 10;
+				int cur_idx = 0;
+				for (int p = 0; p < preset_count; p++) {
+					if (vita_quick_presets[p] == cur_var) {
+						cur_idx = p;
+						break;
+					}
 				}
-				else
-				{
-					quickSwitchModeID++;
-				}
-				mainMenu_displayedLines = 
-					quickSwitchModes[quickSwitchModeID].num_lines;	
-				moveY = 
-					quickSwitchModes[quickSwitchModeID].top_pos;
+				cur_idx = (cur_idx - 1 + preset_count) % preset_count;
+				SetPresetMode(width_group + vita_quick_presets[cur_idx]);
 				getChanges();
 				check_all_prefs();
 				update_display();
-				can_change_quickSwitchModeID=0;
+				char msg[128];
+				snprintf(msg, sizeof(msg), "%s", presetMode);
+				gui_set_message(msg, 60);
+				can_change_quickSwitchModeID = 0;
 			}
 #else
 			screenWidth -=10;
@@ -1193,21 +1202,25 @@ if(!vkbd_mode)
 #if defined(__PSP2__) || defined(__SWITCH__)
 			if (can_change_quickSwitchModeID)
 			{
-				if (quickSwitchModeID==0)
-				{
-					quickSwitchModeID=sizeof(quickSwitchModes)/sizeof(quickSwitchModes[0])-1;
+				static const int vita_quick_presets[] = { 0, 1, 2, 3, 4, 5, 7, 8 };
+				const int preset_count = (int)(sizeof(vita_quick_presets) / sizeof(vita_quick_presets[0]));
+				int width_group = (presetModeId / 10) * 10;
+				int cur_var = presetModeId % 10;
+				int cur_idx = 0;
+				for (int p = 0; p < preset_count; p++) {
+					if (vita_quick_presets[p] == cur_var) {
+						cur_idx = p;
+						break;
+					}
 				}
-				else
-				{
-					quickSwitchModeID--;
-				}
-				mainMenu_displayedLines = 
-					quickSwitchModes[quickSwitchModeID].num_lines;	
-				moveY = 
-					quickSwitchModes[quickSwitchModeID].top_pos;
+				cur_idx = (cur_idx + 1) % preset_count;
+				SetPresetMode(width_group + vita_quick_presets[cur_idx]);
 				getChanges();
 				check_all_prefs();
 				update_display();
+				char msg[128];
+				snprintf(msg, sizeof(msg), "%s", presetMode);
+				gui_set_message(msg, 60);
 				can_change_quickSwitchModeID = 0;
 			}
 #else
@@ -2247,10 +2260,13 @@ if(!vkbd_mode)
 
 void gui_set_message(const char *msg, int t)
 {
-	return;
-
-	show_message=t;
-	strncpy(show_message_str, msg, 36);
+	show_message = t;
+	if (msg) {
+		strncpy(_show_message_str, msg, sizeof(_show_message_str) - 1);
+		_show_message_str[sizeof(_show_message_str) - 1] = '\0';
+	} else {
+		_show_message_str[0] = '\0';
+	}
 }
 
 void gui_show_window_bar(int per, int max, int case_title)

@@ -168,7 +168,7 @@ static int min_diwstart, max_diwstop;
 static int thisframe_y_adjust;
 static int thisframe_y_adjust_real, max_ypos_thisframe, min_ypos_for_screen;
 static int extra_y_adjust;
-int moveX = 0, moveY = 16;
+int moveX = 0, moveY = 0;
 
 /* A frame counter that forces a redraw after at least one skipped frame in
    interlace mode.  */
@@ -1791,16 +1791,34 @@ static __inline__ void pfield_doline (int lineno)
 void init_row_map (void)
 {
   int i;
+  int surface_height = prSDLScreen->h;
 
 	gfx_mem = (char *)prSDLScreen->pixels;
 	gfx_rowbytes = prSDLScreen->pitch;
-  for (i = 0; i < gfxHeight + 1; i++)
-		row_map[i] = gfx_mem + gfx_rowbytes * i;
+  for (i = 0; i < gfxHeight + 1; i++) {
+		/* Clamp entries beyond the SDL surface height to the last valid
+		   line.  The static row_map array is sized for gfxHeight (286)
+		   entries but the actual SDL surface may be shorter (e.g. 200-270
+		   on Vita).  Without this clamp, writes past the surface are
+		   undefined behaviour. */
+		int safe_i = (i < surface_height) ? i : (surface_height - 1);
+		if (safe_i < 0) safe_i = 0;
+		row_map[i] = gfx_mem + gfx_rowbytes * safe_i;
+  }
 }
 
 static _INLINE_ void init_aspect_maps (void)
 {
     int i, maxl;
+
+    /* Use the actual SDL surface height rather than the compile-time
+       GFXVIDINFO_HEIGHT constant.  The old code mapped up to 286 native
+       lines regardless of the real surface size, which caused vertical
+       clipping on the Vita where the surface is mainMenu_displayedLines
+       pixels tall (typically 200-270). */
+    int visible_height = mainMenu_displayedLines;
+    if (visible_height <= 0) visible_height = GFXVIDINFO_HEIGHT;
+    if (visible_height > GFXVIDINFO_HEIGHT) visible_height = GFXVIDINFO_HEIGHT;
 
     if (native2amiga_line_map)
 	free (native2amiga_line_map);
@@ -1809,28 +1827,28 @@ static _INLINE_ void init_aspect_maps (void)
 
     /* At least for this array the +1 is necessary. */
     amiga2aspect_line_map = (int *)xmalloc (sizeof (int) * (MAXVPOS + 1)*2 + 1);
-    native2amiga_line_map = (int *)xmalloc (sizeof (int) * GFXVIDINFO_HEIGHT);
+    native2amiga_line_map = (int *)xmalloc (sizeof (int) * visible_height);
 
     maxl = (MAXVPOS + 1);
     min_ypos_for_screen = minfirstline;
     max_drawn_amiga_line = -1;
     for (i = 0; i < maxl; i++) {
 	int v = (int) (i - min_ypos_for_screen);
-	if (v >= GFXVIDINFO_HEIGHT && max_drawn_amiga_line == -1)
+	if (v >= visible_height && max_drawn_amiga_line == -1)
 	    max_drawn_amiga_line = i - min_ypos_for_screen;
-	if (i < min_ypos_for_screen || v >= GFXVIDINFO_HEIGHT)
+	if (i < min_ypos_for_screen || v >= visible_height)
 	    v = -1;
 	amiga2aspect_line_map[i] = v;
     }
 
-    for (i = GFXVIDINFO_HEIGHT; i--;)
+    for (i = visible_height; i--;)
 	native2amiga_line_map[i] = -1;
 
     for (i = maxl-1; i >= min_ypos_for_screen; i--) {
 	int j;
 	if (amiga2aspect_line_map[i] == -1)
 	    continue;
-	for (j = amiga2aspect_line_map[i]; j < GFXVIDINFO_HEIGHT && native2amiga_line_map[j] == -1; j++)
+	for (j = amiga2aspect_line_map[i]; j < visible_height && native2amiga_line_map[j] == -1; j++)
 	    native2amiga_line_map[j] = i;
     }
 }
@@ -2265,6 +2283,21 @@ void check_all_prefs(void)
 }
 
 
+static int auto_crop_first = -1;
+static int auto_crop_last = -1;
+static int auto_crop_shrink_timer = 0;
+static int auto_crop_cached_start = -1;
+static int auto_crop_throttle = 0;
+
+void reset_auto_crop(void)
+{
+    auto_crop_first = -1;
+    auto_crop_last = -1;
+    auto_crop_shrink_timer = 0;
+    auto_crop_cached_start = -1;
+    auto_crop_throttle = 0;
+}
+
 static _INLINE_ void finish_drawing_frame (void)
 {
 	int i;
@@ -2282,21 +2315,123 @@ static _INLINE_ void finish_drawing_frame (void)
 		pfield_do_fill_line=(line_draw_func *)pfield_do_fill_line_0;
 	}
 
-	for (i = 0; i < max_ypos_thisframe; i++) {
-		int where,i1;
-		int active_line = i + thisframe_y_adjust_real;
+	int window_first = minfirstline;
+	int window_last = maxvpos;
+	int default_start = (window_first + window_last - mainMenu_displayedLines) / 2;
+	if (default_start < window_first)
+		default_start = window_first;
+	int start_line = default_start;
 
-    if(active_line >= linestate_first_undecided)
-			break;
+	if (mainMenu_autoCrop && mainMenu_displayedLines < 286) {
+		if (auto_crop_cached_start != -1 && (++auto_crop_throttle % 16) != 0) {
+			start_line = auto_crop_cached_start;
+		} else {
+			const int crop_margin = 8;
+			int scan_start = window_first;
+			int scan_end = window_last + 1;
+			if (scan_end > linestate_first_undecided)
+				scan_end = linestate_first_undecided;
+			if (scan_end <= scan_start)
+				scan_end = scan_start + 1;
 
-		i1 = i + min_ypos_for_screen;
-		where = amiga2aspect_line_map[i1];
-		if (where >= mainMenu_displayedLines)
-			break;
-		if (where == -1)
-			continue;
+			int frame_first = -1;
+			int frame_last = -1;
+			for (int l = scan_start; l < scan_end; l++) {
+				struct draw_info *dip = curr_drawinfo + l;
+				/* Only actual bitplanes and hardware sprites represent visible game graphics.
+				 * Color changes alone occur during blank Copper palette setups at line 26/310. */
+				if ((line_decisions[l].plfleft != -1 && line_decisions[l].nr_planes > 0) ||
+				    dip->nr_sprites > 0) {
+					if (frame_first == -1) frame_first = l;
+					frame_last = l;
+				}
+			}
 
-		pfield_draw_line (active_line, where);
+			/* The hardware DIW is the reliable per-game envelope. Use it as
+			 * a fallback and union it with rendered-line detection so blank
+			 * score/footer lines are not discarded. */
+			int diw_first = plffirstline;
+			int diw_last = plflastline - 1;
+			if (diw_first >= window_first && diw_first <= window_last &&
+			    diw_last >= diw_first && diw_last <= window_last) {
+				if (frame_first == -1 || diw_first < frame_first)
+					frame_first = diw_first;
+				if (frame_last == -1 || diw_last > frame_last)
+					frame_last = diw_last;
+			}
+
+			if (frame_first == -1) frame_first = default_start;
+			if (frame_last < frame_first) frame_last = scan_end - 1;
+
+			frame_first -= crop_margin;
+			frame_last += crop_margin;
+			if (frame_first < window_first) frame_first = window_first;
+			if (frame_last > window_last) frame_last = window_last;
+
+			/* Expand immediately, but delay shrinking. This keeps the game
+			 * stable during screen transitions while still adapting when the
+			 * game genuinely selects another vertical mode. */
+			if (auto_crop_first == -1) {
+				auto_crop_first = frame_first;
+				auto_crop_last = frame_last;
+				auto_crop_shrink_timer = 0;
+			} else {
+				if (frame_first < auto_crop_first) {
+					auto_crop_first = frame_first;
+					auto_crop_shrink_timer = 0;
+				}
+				if (frame_last > auto_crop_last) {
+					auto_crop_last = frame_last;
+					auto_crop_shrink_timer = 0;
+				}
+				if (frame_first > auto_crop_first || frame_last < auto_crop_last) {
+					auto_crop_shrink_timer++;
+					if (auto_crop_shrink_timer >= 60) {
+						auto_crop_first = frame_first;
+						auto_crop_last = frame_last;
+						auto_crop_shrink_timer = 0;
+					}
+				} else {
+					auto_crop_shrink_timer = 0;
+				}
+			}
+
+			if (auto_crop_first != -1 && auto_crop_last >= auto_crop_first) {
+				int active_height = auto_crop_last - auto_crop_first + 1;
+				if (mainMenu_displayedLines >= active_height) {
+					/* Display mode fits the whole game: center active area with balanced margins */
+					int margin = (mainMenu_displayedLines - active_height) / 2;
+					start_line = auto_crop_first - margin;
+				} else {
+					int active_midpoint = auto_crop_first + active_height / 2;
+					start_line = active_midpoint - mainMenu_displayedLines / 2;
+				}
+			}
+			auto_crop_cached_start = start_line;
+		}
+	}
+
+	/* Apply the manual offset and Vita screen offset to the Amiga scanlines:
+	 * Negative mainMenu_screenOffsetY (up) moves the picture up (increases start_line).
+	 * Positive mainMenu_screenOffsetY (down) moves the picture down (decreases start_line). */
+#if defined(__PSP2__)
+	int screen_offset_lines = (mainMenu_screenOffsetY * mainMenu_displayedLines) / 544;
+	start_line += moveY - screen_offset_lines;
+#else
+	start_line += moveY;
+#endif
+
+	if (start_line < window_first)
+		start_line = window_first;
+	if (start_line > window_last - 100)
+		start_line = window_last - 100;
+
+	for (i = 0; i < mainMenu_displayedLines; i++) {
+		int active_line = start_line + i;
+		if (active_line < minfirstline || active_line >= linestate_first_undecided || active_line > maxvpos)
+			pfield_draw_line (minfirstline, i);
+		else
+			pfield_draw_line (active_line, i);
 	}
 
 		/* HD LED off delay */
@@ -2410,6 +2545,7 @@ void reset_drawing (void)
     uae4all_memclr(spixels, sizeof spixels);
     uae4all_memclr(&spixstate, sizeof spixstate);
 
+    reset_auto_crop();
     init_drawing_frame ();
 }
 
@@ -2417,6 +2553,7 @@ void drawing_init ()
 {
     native2amiga_line_map = 0;
     amiga2aspect_line_map = 0;
+    reset_auto_crop();
     gen_pfield_tables();
 }
 
@@ -2424,8 +2561,8 @@ void drawing_init ()
 void moveVertical(int value)
 {
 	moveY += value;
-	if(moveY<-26)
-		moveY=-26;
-	else if(moveY>66)
-		moveY=66;
+	if(moveY<-40)
+		moveY=-40;
+	else if(moveY>80)
+		moveY=80;
 }

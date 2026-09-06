@@ -189,7 +189,7 @@ enum diw_states
     DIW_waiting_start, DIW_waiting_stop
 };
 
-static int plffirstline, plflastline;
+int plffirstline = 44, plflastline = 300;
 static int plfstrt, plfstop;
 static int last_diw_pix_hpos, last_decide_line_hpos;
 static int last_fetch_hpos, last_sprite_hpos;

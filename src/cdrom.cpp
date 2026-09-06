@@ -7,6 +7,8 @@
 #include "sysconfig.h"
 #include "sysdeps.h"
 #include "cdrom.h"
+#include <libchdr/chd.h>
+#include <libchdr/cdrom.h>
 
 #define CDROM_MAX_TRACKS 100
 #define CDROM_MAX_FILES 100
@@ -39,6 +41,11 @@ char current_cd_image[256] = "";
 int cdrom_is_inserted = 0;
 
 static FILE *cd_file = NULL;
+static chd_file *cd_chd = NULL;
+static uint8_t *chd_hunk_buffer = NULL;
+static int chd_cached_hunk = -1;
+static uint32_t chd_frames_per_hunk = 0;
+static uint32_t chd_unit_bytes = 0;
 static struct cdrom_file_entry cd_files[CDROM_MAX_FILES];
 static struct cdrom_track_entry cd_tracks[CDROM_MAX_TRACKS];
 static int cd_file_count = 0;
@@ -298,6 +305,147 @@ static int open_plain_image(const char *path)
     return 1;
 }
 
+static int open_chd(const char *path)
+{
+    chd_error err;
+    const chd_header *header;
+    uint32_t current_chd_frame = 0;
+    uint32_t current_lba = 0;
+    int track_idx;
+
+    err = chd_open(path, CHD_OPEN_READ, NULL, &cd_chd);
+    if (err != CHDERR_NONE || !cd_chd) {
+        cd_chd = NULL;
+        return 0;
+    }
+
+    header = chd_get_header(cd_chd);
+    if (!header || header->hunkbytes == 0) {
+        chd_close(cd_chd);
+        cd_chd = NULL;
+        return 0;
+    }
+
+    chd_unit_bytes = header->unitbytes ? header->unitbytes : (uint32_t)CD_FRAME_SIZE;
+    chd_frames_per_hunk = header->hunkbytes / chd_unit_bytes;
+    if (chd_frames_per_hunk == 0) {
+        chd_close(cd_chd);
+        cd_chd = NULL;
+        return 0;
+    }
+
+    chd_hunk_buffer = (uint8_t *)malloc(header->hunkbytes);
+    if (!chd_hunk_buffer) {
+        chd_close(cd_chd);
+        cd_chd = NULL;
+        return 0;
+    }
+    chd_cached_hunk = -1;
+
+    chd_set_cache_budget(cd_chd, 512 * 1024);
+
+    cd_file_count = 1;
+    strncpy(cd_files[0].path, path, sizeof(cd_files[0].path) - 1);
+    cd_files[0].path[sizeof(cd_files[0].path) - 1] = '\0';
+    cd_files[0].sector_size = 2352;
+
+    cd_track_count = 0;
+
+    for (track_idx = 0; track_idx < CDROM_MAX_TRACKS; track_idx++) {
+        char meta[512];
+        uint32_t meta_len = 0;
+        int track_num = 0;
+        char type[64] = {0};
+        char subtype[32] = {0};
+        int frames = 0;
+        int pregap = 0;
+        int postgap = 0;
+        char pgtype[32] = {0};
+        char pgsub[32] = {0};
+        int parsed = 0;
+
+        err = chd_get_metadata(cd_chd, CDROM_TRACK_METADATA2_TAG, (uint32_t)track_idx, meta, (uint32_t)(sizeof(meta) - 1), &meta_len, NULL, NULL);
+        if (err == CHDERR_NONE) {
+            meta[meta_len < sizeof(meta) ? meta_len : (sizeof(meta) - 1)] = '\0';
+            if (sscanf(meta, CDROM_TRACK_METADATA2_FORMAT, &track_num, type, subtype, &frames, &pregap, pgtype, pgsub, &postgap) == 8) {
+                parsed = 1;
+            }
+        }
+        if (!parsed) {
+            err = chd_get_metadata(cd_chd, CDROM_TRACK_METADATA_TAG, (uint32_t)track_idx, meta, (uint32_t)(sizeof(meta) - 1), &meta_len, NULL, NULL);
+            if (err == CHDERR_NONE) {
+                meta[meta_len < sizeof(meta) ? meta_len : (sizeof(meta) - 1)] = '\0';
+                if (sscanf(meta, CDROM_TRACK_METADATA_FORMAT, &track_num, type, subtype, &frames) == 4) {
+                    parsed = 1;
+                    pregap = 0;
+                    postgap = 0;
+                }
+            }
+        }
+        if (!parsed) {
+            int padframes = 0;
+            err = chd_get_metadata(cd_chd, GDROM_TRACK_METADATA_TAG, (uint32_t)track_idx, meta, (uint32_t)(sizeof(meta) - 1), &meta_len, NULL, NULL);
+            if (err == CHDERR_NONE) {
+                meta[meta_len < sizeof(meta) ? meta_len : (sizeof(meta) - 1)] = '\0';
+                if (sscanf(meta, GDROM_TRACK_METADATA_FORMAT, &track_num, type, subtype, &frames, &padframes, &pregap, pgtype, pgsub, &postgap) == 9) {
+                    parsed = 1;
+                }
+            }
+        }
+
+        if (!parsed || frames <= 0) {
+            break;
+        }
+
+        struct cdrom_track_entry *trk = &cd_tracks[cd_track_count];
+        memset(trk, 0, sizeof(*trk));
+        trk->number = (track_num > 0) ? track_num : (cd_track_count + 1);
+
+        if (strcasecmp(type, "AUDIO") == 0) {
+            trk->audio = 1;
+            trk->sector_size = 2352;
+        } else {
+            trk->audio = 0;
+            if (strcasecmp(type, "MODE1/2048") == 0 || strcasecmp(type, "MODE1") == 0 ||
+                strcasecmp(type, "MODE2/2048") == 0 || strcasecmp(type, "MODE2_FORM1") == 0) {
+                trk->sector_size = 2048;
+            } else {
+                trk->sector_size = 2352;
+            }
+        }
+
+        trk->file_index = 0;
+        trk->pregap_frames = pregap;
+        trk->postgap_frames = postgap;
+
+        if (cd_track_count == 0) {
+            trk->start_lba = 0;
+        } else {
+            if (pregap > 0 && pgtype[0] != 'V') {
+                current_lba += (uae_u32)pregap;
+            }
+            trk->start_lba = current_lba;
+        }
+
+        trk->end_lba = trk->start_lba + (uae_u32)frames;
+        trk->file_offset = (long)current_chd_frame;
+
+        current_lba = trk->end_lba + (uae_u32)postgap;
+
+        uint32_t padded_frames = (uint32_t)((frames + CD_TRACK_PADDING - 1) / CD_TRACK_PADDING) * CD_TRACK_PADDING;
+        current_chd_frame += padded_frames;
+
+        cd_track_count++;
+    }
+
+    if (cd_track_count <= 0) {
+        cdrom_close_image();
+        return 0;
+    }
+
+    return 1;
+}
+
 static struct cdrom_track_entry *find_track(uae_u32 lba)
 {
     int i;
@@ -308,6 +456,11 @@ static struct cdrom_track_entry *find_track(uae_u32 lba)
     return NULL;
 }
 
+static uae_u8 to_bcd(int value)
+{
+    return (uae_u8)(((value / 10) << 4) | (value % 10));
+}
+
 static int read_track_raw(struct cdrom_track_entry *track, uae_u32 lba, uae_u8 *buffer)
 {
     FILE *file;
@@ -316,6 +469,42 @@ static int read_track_raw(struct cdrom_track_entry *track, uae_u32 lba, uae_u8 *
 
     if (!track || !buffer || lba < track->start_lba || lba >= track->end_lba)
         return 0;
+
+    if (cd_chd) {
+        uint32_t chd_frame_no = (uint32_t)track->file_offset + (lba - track->start_lba);
+        uint32_t hunk_no = chd_frame_no / chd_frames_per_hunk;
+        uint32_t frame_in_hunk = chd_frame_no % chd_frames_per_hunk;
+        if (chd_cached_hunk != (int)hunk_no) {
+            if (chd_read(cd_chd, hunk_no, chd_hunk_buffer) != CHDERR_NONE) {
+                chd_cached_hunk = -1;
+                return 0;
+            }
+            chd_cached_hunk = (int)hunk_no;
+        }
+        const uint8_t *frame_ptr = chd_hunk_buffer + frame_in_hunk * chd_unit_bytes;
+
+        if (track->audio) {
+            int j;
+            for (j = 0; j < 2352; j += 2) {
+                buffer[j]     = frame_ptr[j + 1];
+                buffer[j + 1] = frame_ptr[j];
+            }
+        } else if (track->sector_size == 2352) {
+            memcpy(buffer, frame_ptr, 2352);
+        } else {
+            static const uae_u8 sync_hdr[12] = { 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00 };
+            uae_u32 msf = lba + 150;
+            memcpy(buffer, sync_hdr, 12);
+            buffer[12] = to_bcd((int)(msf / (60 * 75)));
+            buffer[13] = to_bcd((int)((msf / 75) % 60));
+            buffer[14] = to_bcd((int)(msf % 75));
+            buffer[15] = 1;
+            memcpy(buffer + 16, frame_ptr, 2048);
+            memset(buffer + 16 + 2048, 0, 2352 - (16 + 2048));
+        }
+        return 1;
+    }
+
     file = cd_file;
     if (!file) return 0;
     if (track->file_index != 0 || cd_file_count > 1) {
@@ -330,16 +519,18 @@ static int read_track_raw(struct cdrom_track_entry *track, uae_u32 lba, uae_u8 *
     if (track->sector_size == 2352) {
         read_bytes = fread(buffer, 1, 2352, file);
     } else {
-        memset(buffer, 0, 2352);
+        static const uae_u8 sync_hdr[12] = { 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00 };
+        uae_u32 msf = lba + 150;
+        memcpy(buffer, sync_hdr, 12);
+        buffer[12] = to_bcd((int)(msf / (60 * 75)));
+        buffer[13] = to_bcd((int)((msf / 75) % 60));
+        buffer[14] = to_bcd((int)(msf % 75));
+        buffer[15] = 1;
         read_bytes = fread(buffer + 16, 1, 2048, file);
+        memset(buffer + 16 + 2048, 0, 2352 - (16 + 2048));
     }
     if (file != cd_file) fclose(file);
     return track->sector_size == 2352 ? read_bytes == 2352 : read_bytes == 2048;
-}
-
-static uae_u8 to_bcd(int value)
-{
-    return (uae_u8)(((value / 10) << 4) | (value % 10));
 }
 
 int cdrom_open_image(const char *path)
@@ -348,7 +539,12 @@ int cdrom_open_image(const char *path)
 
     cdrom_close_image();
     if (!path || path[0] == '\0') return 0;
-    if (has_extension(path, ".cue")) {
+    if (has_extension(path, ".chd")) {
+        if (!open_chd(path)) {
+            cdrom_close_image();
+            return 0;
+        }
+    } else if (has_extension(path, ".cue")) {
         if (!open_cue(path)) {
             cdrom_close_image();
             return 0;
@@ -371,6 +567,18 @@ int cdrom_open_image(const char *path)
 
 void cdrom_close_image(void)
 {
+    if (cd_chd) {
+        chd_close(cd_chd);
+        cd_chd = NULL;
+    }
+    if (chd_hunk_buffer) {
+        free(chd_hunk_buffer);
+        chd_hunk_buffer = NULL;
+    }
+    chd_cached_hunk = -1;
+    chd_frames_per_hunk = 0;
+    chd_unit_bytes = 0;
+
     if (cd_file) {
         fclose(cd_file);
         cd_file = NULL;
@@ -393,6 +601,27 @@ int cdrom_read_sector(uae_u32 lba, uae_u8 *buffer)
     struct cdrom_track_entry *track = find_track(lba);
     if (!track || track->audio) return 0;
     if (!buffer) return 0;
+
+    if (cd_chd) {
+        if (lba < track->start_lba || lba >= track->end_lba) return 0;
+        uint32_t chd_frame_no = (uint32_t)track->file_offset + (lba - track->start_lba);
+        uint32_t hunk_no = chd_frame_no / chd_frames_per_hunk;
+        uint32_t frame_in_hunk = chd_frame_no % chd_frames_per_hunk;
+        if (chd_cached_hunk != (int)hunk_no) {
+            if (chd_read(cd_chd, hunk_no, chd_hunk_buffer) != CHDERR_NONE) {
+                chd_cached_hunk = -1;
+                return 0;
+            }
+            chd_cached_hunk = (int)hunk_no;
+        }
+        const uint8_t *frame_ptr = chd_hunk_buffer + frame_in_hunk * chd_unit_bytes;
+        if (track->sector_size == 2048) {
+            memcpy(buffer, frame_ptr, 2048);
+        } else {
+            memcpy(buffer, frame_ptr + 16, 2048);
+        }
+        return 1;
+    }
     if (track->sector_size == 2048) {
         FILE *file = cd_file;
         long offset = track->file_offset + (long)(lba - track->start_lba) * 2048;
