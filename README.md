@@ -1,4 +1,4 @@
-# UAE4LL2 HD — PlayStation Vita 1.07
+# UAE4ALL2 HD — PlayStation Vita 1.08
 
 A cleaned PlayStation Vita build of UAE4ALL2 HD, an Amiga emulator based on the UAE4ALL2 project.
 
@@ -20,6 +20,7 @@ uae4all2hd.vpk
 - HDF hard-disk images and HD directories (4 HDF slots, boot order selection)
 - Integrated HDF Manager (create, format, and prepare FFS hard-disk images from 50 MB to 4000 MB)
 - Dedicated WHDLoad tab with one-click game launch and automatic A1200 AGA preset configuration
+- Automatic alphabetical (A-Z) library sorting for installed WHDLoad games with support for up to 256 games
 - Custom WHDLoad Arguments editor with native PS Vita OSK keyboard support
 - High-performance, bit-perfect native LHA decompressor (-lh5-, -lh4-, -lh0-) with real-time UI progress bar
 - Pre-bundled official WHDLoad binaries (C:WHDLoad, CD32, DIC, Patcher, RawDIC, WArc, VFS, S:WHDLoad.prefs)
@@ -28,10 +29,14 @@ uae4all2hd.vpk
 - Savestates and thumbnails, savestate slots 1-4 with per-game naming
 - Virtual keyboard, touch controls and analog mouse
 - Advanced Autofire with configurable speeds (Slow, Medium, Turbo) and Trigger modes (Hold Fire Button / Continuous)
-- Vita shaders and aspect-ratio scaling
+- Vita shaders and aspect-ratio scaling (4:3, 5:4, 16:9)
+- Centered 320x286 Full Frame PAL display mode with complete overscan coverage (Project-X HUD, score and power bars visible simultaneously)
+- Unified high-contrast UI highlighting across Floppy (DF0-DF3) and Hard Disk (HDF1-HDF4) slots
+- In-game hotkeys: `R + START + D-Pad Up/Down` for fine scanline panning with real-time OSD toast overlay (`Offset Y: %+d`) and `R + START + D-Pad Left/Right` for live resolution switching
 - Vita menu with floppy, hard disk, WHDLoad, presets, hardware, display, controls, savestates and system tabs
-- About screen with version 1.07 and automatic scrolling credits
-- CD32 Akiko CD controller with ISO, raw BIN and multi-track CUE images
+- About screen with version 1.08 and automatic scrolling credits
+- CD32 Akiko CD controller with native CHD (Compressed Hunks of Data), ISO, raw BIN and multi-track CUE images
+- Native CHD v1-v5 disc image support with transparent decompression (ZLIB, LZMA, FLAC, ZSTD) saving up to 60-70% storage on PS Vita memory cards
 - CD32 data tracks, CD audio playback, subcode data, DMA and controller state
 - CD32-aware savestates including the mounted image and playback position
 - Automatic per-game configuration files with CD32 profile application when a CD image is mounted
@@ -212,7 +217,7 @@ The packaged copies are `psp2data/data/sounds/floppy_drive.ogg` and `psp2data/da
 - **Restore Default Settings**: resets CPU, chipset, memory, Kickstart, floppies, HDFs, CD, display, audio and controls to factory defaults in memory (does not write any file).
 - **Reboot Amiga Emulation**: hard resets the Amiga with the current settings.
 - **Take Screenshot**: captures the next emulated frame as a PNG.
-- **About**: version 1.06 with scrolling credits.
+- **About**: version 1.08 with scrolling credits.
 - **Startup**: displays `Loading UAE4ALL2 HD...` before the main interface is opened.
 - **Release notes**: see [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -228,7 +233,7 @@ cmake .. -DBUILD_PSP2=ON -DCMAKE_BUILD_TYPE=Release
 ninja uae4all2.vpk
 ```
 
-The build output is `uae4all2hd.vpk`. The Vita package uses Title ID `UAE4ALLHD` and application version `01.06`, so it installs separately from the legacy UAE4ALL2.
+The build output is `uae4all2hd.vpk`. The Vita package uses Title ID `UAE4ALLHD` and application version `01.08`, so it installs separately from the legacy UAE4ALL2.
 
 The FTP implementation links the VitaSDK `ftpvita` library, matching the service integration used by VitaArchive. Ensure the VitaSDK installation includes the `ftpvita` development library before building.
 

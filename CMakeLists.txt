@@ -149,7 +149,15 @@ include_directories(
         src/capsimg/Core
         src/capsimg/Device
         src/capsimg/LibIPF
+        src/libchdr/include
 )
+
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(CHDR_WANT_TESTS OFF CACHE BOOL "" FORCE)
+set(INSTALL_STATIC_LIBS OFF CACHE BOOL "" FORCE)
+set(WITH_SYSTEM_ZLIB OFF CACHE BOOL "" FORCE)
+set(WITH_SYSTEM_ZSTD OFF CACHE BOOL "" FORCE)
+add_subdirectory(src/libchdr EXCLUDE_FROM_ALL)
 
 if(BUILD_PSP2)
   set(PSP2_SRC_FILES
@@ -178,6 +186,7 @@ if(BUILD_PSP2)
   set(FLAGS
           -fno-lto
           -Wno-write-strings
+          -Wno-psabi
           -fno-strict-aliasing
           -DVERSION=\"${BUILD_DATE}\"
           -DGP2X -DPANDORA -D__PSP2__ -DUSE_AUTOCONFIG -DUSE_ZFILE -DUSE_FAME_CORE -DWITH_TESTMODE
@@ -220,13 +229,13 @@ if(BUILD_PSP2)
   add_executable(${PROJECT_NAME} ${SRC_FILES})
   set_source_files_properties(src/m68k/fame/famec.cpp PROPERTIES COMPILE_FLAGS "-O1 -fno-unroll-loops -fno-inline")
   target_compile_options(${PROJECT_NAME} PRIVATE ${FLAGS})
-  target_link_libraries(${PROJECT_NAME} ${LDFLAGS})
+  target_link_libraries(${PROJECT_NAME} chdr-static ${LDFLAGS})
 
   vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME} UNSAFE)
   add_custom_target(${PROJECT_NAME}.vpk
           DEPENDS ${PROJECT_NAME}.self-self
           COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Generating param.sfo"
-          COMMAND ${VITASDK}/bin/vita-mksfoex -d ATTRIBUTE2=12 -s TITLE_ID=${TITLEID} -s APP_VER=01.07 "UAE4All2 HD" param.sfo
+          COMMAND ${VITASDK}/bin/vita-mksfoex -d ATTRIBUTE2=12 -s TITLE_ID=${TITLEID} -s APP_VER=01.08 "UAE4All2 HD" param.sfo
           COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Packaging uae4all2hd.vpk"
           COMMAND ${VITASDK}/bin/vita-pack-vpk -s param.sfo -b ${PROJECT_NAME}.self -a ${CMAKE_SOURCE_DIR}/psp2data/data=data -a ${CMAKE_SOURCE_DIR}/psp2data/sce_sys=sce_sys uae4all2hd.vpk
   )
