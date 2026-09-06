@@ -1045,6 +1045,11 @@ int vita_whdload_prepare_launch(const char *game_name)
     return 1;
 }
 
+static int whdload_name_cmp(const void *a, const void *b)
+{
+    return strcasecmp((const char *)a, (const char *)b);
+}
+
 int vita_whdload_list(char names[][128], int max_names)
 {
     if (!names || max_names <= 0)
@@ -1075,6 +1080,10 @@ int vita_whdload_list(char names[][128], int max_names)
         count++;
     }
     sceIoDclose(directory);
+
+    if (count > 1)
+        qsort(names, (size_t)count, 128, whdload_name_cmp);
+
     return count;
 }
 

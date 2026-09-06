@@ -84,7 +84,7 @@ int mainMenu_joyConf = 0;
 int mainMenu_joyPort = 2; // Default to port 1 on Vita because mouse is always on.
 int mainMenu_autofireRate = 8;
 int mainMenu_customAutofireButton = 0;
-int mainMenu_showStatus = DEFAULT_STATUSLN;
+int mainMenu_showStatus = 1; /* LED bar overlay, does not shrink the Amiga picture */
 int mainMenu_background = 0;
 int mainMenu_font = 0;
 int mainMenu_mouseMultiplier = DEFAULT_MOUSEMULTIPLIER;
@@ -142,13 +142,14 @@ int mainMenu_autofireMode = 0;
 
 int mainMenu_displayedLines = 240;
 int mainMenu_displayHires = 0;
-char presetMode[20] = "320x240 upscaled";
+char presetMode[64] = "320x240 upscaled";
 int presetModeId = 2;
 int mainMenu_cutLeft = 0;
 int mainMenu_cutRight = 0;
 int mainMenu_footerSize = 0;
 int mainMenu_screenOffsetY = 0;
 int mainMenu_screenOffsetX = 0;
+int mainMenu_autoCrop = 0; /* default: Disabled (Manual) for 100% full speed */
 int mainMenu_ntsc = DEFAULT_NTSC;
 int mainMenu_frameskip = 0;
 int mainMenu_vkbdLanguage = 0; //Default is US Keyboard
@@ -307,7 +308,7 @@ void SetDefaultMenuSettings(int general)
     mainMenu_joyPort = 2; // Default to port 1 on Vita because mouse is always on.
     mainMenu_autofireRate = 8;
     mainMenu_customAutofireButton = 0;
-    mainMenu_showStatus = DEFAULT_STATUSLN;
+    mainMenu_showStatus = 1; /* LED bar overlay, does not shrink the Amiga picture */
     mainMenu_background = 0;
     mainMenu_font = 0;
     mainMenu_mouseMultiplier = DEFAULT_MOUSEMULTIPLIER;
@@ -549,14 +550,15 @@ void SetDefaultMenuSettings(int general)
 #endif
 	remap_custom_controls();
 #endif //__PSP2__
-    SetPresetMode(2);
+    SetPresetMode(5);
     moveX = 0;
-    moveY = 16;
+    moveY = 0;
     mainMenu_cutLeft = 0;
     mainMenu_cutRight = 0;
     mainMenu_footerSize = 0;
     mainMenu_screenOffsetY = 0;
     mainMenu_screenOffsetX = 0;
+    mainMenu_autoCrop = 0; /* default: Disabled (Manual) for 100% full speed */
     mainMenu_ntsc = DEFAULT_NTSC;
     mainMenu_frameskip = 0;
     mainMenu_vkbdLanguage = 0; //Default is US Keyboard
@@ -665,6 +667,7 @@ void ApplyA500Profile(void)
     mainMenu_slowMemory = 1;
     mainMenu_fastMemory = 0;
     mainMenu_bootHD = 0;
+    mainMenu_autoCrop = 0;
     UpdateCPUModelSettings();
     UpdateMemorySettings();
     UpdateChipsetSettings();
@@ -682,6 +685,7 @@ void ApplyA1200Profile(void)
     mainMenu_slowMemory = 0;
     mainMenu_fastMemory = 3;
     mainMenu_bootHD = has_hdf_files() ? 2 : 0;
+    mainMenu_autoCrop = 0;
     UpdateCPUModelSettings();
     UpdateMemorySettings();
     UpdateChipsetSettings();
@@ -699,6 +703,7 @@ void ApplyCd32Profile(void)
     mainMenu_slowMemory = 0;
     mainMenu_bootHD = 0;
     mainMenu_drives = 1;
+    mainMenu_autoCrop = 0;
     UpdateCPUModelSettings();
     UpdateMemorySettings();
     UpdateChipsetSettings();
@@ -797,9 +802,9 @@ void SetPresetMode(int mode)
         break;
 
     case 5:
-        mainMenu_displayedLines = 270;
-        screenWidth = 570;
-        strcpy(presetMode, "320x270 upscaled");
+        mainMenu_displayedLines = 286;
+        screenWidth = 540;
+        strcpy(presetMode, "320x286 full frame");
         break;
 
     case 6:
@@ -1426,7 +1431,7 @@ int saveconfig(int general)
     fputs(buffer,f);
     snprintf((char*)buffer, 255, "moveX=%d\n",moveX);
     fputs(buffer,f);
-    snprintf((char*)buffer, 255, "moveY=%d\n",moveY-16); // compatibility with versions <1.96
+    snprintf((char*)buffer, 255, "moveY=%d\n",moveY);
     fputs(buffer,f);
     snprintf((char*)buffer, 255, "displayedLines=%d\n",mainMenu_displayedLines);
     fputs(buffer,f);
@@ -1675,6 +1680,8 @@ int saveconfig(int general)
     fputs(buffer,f);
     snprintf((char*)buffer, 255, "screenOffsetX=%d\n",mainMenu_screenOffsetX);
     fputs(buffer,f);
+    snprintf((char*)buffer, 255, "autoCrop=%d\n",mainMenu_autoCrop);
+    fputs(buffer,f);
 #ifdef __SWITCH__
     snprintf((char*)buffer, 255, "swapAB=%d\n",mainMenu_swapAB);
     fputs(buffer,f);
@@ -1863,7 +1870,6 @@ void loadconfig(int general)
         fscanf(f,"presetModeId=%d\n",&presetModeId);
         fscanf(f,"moveX=%d\n",&moveX);
         fscanf(f,"moveY=%d\n",&moveY);
-        moveY+=16; // compatibility with versions <1.96
         fscanf(f,"displayedLines=%d\n",&mainMenu_displayedLines);
         fscanf(f,"screenWidth=%d\n",&screenWidth);
         fscanf(f,"cutLeft=%d\n",&mainMenu_cutLeft);
@@ -2128,8 +2134,7 @@ void loadconfig(int general)
         mainMenu_useSavesFolder = DEFAULT_USESAVESFOLDER;
         if (fscanf(f,"footerSize=%d\n",&mainMenu_footerSize) != 1)
             mainMenu_footerSize = 0;
-        if (mainMenu_footerSize < -64) mainMenu_footerSize = -64;
-        if (mainMenu_footerSize > 160) mainMenu_footerSize = 160;
+        mainMenu_footerSize = 0;
         if (fscanf(f,"screenOffsetY=%d\n",&mainMenu_screenOffsetY) != 1)
             mainMenu_screenOffsetY = 0;
         if (mainMenu_screenOffsetY < -128) mainMenu_screenOffsetY = -128;
@@ -2138,6 +2143,8 @@ void loadconfig(int general)
             mainMenu_screenOffsetX = 0;
         if (mainMenu_screenOffsetX < -128) mainMenu_screenOffsetX = -128;
         if (mainMenu_screenOffsetX > 128) mainMenu_screenOffsetX = 128;
+        if (fscanf(f,"autoCrop=%d\n",&mainMenu_autoCrop) != 1)
+            mainMenu_autoCrop = 0; /* default: Disabled (Manual) */
 #ifdef __SWITCH__ 
         fscanf(f,"swapAB=%d\n",&mainMenu_swapAB);
         fscanf(f,"singleJoycons=%d\n",&mainMenu_singleJoycons);
@@ -2170,8 +2177,12 @@ void loadconfig(int general)
     }
 // make sure the just-loaded mainMenu_displayedLines is not changed by setPresetMode
     int old_displayedLines = mainMenu_displayedLines;
-    SetPresetMode(presetModeId);
-    mainMenu_displayedLines = old_displayedLines;
+    if (mainMenu_ntsc == 0 && (presetModeId == 2 || presetModeId == 3 || old_displayedLines < 286)) {
+        SetPresetMode(5);
+    } else {
+        SetPresetMode(presetModeId);
+        mainMenu_displayedLines = old_displayedLines;
+    }
     UpdateCPUModelSettings();
     UpdateChipsetSettings();
 #ifdef USE_GUICHAN

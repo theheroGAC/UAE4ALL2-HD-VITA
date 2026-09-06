@@ -97,6 +97,7 @@ static bool is_supported_ext(const char *name)
         strcasecmp(ext, ".bz2") == 0 ||
         strcasecmp(ext, ".iso") == 0 ||
         strcasecmp(ext, ".cue") == 0 ||
+        strcasecmp(ext, ".chd") == 0 ||
         strcasecmp(ext, ".fdi") == 0) {
         return true;
     }
@@ -520,7 +521,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
                     else if (!strcasecmp(ext, ".ipf")) type_desc = "CAPS / IPF Image";
                     else if (!strcasecmp(ext, ".adz")) type_desc = "Compressed ADF";
                     else if (!strcasecmp(ext, ".dms")) type_desc = "DMS Disk";
-                    else if (!strcasecmp(ext, ".iso") || !strcasecmp(ext, ".cue")) type_desc = "CD Image";
+                    else if (!strcasecmp(ext, ".iso") || !strcasecmp(ext, ".cue") || !strcasecmp(ext, ".chd")) type_desc = "CD Image (CHD/ISO)";
                     else if (!strcasecmp(ext, ".lha") || !strcasecmp(ext, ".lzh")) type_desc = "LHA Archive";
                     else if (!strcasecmp(ext, ".zip")) type_desc = "ZIP Archive";
                     else if (!strcasecmp(ext, ".hdf")) type_desc = "Hard Disk Image";

@@ -1277,7 +1277,7 @@ void vita_show_about_box(void)
 {
     static const CreditLine credits[] = {
         { "UAE4ALL2 HD Vita", CR_TITLE },
-        { "Version 1.07 - Amiga Emulator for PS Vita", CR_SUBTITLE },
+        { "Version 1.08 - Amiga Emulator for PS Vita", CR_SUBTITLE },
         { "", CR_EMPTY },
         { "A high-definition port of the classic UAE4ALL Amiga emulator,", CR_TEXT },
         { "now with WHDLoad, HDF, IPF and CD32 support on the Vita.", CR_TEXT },
@@ -1377,7 +1377,7 @@ void vita_show_about_box(void)
         rot_x += 0.045f;
         rot_y += 0.065f;
         vita_draw_boing_ball_3d(dx + 46.0f, dy + 40.0f, 24.0f, rot_x, rot_y);
-        vita_draw_text(dx + 92.0f, dy + 20.0f, VITA_COLOR_AMIGA_RED, 1.15f, "UAE4ALL2 HD Vita");
+        vita_draw_text(dx + 92.0f, dy + 20.0f, VITA_COLOR_AMIGA_RED, 1.15f, "UAE4ALL2 HD Vita v1.08");
         vita_draw_text(dx + 92.0f, dy + 44.0f, VITA_COLOR_AMIGA_ORANGE, 0.85f, "About & Credits - WHDLoad Edition");
 
         vita_draw_rounded_rect_outline(dx + 16.0f, dy + 76.0f, dw - 32.0f, 1.0f, 0.0f, 1.0f, VITA_COLOR_CARD_BORDER);
@@ -1788,8 +1788,11 @@ int run_mainMenu_vita(void)
 			}
             write_log("[VITA] menu: Start pressed (kickstart_warning=%d)\n", kickstart_warning);
             if (kickstart_warning) {
-                write_log("[VITA] run_mainMenu_vita: Start blocked, Kickstart missing\n");
-                vita_show_message_box("Kickstart Missing", "Copy kick13.rom and kick31.rom for normal Amiga use, or kick40060.CD32 and kick40060.CD32.ext for CD32, to ux0:/data/uae4all/kickstarts/.", "OK (X)");
+                write_log("[VITA] run_mainMenu_vita: Start blocked, Kickstart missing (kickstart=%d)\n", kickstart);
+                if (kickstart == 6)
+                    vita_show_message_box("Kickstart CD32 Missing", "CD32 requires kick40060.CD32 AND kick40060.CD32.ext (or 1MB combined ROM) in ux0:/data/uae4all/kickstarts/.", "OK (X)");
+                else
+                    vita_show_message_box("Kickstart Missing", "Copy kick13.rom and kick31.rom for normal Amiga use, or kick40060.CD32 and kick40060.CD32.ext for CD32, to ux0:/data/uae4all/kickstarts/.", "OK (X)");
             } else {
                 mainMenu_case = MAIN_MENU_CASE_RUN;
                 break;

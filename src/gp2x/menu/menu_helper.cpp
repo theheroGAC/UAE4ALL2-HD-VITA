@@ -241,53 +241,33 @@ void vita_get_display_geometry(int *x, int *y, float *sw, float *sh)
     int preset_variant = presetModeId % 10;
     bool fullscreen_scaling = (preset_variant == 7);
     bool five_four_scaling = (preset_variant == 8);
-    int footer_pixels = mainMenu_footerSize;
-    if (footer_pixels < -64) footer_pixels = -64;
-    if (footer_pixels > 160) footer_pixels = 160;
-    float top_anchored_height = 544.0f - (float)footer_pixels;
-    if (top_anchored_height < 320.0f) top_anchored_height = 320.0f;
-    if (top_anchored_height > 608.0f) top_anchored_height = 608.0f;
 
-    int out_x;
-    int out_y;
     float out_sw;
-    float out_sh;
+    float out_sh = 544.0f;
+    int out_x;
+    int out_y = 0;
 
     if (fullscreen_scaling) {
-        out_x = 0;
-        out_y = 0;
         out_sw = 960.0f;
-        out_sh = top_anchored_height;
-    } else if (five_four_scaling && mainMenu_shader != 0) {
-        out_sw = 680.0f;
-        out_sh = top_anchored_height;
-        out_x = (int)((960.0f - out_sw) * 0.5f + 0.5f);
-        out_y = 0;
-    } else if (mainMenu_shader != 0) {
-        out_sw = 725.0f;
-        out_sh = top_anchored_height;
-        out_x = (int)((960.0f - out_sw) * 0.5f + 0.5f);
-        out_y = 0;
+        out_x = 0;
     } else if (five_four_scaling) {
-        out_sw = 675.0f;
-        out_sh = 540.0f - (float)footer_pixels;
-        out_x = (960 - (int)out_sw) / 2;
-        out_y = 0;
+        out_sw = (mainMenu_shader != 0) ? 680.0f : 675.0f;
+        out_x = (int)((960.0f - out_sw) * 0.5f + 0.5f);
     } else {
-        out_sw = 720.0f;
-        out_sh = 540.0f - (float)footer_pixels;
-        out_x = (960 - (int)out_sw) / 2;
-        out_y = 0;
+        out_sw = (mainMenu_shader != 0) ? 725.0f : 720.0f;
+        out_x = (int)((960.0f - out_sw) * 0.5f + 0.5f);
     }
 
-    int screen_offset_y = mainMenu_screenOffsetY;
-    if (screen_offset_y < -128) screen_offset_y = -128;
-    if (screen_offset_y > 128) screen_offset_y = 128;
+    if (out_sw < 1.0f) out_sw = 1.0f;
+    if (out_sw > 960.0f) out_sw = 960.0f;
+
     int screen_offset_x = mainMenu_screenOffsetX;
     if (screen_offset_x < -128) screen_offset_x = -128;
     if (screen_offset_x > 128) screen_offset_x = 128;
     out_x += screen_offset_x;
-    out_y += screen_offset_y;
+
+    if (out_x < 0) out_x = 0;
+    if (out_x > (960 - (int)out_sw)) out_x = 960 - (int)out_sw;
 
     if (x) *x = out_x;
     if (y) *y = out_y;
@@ -410,15 +390,12 @@ void update_display() {
     int preset_variant = presetModeId % 10;
     bool fullscreen_scaling = (preset_variant == 7);
     bool five_four_scaling = (preset_variant == 8);
-    int footer_pixels = mainMenu_footerSize;
-    if (footer_pixels < -64) footer_pixels = -64;
-    if (footer_pixels > 160) footer_pixels = 160;
     vita_get_display_geometry(&x, &y, &sw, &sh);
     SDL_SetVideoModeScaling(x, y, sw, sh);
     SDL_SetVideoModeBilinear(mainMenu_shader != 0 ? 1 : 0);
     const char *aspect_name = fullscreen_scaling ? "fullscreen" : (five_four_scaling ? "5:4" : "4:3");
-    write_log("[VITA] update_display: preset=%d aspect=%s footer=%d dst=%dx%d+%d+%d\n",
-        presetModeId, aspect_name, footer_pixels,
+    write_log("[VITA] update_display: preset=%d aspect=%s dst=%dx%d+%d+%d\n",
+        presetModeId, aspect_name,
         (int)sw, (int)sh, x, y);
 #else
     //is a shader active?
@@ -481,6 +458,7 @@ void update_display() {
         InitDisplayArea(visibleAreaWidth);
 
     init_row_map();
+    reset_auto_crop();
     notice_screen_contents_lost();
     notice_new_xcolors();
 #if defined(__PSP2__)
