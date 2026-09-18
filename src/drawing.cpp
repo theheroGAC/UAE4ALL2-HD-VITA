@@ -1796,11 +1796,6 @@ void init_row_map (void)
 	gfx_mem = (char *)prSDLScreen->pixels;
 	gfx_rowbytes = prSDLScreen->pitch;
   for (i = 0; i < gfxHeight + 1; i++) {
-		/* Clamp entries beyond the SDL surface height to the last valid
-		   line.  The static row_map array is sized for gfxHeight (286)
-		   entries but the actual SDL surface may be shorter (e.g. 200-270
-		   on Vita).  Without this clamp, writes past the surface are
-		   undefined behaviour. */
 		int safe_i = (i < surface_height) ? i : (surface_height - 1);
 		if (safe_i < 0) safe_i = 0;
 		row_map[i] = gfx_mem + gfx_rowbytes * safe_i;
@@ -1811,11 +1806,6 @@ static _INLINE_ void init_aspect_maps (void)
 {
     int i, maxl;
 
-    /* Use the actual SDL surface height rather than the compile-time
-       GFXVIDINFO_HEIGHT constant.  The old code mapped up to 286 native
-       lines regardless of the real surface size, which caused vertical
-       clipping on the Vita where the surface is mainMenu_displayedLines
-       pixels tall (typically 200-270). */
     int visible_height = mainMenu_displayedLines;
     if (visible_height <= 0) visible_height = GFXVIDINFO_HEIGHT;
     if (visible_height > GFXVIDINFO_HEIGHT) visible_height = GFXVIDINFO_HEIGHT;
@@ -2160,7 +2150,8 @@ static _INLINE_ void write_tdletter (int x, int y, char ch)
         *off_rgb = 0x400;
     } else {
         *track = -2;
-        switch (gui_data.hdled) {
+        int state = is_cd32_mode() ? ((gui_data.cdled != HDLED_OFF) ? gui_data.cdled : gui_data.hdled) : gui_data.hdled;
+        switch (state) {
             case HDLED_OFF:
                 *on = 0;
                 *on_rgb = 0x004;
@@ -2220,6 +2211,10 @@ static _INLINE_ void draw_status_line (int line, int top_mode)
                 }
                 write_tdnumber(x + offs, y - TD_PADY, (track / 10) % 10);
                 write_tdnumber(x + offs + TD_NUM_WIDTH, y - TD_PADY, track % 10);
+            } else if (is_cd32_mode()) {
+                int offs = (TD_LED_WIDTH - 2 * TD_NUM_WIDTH) / 2;
+                write_tdletter(x + offs, y - TD_PADY, 'C');
+                write_tdletter(x + offs + TD_NUM_WIDTH, y - TD_PADY, 'D');
             } else if (nr_units(currprefs.mountinfo) > 0) {
                 int offs = (TD_LED_WIDTH - 2 * TD_NUM_WIDTH) / 2;
                 write_tdletter(x + offs, y - TD_PADY, 'H');
@@ -2411,9 +2406,6 @@ static _INLINE_ void finish_drawing_frame (void)
 		}
 	}
 
-	/* Apply the manual offset and Vita screen offset to the Amiga scanlines:
-	 * Negative mainMenu_screenOffsetY (up) moves the picture up (increases start_line).
-	 * Positive mainMenu_screenOffsetY (down) moves the picture down (decreases start_line). */
 #if defined(__PSP2__)
 	int screen_offset_lines = (mainMenu_screenOffsetY * mainMenu_displayedLines) / 544;
 	start_line += moveY - screen_offset_lines;
@@ -2423,8 +2415,11 @@ static _INLINE_ void finish_drawing_frame (void)
 
 	if (start_line < window_first)
 		start_line = window_first;
-	if (start_line > window_last - 100)
-		start_line = window_last - 100;
+	int max_start_line = window_last - mainMenu_displayedLines + 1;
+	if (max_start_line < window_first)
+		max_start_line = window_first;
+	if (start_line > max_start_line)
+		start_line = max_start_line;
 
 	for (i = 0; i < mainMenu_displayedLines; i++) {
 		int active_line = start_line + i;
@@ -2444,6 +2439,18 @@ static _INLINE_ void finish_drawing_frame (void)
 			}
 		} else {
 			countdown = HDLED_TIMEOUT;
+		}
+
+		/* CD LED off delay */
+		static int cd_countdown = HDLED_TIMEOUT;
+		if (gui_data.cdled != HDLED_OFF) 
+		{
+			if (cd_countdown-- <= 0) {
+				gui_data.cdled = HDLED_OFF;
+				cd_countdown = HDLED_TIMEOUT;
+			}
+		} else {
+			cd_countdown = HDLED_TIMEOUT;
 		}
 
 	if (mainMenu_showStatus == 0 || mainMenu_showStatus == 1)

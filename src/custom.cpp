@@ -2977,9 +2977,55 @@ static _INLINE_ void COLOR_WRITE (int hpos, uae_u16 v, int num)
 	}
 }
 
-static uae_u16 potgo_value;
+extern int buttonA[];
+extern int buttonB[];
+extern int buttonX[];
+extern int buttonY[];
+extern int triggerL[];
+extern int triggerR[];
+extern int buttonStart[];
 
-#define POTGO(V) potgo_value = V
+static uae_u16 potgo_value;
+int cd32_pad_mode[2] = { 0, 0 };
+int cd32_shifter[2] = { 0, 0 };
+
+int cd32_get_bit(int port, int shift)
+{
+    int host = (port == 1) ? 0 : 1;
+    switch (shift) {
+        case 0: return (buttonB[host] || (port == 1 && buttonB[0])) ? 0 : 1;
+        case 1: return (buttonX[host] || (port == 1 && buttonX[0])) ? 0 : 1;
+        case 2: return (buttonY[host] || (port == 1 && buttonY[0])) ? 0 : 1;
+        case 3: return (buttonA[host] || (port == 1 && buttonA[0])) ? 0 : 1;
+        case 4: return (triggerR[host] || (port == 1 && triggerR[0])) ? 0 : 1;
+        case 5: return (triggerL[host] || (port == 1 && triggerL[0])) ? 0 : 1;
+        case 6: return (buttonStart[host] || (port == 1 && buttonStart[0])) ? 0 : 1;
+        case 7: return 1;
+        case 8: return 0;
+        default: return 0;
+    }
+}
+
+static _INLINE_ void write_potgo(uae_u16 v)
+{
+    potgo_value = v;
+
+    if ((v & 0x3000) == 0x2000) {
+        cd32_pad_mode[1] = 1;
+        cd32_shifter[1] = 0;
+    } else {
+        cd32_pad_mode[1] = 0;
+    }
+
+    if ((v & 0x0300) == 0x0200) {
+        cd32_pad_mode[0] = 1;
+        cd32_shifter[0] = 0;
+    } else {
+        cd32_pad_mode[0] = 0;
+    }
+}
+
+#define POTGO(V) write_potgo(V)
 
 static _INLINE_ uae_u16 POTGOR (void)
 {
@@ -2987,17 +3033,29 @@ static _INLINE_ uae_u16 POTGOR (void)
 
     v |= (~potgo_value & 0xAA00) >> 1;
 
-    if (buttonstate[2] || (joy0button & 2) || (cd32_button_state & 2))
-    	v &= 0xFBFF;
+    if (cd32_pad_mode[0]) {
+        int b = cd32_get_bit(0, cd32_shifter[0]);
+        if (!b) v &= ~0x0400;
+        else    v |= 0x0400;
+    } else {
+        if (buttonstate[2] || (joy0button & 2) || (cd32_button_state & 2))
+            v &= 0xFBFF;
 
-    if (buttonstate[1] || (joy0button & 4) || (cd32_button_state & 4))
-	v &= 0xFEFF;
+        if (buttonstate[1] || (joy0button & 4) || (cd32_button_state & 4))
+            v &= 0xFEFF;
+    }
 
-    if ((joy1button & 2) || (cd32_button_state & 16))
-	    v &= 0xbfff;
+    if (cd32_pad_mode[1]) {
+        int b = cd32_get_bit(1, cd32_shifter[1]);
+        if (!b) v &= ~0x4000;
+        else    v |= 0x4000;
+    } else {
+        if ((joy1button & 2) || (cd32_button_state & 16) || buttonB[0])
+            v &= 0xbfff;
 
-    if ((joy1button & 4) || (cd32_button_state & 32))
-	    v &= 0xefff;
+        if ((joy1button & 4) || (cd32_button_state & 32))
+            v &= 0xefff;
+    }
 
     return v;
 }
@@ -3888,7 +3946,7 @@ static void hsync_handler (void)
    }
    
    DISK_update ();
-   akiko_hsync_handler ();
+   akiko_hsync_handler (vpos);
    
    if (framecnt == 0) {
       int lineno = vpos;

@@ -609,7 +609,7 @@ uae_u8 REGPARAM2 *kickmem_xlate (uaecptr addr)
 
 uae_u8 *extendedkickmemory;
 static int extendedkickmem_size;
-static uae_u32 extendedkickmem_start;
+static uae_u32 extendedkickmem_start = 0xE00000;
 
 #define EXTENDED_ROM_CD32 1
 #define EXTENDED_ROM_CDTV 2
@@ -637,7 +637,7 @@ static uae_u8 *extendedkickmem_xlate (uaecptr addr) REGPARAM;
 uae_u32 REGPARAM2 extendedkickmem_lget (uaecptr addr)
 {
     uae_u32 *m;
-    addr -= extendedkickmem_start & extendedkickmem_mask;
+    addr -= extendedkickmem_start;
     addr &= extendedkickmem_mask;
     m = (uae_u32 *)(extendedkickmemory + addr);
     return do_get_mem_long (m);
@@ -646,7 +646,7 @@ uae_u32 REGPARAM2 extendedkickmem_lget (uaecptr addr)
 uae_u32 REGPARAM2 extendedkickmem_wget (uaecptr addr)
 {
     uae_u16 *m;
-    addr -= extendedkickmem_start & extendedkickmem_mask;
+    addr -= extendedkickmem_start;
     addr &= extendedkickmem_mask;
     m = (uae_u16 *)(extendedkickmemory + addr);
     return do_get_mem_word (m);
@@ -654,9 +654,11 @@ uae_u32 REGPARAM2 extendedkickmem_wget (uaecptr addr)
 
 uae_u32 REGPARAM2 extendedkickmem_bget (uaecptr addr)
 {
-    addr -= extendedkickmem_start & extendedkickmem_mask;
+    uae_u8 *m;
+    addr -= extendedkickmem_start;
     addr &= extendedkickmem_mask;
-    return extendedkickmemory[addr];
+    m = (uae_u8 *)(extendedkickmemory + addr);
+    return do_get_mem_byte (m);
 }
 
 void REGPARAM2 extendedkickmem_lput (uaecptr addr, uae_u32 b)
@@ -673,14 +675,14 @@ void REGPARAM2 extendedkickmem_bput (uaecptr addr, uae_u32 b)
 
 int REGPARAM2 extendedkickmem_check (uaecptr addr, uae_u32 size)
 {
-    addr -= extendedkickmem_start & extendedkickmem_mask;
+    addr -= extendedkickmem_start;
     addr &= extendedkickmem_mask;
     return (addr + size) <= extendedkickmem_size;
 }
 
 uae_u8 REGPARAM2 *extendedkickmem_xlate (uaecptr addr)
 {
-    addr -= extendedkickmem_start & extendedkickmem_mask;
+    addr -= extendedkickmem_start;
     addr &= extendedkickmem_mask;
     return extendedkickmemory + addr;
 }
@@ -859,6 +861,23 @@ static int read_kickstart (FILE *f, uae_u8 *mem, int size, int dochecksum, int *
     return 1;
 }
 
+static void patch_cd32_extended_rom (uae_u8 *p, int size)
+{
+    static const uae_u8 patchdata[] = { 0x0c, 0x82, 0x00, 0x00, 0x03, 0xe8, 0x64, 0x00, 0x00, 0x46 };
+    if (!p || size < 524288)
+        return;
+    for (int j = 0; j < size - (int)sizeof(patchdata); j++) {
+        if (!memcmp(p + j, patchdata, sizeof(patchdata))) {
+            p[j + 6] = 0x4e;
+            p[j + 7] = 0x71;
+            p[j + 8] = 0x4e;
+            p[j + 9] = 0x71;
+            write_log("[CD32] extended rom delay loop patched at 0x%08x\n", 0xE00000 + j + 6);
+            return;
+        }
+    }
+}
+
 static int load_extendedkickstart (void)
 {
   FILE *f;
@@ -930,6 +949,8 @@ static int load_extendedkickstart (void)
   }
   fclose (f);
   printf("Extended ROM loaded: %s\n", extfile);
+  if (extromtype () == EXTENDED_ROM_CD32)
+      patch_cd32_extended_rom (extendedkickmemory, extendedkickmem_size);
   swab_memory(extendedkickmemory, extendedkickmem_size);
   
   return 1;
@@ -1161,9 +1182,11 @@ void memory_reset (void)
     switch (extromtype ()) 
     {
        case EXTENDED_ROM_CDTV:
+          extendedkickmem_start = 0xF00000;
           map_banks (&extendedkickmem_bank, 0xF0, 8, 0);
           break;
        case EXTENDED_ROM_CD32:
+          extendedkickmem_start = 0xE00000;
           map_banks (&extendedkickmem_bank, 0xE0, 8, 0);
           map_banks (&akiko_bank, 0xB8, 1, 0);
           break;

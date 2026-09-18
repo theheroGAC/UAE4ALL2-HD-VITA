@@ -415,6 +415,22 @@ static void goMenu(void)
 	int autosave=mainMenu_autosave;
 	if (quit_program != 0)
 		return;
+#if defined(__PSP2__)
+	if (triggerR[0]) {
+		vkbd_mode = !vkbd_mode;
+		buttonSelect[0] = 0;
+		return;
+	}
+	if (buttonStart[0]) {
+		vkbd_mode = !vkbd_mode;
+		buttonSelect[0] = 0;
+		buttonStart[0] = 0;
+		return;
+	}
+	if (vkbd_mode) {
+		vkbd_mode = 0;
+	}
+#endif
 	emulating=1;
 #if !defined(__PSP2__) && !defined(__SWITCH__) //no need to erase all the vkbd graphics from memory on Vita
 #ifdef USE_UAE4ALL_VKBD
@@ -1573,6 +1589,7 @@ if(!vkbd_mode)
 							else if (*mainMenu_custom == -2) buttonstate[2]=1;
 							else if (*mainMenu_custom == -27) quickSave=1;
 							else if (*mainMenu_custom == -28) quickLoad=1;
+							else if (*mainMenu_custom == -29) vkbd_mode = !vkbd_mode;
 							else if (*mainMenu_custom > 0)
 							{
 								getMapping(*mainMenu_custom);
@@ -2156,18 +2173,64 @@ if(!vkbd_mode)
 	}
 #endif // __PSP2__
 
+	static int justPressedStart[MAX_NUM_CONTROLLERS] = {};
+	if (buttonStart[0] && !triggerR[0] && !triggerL[0] && !buttonSelect[0] && !mainMenu_customControls)
+	{
+		if (!justPressedStart[0])
+		{
+			if (is_cd32_mode())
+			{
+				uae4all_keystate[AK_P] = 1;
+				record_key(AK_P << 1);
+			}
+#ifdef USE_UAE4ALL_VKBD
+			else if (!cd32_pad_mode[0] && !cd32_pad_mode[1])
+			{
+				vkbd_mode = 1;
+				justLK = 1;
+			}
+#endif
+			justPressedStart[0] = 1;
+		}
+	}
+	else if (justPressedStart[0])
+	{
+		if (is_cd32_mode())
+		{
+			uae4all_keystate[AK_P] = 0;
+			record_key((AK_P << 1) | 1);
+		}
+		justPressedStart[0] = 0;
+	}
+
 } // if(!vkbd_mode)
 
 #ifdef USE_UAE4ALL_VKBD
 #if defined(__PSP2__) || defined(__SWITCH__)
-	//on Vita, Start brings up the  virtual keyboard, but Trigger R + Start is used for
-	//quickswitch resolution etc. and Trigger L + Start is used for switching between
-	//custom control configs
-	if(buttonStart[0] && !triggerR[0] && !triggerL[0])
+	if (vkbd_mode && buttonStart[0])
+	{
+		if (!justLK)
+		{
+			vkbd_mode = 0;
+			buttonStart[0] = 0;
+			justLK = 1;
+		}
+	}
+	else if ((buttonSelect[0] && buttonStart[0]) || (buttonSelect[0] && triggerR[0]))
+	{
+		if (!justLK)
+		{
+			vkbd_mode = !vkbd_mode;
+			buttonSelect[0] = 0;
+			buttonStart[0] = 0;
+			justLK = 1;
+		}
+	}
+	else if (justLK)
+		justLK = 0;
 #else
 	//L+K: virtual keyboard
 	if(triggerL[0] && keystate[SDLK_k])
-#endif
 	{
 		if(!justLK)
 		{
@@ -2177,6 +2240,7 @@ if(!vkbd_mode)
 	}
 	else if(justLK)
 		justLK=0;
+#endif
 #endif
 
 #if !defined(__PSP2__) && !defined(__SWITCH__)

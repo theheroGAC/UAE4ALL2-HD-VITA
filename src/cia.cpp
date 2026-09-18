@@ -566,7 +566,21 @@ static void WriteCIAA (uae_u16 addr,uae_u8 val)
 		oldovl = ciaapra & 1;
 	}
 	oldled = ciaapra & 2;
-	ciaapra = (ciaapra & ~0x3) | (val & 0x3);
+	{
+		uae_u8 old_pra = ciaapra;
+		ciaapra = (ciaapra & ~0xc3) | (val & 0xc3);
+
+		if ((ciaadra & 0x80) && cd32_pad_mode[1]) {
+			if (!(old_pra & 0x80) && (val & 0x80)) {
+				cd32_shifter[1]++;
+			}
+		}
+		if ((ciaadra & 0x40) && cd32_pad_mode[0]) {
+			if (!(old_pra & 0x40) && (val & 0x40)) {
+				cd32_shifter[0]++;
+			}
+		}
+	}
 	gui_ledstate &= ~1;
 	gui_ledstate |= ((~ciaapra & 2) >> 1);
 	gui_data.powerled = ((~ciaapra & 2) >> 1);

@@ -138,9 +138,10 @@ static void draw_activity_lights(SDL_Surface *surface)
     {
         SDL_Rect rect;
         Uint32 color;
-        if (gui_data.hdled == HDLED_WRITE)
+        int state = is_cd32_mode() ? ((gui_data.cdled != HDLED_OFF) ? gui_data.cdled : gui_data.hdled) : gui_data.hdled;
+        if (state == HDLED_WRITE)
             color = SDL_MapRGB(surface->format, 255, 50, 30);
-        else if (gui_data.hdled == HDLED_READ)
+        else if (state == HDLED_READ)
             color = SDL_MapRGB(surface->format, 40, 120, 255);
         else
             color = SDL_MapRGB(surface->format, 15, 25, 70);

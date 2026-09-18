@@ -6,6 +6,9 @@
 #include <string.h>
 #include <stdio.h>
 
+extern int mainMenu_drives;
+extern int kickstart;
+
 static volatile int disk_sound_volume = 35;
 static volatile int pending_floppy_step;
 static volatile int pending_floppy_motor;
@@ -162,21 +165,25 @@ static void add_pending(volatile int *counter)
 
 void disk_sound_floppy_step(void)
 {
+    if (mainMenu_drives <= 0 || kickstart == 6) return;
     add_pending(&pending_floppy_step);
 }
 
 void disk_sound_floppy_motor(void)
 {
+    if (mainMenu_drives <= 0 || kickstart == 6) return;
     add_pending(&pending_floppy_motor);
 }
 
 void disk_sound_floppy_read(void)
 {
+    if (mainMenu_drives <= 0 || kickstart == 6) return;
     add_pending(&pending_floppy_read);
 }
 
 void disk_sound_floppy_write(void)
 {
+    if (mainMenu_drives <= 0 || kickstart == 6) return;
     add_pending(&pending_floppy_write);
 }
 

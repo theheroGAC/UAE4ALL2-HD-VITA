@@ -49,6 +49,8 @@ extern "C" int main( int argc, char *argv[] );
 #include "menu.h" 
 #include "menu_config.h"
 #include "gp2xutil.h"
+#include "akiko.h"
+#include "cdrom.h"
 /* PocketUAE */
 #include "native2amiga.h"
 
@@ -218,6 +220,7 @@ void uae_reset (void)
 #ifdef USE_UAE4ALL_VKBD
 	vkbd_reset_sticky_keys(); // keyvalues clear on reset, so vkbd must reflect this
 #endif
+    cdrom_audio_stop();
     black_screen_now();
     quit_program = 2;
     set_special (SPCFLAG_BRK);
@@ -231,6 +234,7 @@ void uae_quit (void)
 
 void reset_all_systems (void)
 {
+    cdrom_audio_stop();
     init_eventtab ();
     memory_reset ();
     // the following is a workaround to prevent failed fdopen commands for hdf files
@@ -250,6 +254,7 @@ void reset_all_systems (void)
  */
 void do_start_program (void)
 {
+    DISK_check_change ();
 	quit_program = 2;
 	m68k_go (1);
 }
@@ -270,6 +275,7 @@ void do_leave_program (void)
     SDL_FreeSurface(current_screenshot);
 #endif
 	     
+    akiko_nvram_flush ();
     graphics_leave ();
     close_joystick ();
     close_sound ();
@@ -445,7 +451,6 @@ void real_main (int argc, char **argv)
 	if (err == -1) {
 	    write_log ("Failed to initialize the GUI\n");
 #ifdef __PSP2__
-        /* Do not continue into emulator startup with no valid framebuffer. */
         vita_debug_log_close();
         return;
 #endif
