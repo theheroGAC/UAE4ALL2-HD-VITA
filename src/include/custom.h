@@ -67,6 +67,9 @@ extern uae_u16 adkcon;
 extern unsigned int joy0dir, joy1dir, joy2dir, joy3dir;
 extern int joy0button, joy1button, joy2button, joy3button;
 extern unsigned int cd32_button_state;
+extern int cd32_pad_mode[2];
+extern int cd32_shifter[2];
+extern int cd32_get_bit(int port, int shift);
 
 extern void INTREQ (uae_u16);
 extern void INTREQ_0 (uae_u16);
@@ -96,6 +99,7 @@ extern uae_u16 INTREQR (void);
 #define VBLANK_HZ_NTSC 60
 
 extern int maxhpos, maxvpos, minfirstline, vblank_endline, numscrlines;
+extern int plffirstline, plflastline;
 #define NUMSCRLINES (maxvpos+1-minfirstline+1)
 
 #define DMA_AUD0      0x0001

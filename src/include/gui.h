@@ -35,8 +35,17 @@ struct gui_info
     uae_u8 drive_writing[4];        /* drive is writing */
     uae_u8 powerled;                /* state of power led */
     uae_u8 hdled;					/* state of hard disk access */
+    uae_u8 cdled;					/* state of CD access */
     uae_u16 fps;
 };
+
+extern int kickstart;
+extern int cdrom_is_inserted;
+
+static inline int is_cd32_mode(void)
+{
+    return (kickstart == 6 || cdrom_is_inserted != 0);
+}
 
 #ifndef _GUI_CPP
 extern struct gui_info gui_data;

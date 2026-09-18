@@ -27,6 +27,7 @@ void cdrom_audio_start(uae_u32 start_lba, uae_u32 end_lba);
 void cdrom_audio_pause(int paused);
 void cdrom_audio_stop(void);
 int cdrom_audio_is_playing(void);
+uae_u32 cdrom_get_current_lba(void);
 void cdrom_mix_audio(uae_s16 *samples, int frames, int channels, int output_rate);
 void cdrom_audio_get_state(uae_u32 *start_lba, uae_u32 *end_lba, uae_u32 *phase, int *playing, int *paused);
 void cdrom_audio_set_state(uae_u32 start_lba, uae_u32 end_lba, uae_u32 phase, int playing, int paused);

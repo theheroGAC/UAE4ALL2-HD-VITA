@@ -216,3 +216,4 @@ extern int diwfirstword,diwlastword;
 
 void check_all_prefs(void);
 void init_row_map(void);
+void reset_auto_crop(void);
