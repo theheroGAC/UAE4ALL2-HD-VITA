@@ -23,6 +23,7 @@
 #include <SDL_ttf.h>
 #include "savestate.h"
 #include "menu_config.h"
+#include "cdrom.h"
 
 #ifdef __SWITCH__
 #include "switch_kbd.h"
@@ -584,8 +585,12 @@ void make_savestate_filenames(char *save, char *thumb)
 	}
 #endif
 	// savestate is named by boot unit
-	// use first floppy as filename, if empty, use boot hdf/hd dir
-	if (uae4all_image_file0[0]!='\0')
+	// use CD image if CD32 mode, first floppy as filename, if empty, use boot hdf/hd dir
+	if (is_cd32_mode() && current_cd_image[0] != '\0')
+	{
+		copy_state_path(save, current_cd_image);
+	}
+	else if (uae4all_image_file0[0]!='\0')
 	{
 		copy_state_path(save, uae4all_image_file0);
 	}
@@ -627,7 +632,7 @@ void make_savestate_filenames(char *save, char *thumb)
 				save[0]='\0';
 			}
 		} 
-	} //Still nothing? Use floppy numbers 2,3,4
+	} //Still nothing? Use floppy numbers 2,3,4 or CD image
 	if (save[0]=='\0')
 	{
 		if (uae4all_image_file1[0]!='\0')
@@ -636,6 +641,8 @@ void make_savestate_filenames(char *save, char *thumb)
 			copy_state_path(save, uae4all_image_file2);
 		else if	(uae4all_image_file3[0]!='\0')
 			copy_state_path(save, uae4all_image_file3);
+		else if (current_cd_image[0]!='\0')
+			copy_state_path(save, current_cd_image);
 	}
 	switch(saveMenu_n_savestate)
 	{

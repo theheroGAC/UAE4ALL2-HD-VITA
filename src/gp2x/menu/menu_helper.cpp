@@ -304,10 +304,6 @@ void update_display() {
 
 #if defined(__PSP2__) || defined(__SWITCH__)
 #if defined(__PSP2__)
-    /* Drain and release the menu surface here, immediately before the SDL
-       mode switch. Keeping this transition in one place matches the original
-       Vita SDL path and avoids asking SDL for a second mode while its old
-       video surface is still registered. */
     if (prSDLScreen != NULL) {
         write_log("[VITA] update_display: releasing previous video surface\n");
         vita2d_wait_rendering_done();
@@ -316,9 +312,6 @@ void update_display() {
         write_log("[VITA] update_display: previous video surface released\n");
     }
 
-    /* The menu surface uses GPU memory. Before allocating the smaller game
-       framebuffer, force Vita2D to use writable user memory as the original
-       Vita display transition did. */
     vita2d_texture_set_alloc_memblock_type(SCE_KERNEL_MEMBLOCK_TYPE_USER_RW);
 #endif
 	displaying_menu = 0;
@@ -374,29 +367,9 @@ void update_display() {
     int y;
 
 #if defined(__PSP2__)
-    /*
-     * The Amiga's low-resolution pixels are not square on a 16:9 Vita
-     * display.  The old calculation used visibleAreaWidth / lines directly,
-     * so 320x200 became 16:10 while 320x240 became 4:3.  The result was a
-     * different stretch for every video mode and the "NTSC" and "fullscreen"
-     * presets were indistinguishable because screenWidth is not used by the
-     * Vita renderer.
-     *
-     * Presets 0-6 are aspect-correct 4:3 modes. Preset 7 is deliberately a
-     * full-screen stretch.  Keep this geometry independent of the fallback
-     * 320x200 SDL surface: the fallback is a backend limitation, not the
-     * display aspect ratio selected by the user.
-     */
-    int preset_variant = presetModeId % 10;
-    bool fullscreen_scaling = (preset_variant == 7);
-    bool five_four_scaling = (preset_variant == 8);
     vita_get_display_geometry(&x, &y, &sw, &sh);
     SDL_SetVideoModeScaling(x, y, sw, sh);
     SDL_SetVideoModeBilinear(mainMenu_shader != 0 ? 1 : 0);
-    const char *aspect_name = fullscreen_scaling ? "fullscreen" : (five_four_scaling ? "5:4" : "4:3");
-    write_log("[VITA] update_display: preset=%d aspect=%s dst=%dx%d+%d+%d\n",
-        presetModeId, aspect_name,
-        (int)sw, (int)sh, x, y);
 #else
     //is a shader active?
     if (mainMenu_shader != 0)

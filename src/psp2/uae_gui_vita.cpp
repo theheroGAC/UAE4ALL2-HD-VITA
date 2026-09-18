@@ -89,6 +89,7 @@ void vita_gui_save_as_started(void) { s_save_as_ime_active = 1; }
 extern char *config_filename;
 extern const char *config_save_as_name;
 extern int buttonSelect[4];
+extern int buttonStart[4];
 
 static const unsigned char s_font_8x8[96][8] = {
     {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
@@ -1277,7 +1278,7 @@ void vita_show_about_box(void)
 {
     static const CreditLine credits[] = {
         { "UAE4ALL2 HD Vita", CR_TITLE },
-        { "Version 1.08 - Amiga Emulator for PS Vita", CR_SUBTITLE },
+        { "Version 1.09 - Amiga Emulator for PS Vita", CR_SUBTITLE },
         { "", CR_EMPTY },
         { "A high-definition port of the classic UAE4ALL Amiga emulator,", CR_TEXT },
         { "now with WHDLoad, HDF, IPF and CD32 support on the Vita.", CR_TEXT },
@@ -1377,7 +1378,7 @@ void vita_show_about_box(void)
         rot_x += 0.045f;
         rot_y += 0.065f;
         vita_draw_boing_ball_3d(dx + 46.0f, dy + 40.0f, 24.0f, rot_x, rot_y);
-        vita_draw_text(dx + 92.0f, dy + 20.0f, VITA_COLOR_AMIGA_RED, 1.15f, "UAE4ALL2 HD Vita v1.08");
+        vita_draw_text(dx + 92.0f, dy + 20.0f, VITA_COLOR_AMIGA_RED, 1.15f, "UAE4ALL2 HD Vita v1.09");
         vita_draw_text(dx + 92.0f, dy + 44.0f, VITA_COLOR_AMIGA_ORANGE, 0.85f, "About & Credits - WHDLoad Edition");
 
         vita_draw_rounded_rect_outline(dx + 16.0f, dy + 76.0f, dw - 32.0f, 1.0f, 0.0f, 1.0f, VITA_COLOR_CARD_BORDER);
@@ -1550,16 +1551,42 @@ bool vita_show_confirm_box(const char *title, const char *message, const char *y
         vita_draw_text_centered(dx + (dw * 0.5f), dy + 22.0f, VITA_COLOR_AMIGA_RED, 1.10f, title ? title : "Confirm");
         vita_draw_text_wrapped(dx + 30.0f, dy + 70.0f, dw - 60.0f, VITA_COLOR_TEXT_WHITE, 0.90f, message ? message : "");
 
-        float bw = 160.0f, bh = 38.0f;
-        float b1_x = dx + 110.0f;
-        float b2_x = dx + dw - 110.0f - bw;
+        float bh = 38.0f;
         float by = dy + dh - 54.0f;
 
-        vita_draw_rounded_rect(b1_x, by, bw, bh, 6.0f, choice == 0 ? VITA_COLOR_AMIGA_RED : VITA_COLOR_CARD);
-        vita_draw_text_centered(b1_x + (bw * 0.5f), by + 11.0f, VITA_COLOR_TEXT_WHITE, 0.95f, yes_label ? yes_label : "Yes (X)");
+        char yes_text[64], no_text[64];
+        const char *src_yes = yes_label ? yes_label : "Yes";
+        const char *src_no = no_label ? no_label : "No";
+        strncpy(yes_text, src_yes, sizeof(yes_text) - 1);
+        yes_text[sizeof(yes_text) - 1] = '\0';
+        strncpy(no_text, src_no, sizeof(no_text) - 1);
+        no_text[sizeof(no_text) - 1] = '\0';
+        char *paren = strchr(yes_text, '(');
+        if (paren) *paren = '\0';
+        paren = strchr(no_text, '(');
+        if (paren) *paren = '\0';
+        size_t label_len = strlen(yes_text);
+        while (label_len > 0 && yes_text[label_len - 1] == ' ')
+            yes_text[--label_len] = '\0';
+        label_len = strlen(no_text);
+        while (label_len > 0 && no_text[label_len - 1] == ' ')
+            no_text[--label_len] = '\0';
 
-        vita_draw_rounded_rect(b2_x, by, bw, bh, 6.0f, choice == 1 ? VITA_COLOR_AMIGA_RED : VITA_COLOR_CARD);
-        vita_draw_text_centered(b2_x + (bw * 0.5f), by + 11.0f, VITA_COLOR_TEXT_WHITE, 0.95f, no_label ? no_label : "No (O)");
+        float yes_w = 62.0f + (float)vita_get_text_width(0.95f, yes_text) + 18.0f;
+        float no_w = 62.0f + (float)vita_get_text_width(0.95f, no_text) + 18.0f;
+        if (yes_w < 140.0f) yes_w = 140.0f;
+        if (no_w < 140.0f) no_w = 140.0f;
+        float btn_gap = 24.0f;
+        float b1_x = dx + ((dw - (yes_w + btn_gap + no_w)) * 0.5f);
+        float b2_x = b1_x + yes_w + btn_gap;
+
+        vita_draw_rounded_rect(b1_x, by, yes_w, bh, 6.0f, choice == 0 ? VITA_COLOR_AMIGA_RED : VITA_COLOR_CARD);
+        vita_draw_button_glyph(b1_x + 24.0f, by + 8.0f, VITA_BTN_CROSS);
+        vita_draw_text(b1_x + 62.0f, by + 11.0f, VITA_COLOR_TEXT_WHITE, 0.95f, yes_text);
+
+        vita_draw_rounded_rect(b2_x, by, no_w, bh, 6.0f, choice == 1 ? VITA_COLOR_AMIGA_RED : VITA_COLOR_CARD);
+        vita_draw_button_glyph(b2_x + 24.0f, by + 8.0f, VITA_BTN_CIRCLE);
+        vita_draw_text(b2_x + 62.0f, by + 11.0f, VITA_COLOR_TEXT_WHITE, 0.95f, no_text);
 
         SDL_Flip(prSDLScreen);
         SDL_Delay(20);
@@ -1626,7 +1653,7 @@ int run_overlay_vita(void)
 
     VitaInputState input;
     VitaSystemInfo sysinfo;
-    const char *items[6] = { "Resume", "Save State", "Load State", "Eject DF0", "Eject CD32", "Screenshot" };
+    const char *items[7] = { "Resume", "Virtual Keyboard", "Save State", "Load State", "Eject DF0", "Eject CD32", "Screenshot" };
     int selected = 0;
     int frame_count = 0;
     memset(&input, 0, sizeof(input));
@@ -1641,30 +1668,43 @@ int run_overlay_vita(void)
         frame_count++;
 
         if (input.pressed & (SCE_CTRL_CIRCLE | SCE_CTRL_START)) {
+            buttonStart[0] = 0;
+            buttonSelect[0] = 0;
             mainMenu_case = MAIN_MENU_CASE_RUN;
             break;
         }
         if (input.pressed & SCE_CTRL_UP) {
             selected--;
-            if (selected < 0) selected = 5;
+            if (selected < 0) selected = 6;
         }
         if (input.pressed & SCE_CTRL_DOWN) {
             selected++;
-            if (selected > 5) selected = 0;
+            if (selected > 6) selected = 0;
         }
         if (input.pressed & SCE_CTRL_CROSS) {
             extern char *savestate_filename;
             extern char *screenshot_filename;
             if (selected == 0) {
+                buttonStart[0] = 0;
+                buttonSelect[0] = 0;
                 mainMenu_case = MAIN_MENU_CASE_RUN;
                 break;
             } else if (selected == 1) {
-                saveMenu_n_savestate = 1;
-                make_savestate_filenames(savestate_filename, screenshot_filename);
-                savestate_state = STATE_DOSAVE;
+                extern int vkbd_mode;
+                vkbd_mode = 1;
+                buttonStart[0] = 0;
+                buttonSelect[0] = 0;
                 mainMenu_case = MAIN_MENU_CASE_RUN;
                 break;
             } else if (selected == 2) {
+                saveMenu_n_savestate = 1;
+                make_savestate_filenames(savestate_filename, screenshot_filename);
+                savestate_state = STATE_DOSAVE;
+                buttonStart[0] = 0;
+                buttonSelect[0] = 0;
+                mainMenu_case = MAIN_MENU_CASE_RUN;
+                break;
+            } else if (selected == 3) {
                 saveMenu_n_savestate = 1;
                 make_savestate_filenames(savestate_filename, screenshot_filename);
                 FILE *state_file = fopen(savestate_filename, "rb");
@@ -1672,19 +1712,27 @@ int run_overlay_vita(void)
                     fclose(state_file);
                     savestate_state = STATE_DORESTORE;
                 }
-                mainMenu_case = MAIN_MENU_CASE_RUN;
-                break;
-            } else if (selected == 3) {
-                uae4all_image_file0[0] = '\0';
-                gui_update();
+                buttonStart[0] = 0;
+                buttonSelect[0] = 0;
                 mainMenu_case = MAIN_MENU_CASE_RUN;
                 break;
             } else if (selected == 4) {
+                uae4all_image_file0[0] = '\0';
+                gui_update();
+                buttonStart[0] = 0;
+                buttonSelect[0] = 0;
+                mainMenu_case = MAIN_MENU_CASE_RUN;
+                break;
+            } else if (selected == 5) {
                 cdrom_close_image();
+                buttonStart[0] = 0;
+                buttonSelect[0] = 0;
                 mainMenu_case = MAIN_MENU_CASE_RUN;
                 break;
             } else {
                 vita_screenshot_request = 1;
+                buttonStart[0] = 0;
+                buttonSelect[0] = 0;
                 mainMenu_case = MAIN_MENU_CASE_RUN;
                 break;
             }
@@ -1692,15 +1740,17 @@ int run_overlay_vita(void)
 
         SDL_FillRect(prSDLScreen, NULL, to_sdl_color(VITA_COLOR_OVERLAY_BG));
         vita_draw_header("Quick Menu", VITA_TAB_FLOPPY, &sysinfo);
-        for (int i = 0; i < 6; i++) {
-            float y = 82.0f + (float)i * 58.0f;
-            vita_draw_button_item(80.0f, y, VITA_SCREEN_W - 160.0f, 48.0f, items[i], NULL, NULL, selected == i, false);
+        for (int i = 0; i < 7; i++) {
+            float y = 74.0f + (float)i * 54.0f;
+            vita_draw_button_item(80.0f, y, VITA_SCREEN_W - 160.0f, 44.0f, items[i], NULL, NULL, selected == i, false);
         }
         vita_draw_footer("CROSS SELECT", "CIRCLE/START RESUME");
         SDL_Flip(prSDLScreen);
         SDL_Delay(16);
     }
 
+    buttonStart[0] = 0;
+    buttonSelect[0] = 0;
     inside_menu = 0;
     return 1;
 }
@@ -1769,10 +1819,10 @@ int run_mainMenu_vita(void)
             }
         }		if (input.pressed & SCE_CTRL_START) {
 			int automatic_media = -1;
-            if (mainMenu_whdload_game[0] != '\0')
-                automatic_media = 2;
-            else if (current_cd_image[0] != '\0')
+            if (current_cd_image[0] != '\0' || cdrom_is_inserted)
                 automatic_media = 3;
+            else if (mainMenu_whdload_game[0] != '\0')
+                automatic_media = 2;
             else if (uae4all_hard_file0[0] != '\0' || uae4all_hard_file1[0] != '\0' ||
                      uae4all_hard_file2[0] != '\0' || uae4all_hard_file3[0] != '\0')
                 automatic_media = 1;
@@ -1782,7 +1832,12 @@ int run_mainMenu_vita(void)
                      uae4all_image_file2[0] != '\0' || uae4all_image_file3[0] != '\0')
                 automatic_media = 0;
             if ((automatic_media == 1 || automatic_media == 2) && !vita_confirm_eject_for_hard_disk_launch())
-                continue;			if (automatic_media >= 0 && !emulating) {
+                continue;
+            if (automatic_media >= 0 && automatic_media != 3 && (current_cd_image[0] != '\0' || cdrom_is_inserted)) {
+                cdrom_close_image();
+                cdrom_audio_stop();
+            }
+            if (automatic_media >= 0 && !emulating) {
 				ApplyAutomaticGamePreset(automatic_media);
 				vita_set_kickstart(kickstart, 0);
 			}
@@ -1847,6 +1902,8 @@ int run_mainMenu_vita(void)
         SDL_Delay(16);
     }
 
+    buttonStart[0] = 0;
+    buttonSelect[0] = 0;
     inside_menu = 0;
     setCpuSpeed();
     write_log("[VITA] run_mainMenu_vita: exit menu (case=%d)\n", mainMenu_case);

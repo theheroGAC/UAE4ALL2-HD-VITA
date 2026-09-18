@@ -659,6 +659,10 @@ static int has_hdf_files(void)
 
 void ApplyA500Profile(void)
 {
+#ifdef __PSP2__
+    cdrom_close_image();
+    cdrom_audio_stop();
+#endif
     kickstart = 1;
     extfile[0] = '\0';
     mainMenu_CPU_model = 0;
@@ -677,6 +681,10 @@ void ApplyA500Profile(void)
 
 void ApplyA1200Profile(void)
 {
+#ifdef __PSP2__
+    cdrom_close_image();
+    cdrom_audio_stop();
+#endif
     kickstart = 3;
     extfile[0] = '\0';
     mainMenu_CPU_model = 1;
@@ -702,7 +710,7 @@ void ApplyCd32Profile(void)
     mainMenu_fastMemory = 0;
     mainMenu_slowMemory = 0;
     mainMenu_bootHD = 0;
-    mainMenu_drives = 1;
+    mainMenu_drives = 0;
     mainMenu_autoCrop = 0;
     UpdateCPUModelSettings();
     UpdateMemorySettings();

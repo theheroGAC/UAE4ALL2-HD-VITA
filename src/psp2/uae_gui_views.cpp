@@ -368,14 +368,14 @@ static int vita_load_kickstart(const char *path)
     return 1;
 }
 
-static const char *vita_kickstart_aliases[KICKSTART_ROM_COUNT][10] = {
+static const char *vita_kickstart_aliases[KICKSTART_ROM_COUNT][16] = {
     { "kick12.rom", "kick33180.A500", "amiga-os-120.rom", "kick1.2.rom", NULL },
     { "kick13.rom", "kick34005.A500", "amiga-os-130.rom", "kick1.3.rom", NULL },
     { "kick20.rom", "kick37175.A500", "amiga-os-204.rom", "kick204.rom", "kick2.04.rom", NULL },
     { "kick31.rom", "kick40068.A1200", "amiga-os-310-a1200.rom", "kick3.1.rom", NULL },
-    { "kickcustom.rom", "custom.rom", NULL },
+    { "kickcustom.rom", "custom.rom", "kick32.rom", "kick322.rom", "kick47102.A1200", "kick47102.A500", "kick3.2.rom", "kick3.2.2.rom", "diagrom.rom", NULL },
     { "aros-amiga-m68k-rom.bin", "aros.rom", NULL },
-    { "kick40060.CD32", "amiga-os-310-cd32.rom", "kick31cd32.rom", "cd32.rom", "CD32 ROM r40.60 (1993)(Commodore)(CD32).rom", NULL },
+    { "kick40060.CD32", "Kickstart-v3.1-rev40.60-1993-Commodore-CD32.rom", "Kickstart v3.1 rev 40.60 (1993)(Commodore)(CD32).rom", "amiga-os-310-cd32.rom", "kick31cd32.rom", "cd32.rom", "CD32 ROM r40.60 (1993)(Commodore)(CD32).rom", "kick40060.CD32.rom", "kick40060.rom", NULL },
     { "kick31034.A1000", "amiga-os-110-ntsc.rom", NULL },
     { "kick32034.A1000", "amiga-os-110-pal.rom", NULL },
     { "kick33180.A500", "amiga-os-120.rom", "kick12.rom", "kick1.2.rom", NULL },
@@ -389,14 +389,14 @@ static const char *vita_kickstart_aliases[KICKSTART_ROM_COUNT][10] = {
     { "kick13.rom", "amiga-os-130.rom", "kick34005.A500", "kick1.3.rom", NULL }
 };
 
-static const char *vita_extended_rom_aliases[KICKSTART_ROM_COUNT][10] = {
+static const char *vita_extended_rom_aliases[KICKSTART_ROM_COUNT][16] = {
     { NULL },
     { NULL },
     { NULL },
     { NULL },
     { NULL },
     { "aros-amiga-m68k-ext.bin", "aros-ext.bin", NULL },
-    { "kick40060.CD32.ext", "amiga-os-310-cd32-ext.rom", "CD32 Extended-ROM r40.60 (1993)(Commodore)(CD32).rom", "cd32.ext", "cd32_ext.rom", "kick31cd32.ext", "cd32ext.rom", NULL },
+    { "kick40060.CD32.ext", "CD32 Extended-ROM r40.60 (1993)(Commodore)(CD32).rom", "CD32 Extended-ROM rev 40.60 (1993)(Commodore)(CD32).rom", "CD32-Extended-ROM-r40.60-1993-Commodore-CD32.rom", "amiga-os-310-cd32-ext.rom", "cd32.ext", "cd32_ext.rom", "kick31cd32.ext", "cd32ext.rom", "kick40060.CD32.ext.rom", "CD32 Extended-ROM r40.60 (1993)(Commodore)(CD32)[!].rom", NULL },
     { NULL },
     { NULL },
     { NULL },
@@ -415,18 +415,24 @@ int vita_set_kickstart(int index, int load_rom)
     if (index < 0 || index >= KICKSTART_ROM_COUNT)
         return 0;
 
+    static const char *subdirs[] = { "kickstarts", "roms", "" };
     int found = 0;
     romfile[0] = '\0';
-    for (int i = 0; i < 10 && vita_kickstart_aliases[index][i]; i++) {
-        char candidate[256];
-        snprintf(candidate, sizeof(candidate), "%s/kickstarts/%s", launchDir, vita_kickstart_aliases[index][i]);
-        FILE *file = fopen(candidate, "rb");
-        if (file) {
-            fclose(file);
-            strncpy(romfile, candidate, sizeof(romfile) - 1);
-            romfile[sizeof(romfile) - 1] = '\0';
-            found = 1;
-            break;
+    for (int s = 0; s < 3 && !found; s++) {
+        for (int i = 0; i < 16 && vita_kickstart_aliases[index][i]; i++) {
+            char candidate[256];
+            if (subdirs[s][0] != '\0')
+                snprintf(candidate, sizeof(candidate), "%s/%s/%s", launchDir, subdirs[s], vita_kickstart_aliases[index][i]);
+            else
+                snprintf(candidate, sizeof(candidate), "%s/%s", launchDir, vita_kickstart_aliases[index][i]);
+            FILE *file = fopen(candidate, "rb");
+            if (file) {
+                fclose(file);
+                strncpy(romfile, candidate, sizeof(romfile) - 1);
+                romfile[sizeof(romfile) - 1] = '\0';
+                found = 1;
+                break;
+            }
         }
     }
     if (!found)
@@ -435,16 +441,21 @@ int vita_set_kickstart(int index, int load_rom)
     extfile[0] = '\0';
     int ext_found = 0;
     if (extended_rom_names[index][0] != '\0') {
-        for (int i = 0; i < 10 && vita_extended_rom_aliases[index][i]; i++) {
-            char candidate[256];
-            snprintf(candidate, sizeof(candidate), "%s/kickstarts/%s", launchDir, vita_extended_rom_aliases[index][i]);
-            FILE *file = fopen(candidate, "rb");
-            if (file) {
-                fclose(file);
-                strncpy(extfile, candidate, sizeof(extfile) - 1);
-                extfile[sizeof(extfile) - 1] = '\0';
-                ext_found = 1;
-                break;
+        for (int s = 0; s < 3 && !ext_found; s++) {
+            for (int i = 0; i < 16 && vita_extended_rom_aliases[index][i]; i++) {
+                char candidate[256];
+                if (subdirs[s][0] != '\0')
+                    snprintf(candidate, sizeof(candidate), "%s/%s/%s", launchDir, subdirs[s], vita_extended_rom_aliases[index][i]);
+                else
+                    snprintf(candidate, sizeof(candidate), "%s/%s", launchDir, vita_extended_rom_aliases[index][i]);
+                FILE *file = fopen(candidate, "rb");
+                if (file) {
+                    fclose(file);
+                    strncpy(extfile, candidate, sizeof(extfile) - 1);
+                    extfile[sizeof(extfile) - 1] = '\0';
+                    ext_found = 1;
+                    break;
+                }
             }
         }
         if (!ext_found) {
@@ -1166,6 +1177,11 @@ static int vita_has_mounted_hdf(void)
            uae4all_hard_file2[0] != '\0' || uae4all_hard_file3[0] != '\0';
 }
 
+static int vita_has_inserted_cd(void)
+{
+    return current_cd_image[0] != '\0' || cdrom_is_inserted != 0;
+}
+
 static void vita_eject_all_floppies(void)
 {
     uae4all_image_file0[0] = '\0';
@@ -1191,13 +1207,27 @@ static void vita_eject_all_hdf(void)
 
 int vita_confirm_eject_for_hard_disk_launch(void)
 {
-    if (!vita_has_inserted_floppy())
+    int has_floppy = vita_has_inserted_floppy();
+    int has_cd = vita_has_inserted_cd();
+    if (!has_floppy && !has_cd)
         return 1;
-    if (!vita_show_confirm_box("Floppy Disk Detected",
-            "A floppy disk is inserted. Eject it before launching this hard-disk game?",
+    const char *message;
+    if (has_floppy && has_cd)
+        message = "A floppy disk and a CD image are inserted. Eject them before launching this hard-disk game?";
+    else if (has_cd)
+        message = "A CD image is inserted. Eject it before launching this hard-disk game?";
+    else
+        message = "A floppy disk is inserted. Eject it before launching this hard-disk game?";
+    if (!vita_show_confirm_box("Media Detected",
+            message,
             "Eject and Launch (X)", "Cancel Launch (O)"))
         return 0;
-    vita_eject_all_floppies();
+    if (has_floppy)
+        vita_eject_all_floppies();
+    if (has_cd) {
+        cdrom_close_image();
+        cdrom_audio_stop();
+    }
     return 1;
 }
 
@@ -1205,10 +1235,15 @@ static int vita_confirm_eject_for_whdload_launch(void)
 {
     int has_floppy = vita_has_inserted_floppy();
     int has_hdf = vita_has_mounted_hdf();
-    if (!has_floppy && !has_hdf)
+    int has_cd = vita_has_inserted_cd();
+    if (!has_floppy && !has_hdf && !has_cd)
         return 1;
     const char *message;
-    if (has_floppy && has_hdf)
+    if (has_cd && (has_floppy || has_hdf))
+        message = "A CD image and disk media are mounted. Eject them before launching this WHDLoad game?";
+    else if (has_cd)
+        message = "A CD image is mounted. Eject it before launching this WHDLoad game?";
+    else if (has_floppy && has_hdf)
         message = "A floppy disk and an HDF image are mounted. Eject them before launching this WHDLoad game?";
     else if (has_hdf)
         message = "An HDF image is mounted. Eject it before launching this WHDLoad game?";
@@ -1221,6 +1256,10 @@ static int vita_confirm_eject_for_whdload_launch(void)
         vita_eject_all_floppies();
     if (has_hdf)
         vita_eject_all_hdf();
+    if (has_cd) {
+        cdrom_close_image();
+        cdrom_audio_stop();
+    }
     return 1;
 }
 
@@ -1333,10 +1372,14 @@ void vita_view_whdload(VitaInputState *input, int *selected_item)
                 whdload_ensure_game_dir(game_name);
                 whdload_mark_recent(game_name);
 
+                cdrom_close_image();
+                cdrom_audio_stop();
+
                 strncpy(uae4all_hard_dir, vita_whdload_root(), 255);
                 uae4all_hard_dir[255] = '\0';
                 ApplyAutomaticGamePreset(2);
                 vita_set_kickstart(kickstart, 0);
+                bReloadKickstart = 1;
 
                 gui_update();
                 mainMenu_case = MAIN_MENU_CASE_RUN;
@@ -1492,7 +1535,7 @@ void vita_view_whdload(VitaInputState *input, int *selected_item)
 
 void vita_view_presets(VitaInputState *input, int *selected_item)
 {
-    const int total_items = 5;
+    const int total_items = 6;
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
 
@@ -1507,6 +1550,8 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
 
         if (input->pressed & SCE_CTRL_CROSS) {
         if (*selected_item == 0) {
+            cdrom_close_image();
+            cdrom_audio_stop();
             kickstart = 1;
             extfile[0] = '\0';
             mainMenu_CPU_model = 0;
@@ -1524,6 +1569,8 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
             else
                 vita_show_message_box("Kickstart Missing", "Kickstart 1.3 ROM (kick13.rom / kick34005.A500) not found in ux0:/data/uae4all/kickstarts/.", "OK (X)");
         } else if (*selected_item == 1) {
+            cdrom_close_image();
+            cdrom_audio_stop();
             kickstart = 2;
             extfile[0] = '\0';
             mainMenu_CPU_model = 0;
@@ -1541,6 +1588,8 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
             else
                 vita_show_message_box("Kickstart Missing", "Kickstart 2.04 ROM (kick20.rom / kick37175.A500) not found in ux0:/data/uae4all/kickstarts/.", "OK (X)");
         } else if (*selected_item == 2) {
+            cdrom_close_image();
+            cdrom_audio_stop();
             kickstart = 11;
             extfile[0] = '\0';
             mainMenu_CPU_model = 0;
@@ -1558,6 +1607,8 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
             else
                 vita_show_message_box("Kickstart Missing", "Kickstart 2.05 ROM (kick37350.A600 / kick205.rom) not found in ux0:/data/uae4all/kickstarts/.", "OK (X)");
         } else if (*selected_item == 3) {
+            cdrom_close_image();
+            cdrom_audio_stop();
             kickstart = 3;
             extfile[0] = '\0';
             mainMenu_CPU_model = 1;
@@ -1591,6 +1642,25 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
                 vita_show_message_box("Preset Applied", "Amiga CD32 (Akiko, CD32 Kickstart + Extended ROM) configured! Press Save Game Configuration to save it.", "OK (X)");
             else
                 vita_show_message_box("Kickstart CD32 Missing", "CD32 requires Kickstart 3.1 AND Extended ROM in ux0:/data/uae4all/kickstarts/!\n(kick40060.CD32 and kick40060.CD32.ext, or 1MB combined ROM)", "OK (X)");
+        } else if (*selected_item == 5) {
+            cdrom_close_image();
+            cdrom_audio_stop();
+            kickstart = 4;
+            extfile[0] = '\0';
+            mainMenu_CPU_model = 1;
+            mainMenu_chipset = 2 | 0x100;
+            mainMenu_chipMemory = 2;
+            mainMenu_slowMemory = 0;
+            mainMenu_fastMemory = 4;
+            UpdateCPUModelSettings();
+            UpdateMemorySettings();
+            UpdateChipsetSettings();
+            int kickstart_loaded = vita_set_kickstart(kickstart, 0);
+            bReloadKickstart = 1;
+            if (kickstart_loaded)
+                vita_show_message_box("Preset Applied", "Custom ROM (68020 AGA, 2MB Chip + 8MB Fast RAM) configured! Press Save Game Configuration to save it.", "OK (X)");
+            else
+                vita_show_message_box("Kickstart Missing", "Custom ROM (kickcustom.rom / custom.rom) not found in ux0:/data/uae4all/kickstarts/.", "OK (X)");
         }
     }
 
@@ -1606,12 +1676,13 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
         const char *desc;
         const char *tag;
         const char *recom;
-    } presets[5] = {
+    } presets[6] = {
         { "Amiga 500 (Classic OCS 1.3)", "68000 7MHz | Kickstart 1.3 | 512KB Chip + 512KB Slow RAM", "OCS", "Recommended for 95% of classic Amiga games (1985-1993)" },
         { "Amiga 500+ (Enhanced ECS 2.04)", "68000 7MHz | Kickstart 2.04 | 1MB Chip + 1MB Fast RAM", "ECS", "Recommended for late ECS titles and productivity software" },
         { "Amiga 600 (Enhanced ECS 2.05)", "68000 7MHz | Kickstart 2.05 | 2MB Chip + 8MB Fast RAM", "ECS", "Recommended for Amiga 600 games and ECS software" },
         { "Amiga 1200 (Advanced AGA 3.1)", "68020 14MHz | Kickstart 3.1 | 2MB Chip + 4MB Fast RAM", "AGA", "Recommended for AGA games (Alien Breed 3D, Slam Tilt, Gloom)" },
-        { "Amiga CD32 (Console CD Mode)", "68020 14MHz | Kickstart 3.1 CD32 | 2MB Chip RAM + Akiko", "CD32", "Recommended for Amiga CD32 ISO, CUE and CHD disc images" }
+        { "Amiga CD32 (Console CD Mode)", "68020 14MHz | Kickstart 3.1 CD32 | 2MB Chip RAM + Akiko", "CD32", "Recommended for Amiga CD32 ISO, CUE and CHD disc images" },
+        { "Amiga Custom (Custom ROM)", "68020 14MHz | Custom Kickstart | 2MB Chip + 8MB Fast RAM", "CUST", "Uses kickcustom.rom / custom.rom in ux0:/data/uae4all/kickstarts/" }
     };
 
     const int visible_items = vita_list_visible_rows(start_y, item_h, item_gap);
@@ -1625,19 +1696,19 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
 
         vita_draw_card(card_x, cy, card_w, item_h, focused, false);
 
-        unsigned int badge_col = (item == 3) ? VITA_COLOR_AMIGA_RED : ((item == 0) ? VITA_COLOR_AMIGA_BLUE : RGBA8(40, 50, 70, 255));
-        float badge_x = card_x + ((item == 4) ? 8.0f : 14.0f);
+        unsigned int badge_col = (item == 3) ? VITA_COLOR_AMIGA_RED : ((item == 0) ? VITA_COLOR_AMIGA_BLUE : ((item == 5) ? RGBA8(147, 51, 234, 255) : RGBA8(40, 50, 70, 255)));
+        float badge_x = card_x + ((item == 4 || item == 5) ? 8.0f : 14.0f);
         vita_draw_badge(badge_x, cy + 14.0f, presets[item].tag, badge_col, VITA_COLOR_TEXT_WHITE);
 
-        vita_draw_text(card_x + 72.0f, cy + 12.0f, focused ? VITA_COLOR_TEXT_WHITE : RGBA8(230, 240, 255, 255), 1.05f, presets[item].title);
+        vita_draw_text(card_x + 80.0f, cy + 12.0f, focused ? VITA_COLOR_TEXT_WHITE : RGBA8(230, 240, 255, 255), 1.05f, presets[item].title);
 
         char desc_buf[256];
         vita_truncate_text(presets[item].desc, card_w - 180.0f, 0.85f, desc_buf, sizeof(desc_buf));
-        vita_draw_text(card_x + 72.0f, cy + 34.0f, VITA_COLOR_TEXT_MUTED, 0.85f, desc_buf);
+        vita_draw_text(card_x + 80.0f, cy + 34.0f, VITA_COLOR_TEXT_MUTED, 0.85f, desc_buf);
 
         char rec_buf[256];
         vita_truncate_text(presets[item].recom, card_w - 180.0f, 0.82f, rec_buf, sizeof(rec_buf));
-        vita_draw_text(card_x + 72.0f, cy + 52.0f, VITA_COLOR_AMIGA_ORANGE, 0.82f, rec_buf);
+        vita_draw_text(card_x + 80.0f, cy + 52.0f, VITA_COLOR_AMIGA_ORANGE, 0.82f, rec_buf);
 
         if (focused) {
             vita_draw_hint_item(card_x + card_w - 140.0f, cy + 28.0f, VITA_BTN_CROSS, "Apply");
@@ -1668,6 +1739,8 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
         if (res == 1) {
             if (cdrom_open_image(new_file)) {
                 ApplyCd32Profile();
+                mainMenu_whdload_game[0] = '\0';
+                vita_eject_all_floppies();
                 int ks_loaded = vita_set_kickstart(kickstart, 0);
                 bReloadKickstart = 1;
                 if (ks_loaded)
@@ -2470,6 +2543,7 @@ static bool vita_savestate_file_exists(const char *path)
 
 static const char *vita_get_active_game_path(void)
 {
+    if (is_cd32_mode() && current_cd_image[0] != '\0') return current_cd_image;
     if (uae4all_image_file0[0] != '\0') return uae4all_image_file0;
     if (mainMenu_bootHD == 2) {
         if (uae4all_hard_file0[0] != '\0') return uae4all_hard_file0;
@@ -2481,6 +2555,7 @@ static const char *vita_get_active_game_path(void)
     if (uae4all_image_file1[0] != '\0') return uae4all_image_file1;
     if (uae4all_image_file2[0] != '\0') return uae4all_image_file2;
     if (uae4all_image_file3[0] != '\0') return uae4all_image_file3;
+    if (current_cd_image[0] != '\0') return current_cd_image;
     return "";
 }
 
@@ -2941,7 +3016,7 @@ void vita_view_system(VitaInputState *input, int *selected_item)
                 }
                 break;
             case 10:
-                if (vita_show_confirm_box("About", "Open UAE4All2 HD v1.08 and credits?", "Yes", "No")) {
+                if (vita_show_confirm_box("About", "Open UAE4All2 HD v1.09 and credits?", "Yes", "No")) {
                     vita_show_about_box();
                 }
                 break;
@@ -2967,7 +3042,7 @@ void vita_view_system(VitaInputState *input, int *selected_item)
         "Reboot Amiga Emulation",
         "Take Screenshot",
         "FTP File Transfer",
-        "About UAE4All2 HD v1.08"
+        "About UAE4All2 HD v1.09"
     };
     static const char *system_subtitles[11] = {
         "Save all disk, display, and hardware settings for current game",
