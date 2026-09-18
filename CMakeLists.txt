@@ -235,7 +235,7 @@ if(BUILD_PSP2)
   add_custom_target(${PROJECT_NAME}.vpk
           DEPENDS ${PROJECT_NAME}.self-self
           COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Generating param.sfo"
-          COMMAND ${VITASDK}/bin/vita-mksfoex -d ATTRIBUTE2=12 -s TITLE_ID=${TITLEID} -s APP_VER=01.08 "UAE4All2 HD" param.sfo
+          COMMAND ${VITASDK}/bin/vita-mksfoex -d ATTRIBUTE2=12 -s TITLE_ID=${TITLEID} -s APP_VER=01.09 "UAE4All2 HD" param.sfo
           COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Packaging uae4all2hd.vpk"
           COMMAND ${VITASDK}/bin/vita-pack-vpk -s param.sfo -b ${PROJECT_NAME}.self -a ${CMAKE_SOURCE_DIR}/psp2data/data=data -a ${CMAKE_SOURCE_DIR}/psp2data/sce_sys=sce_sys uae4all2hd.vpk
   )
@@ -371,7 +371,8 @@ endif(BUILD_NX)
 if(BUILD_CDROM_TESTS AND NOT BUILD_PSP2 AND NOT BUILD_NX)
   enable_testing()
   add_executable(cdrom_tests tests/cdrom_tests.cpp src/cdrom.cpp)
-  target_include_directories(cdrom_tests PRIVATE src src/include)
+  target_include_directories(cdrom_tests PRIVATE src src/include src/libchdr/include)
+  target_link_libraries(cdrom_tests PRIVATE chdr-static)
   add_test(NAME cdrom_backend COMMAND cdrom_tests)
 endif()
 
