@@ -150,6 +150,7 @@ int mainMenu_footerSize = 0;
 int mainMenu_screenOffsetY = 0;
 int mainMenu_screenOffsetX = 0;
 int mainMenu_autoCrop = 0; /* default: Disabled (Manual) for 100% full speed */
+int mainMenu_displayAuto = 1;
 int mainMenu_ntsc = DEFAULT_NTSC;
 int mainMenu_frameskip = 0;
 int mainMenu_vkbdLanguage = 0; //Default is US Keyboard
@@ -559,6 +560,7 @@ void SetDefaultMenuSettings(int general)
     mainMenu_screenOffsetY = 0;
     mainMenu_screenOffsetX = 0;
     mainMenu_autoCrop = 0; /* default: Disabled (Manual) for 100% full speed */
+    mainMenu_displayAuto = 1;
     mainMenu_ntsc = DEFAULT_NTSC;
     mainMenu_frameskip = 0;
     mainMenu_vkbdLanguage = 0; //Default is US Keyboard
@@ -1690,6 +1692,8 @@ int saveconfig(int general)
     fputs(buffer,f);
     snprintf((char*)buffer, 255, "autoCrop=%d\n",mainMenu_autoCrop);
     fputs(buffer,f);
+    snprintf((char*)buffer, 255, "displayAuto=%d\n",mainMenu_displayAuto);
+    fputs(buffer,f);
 #ifdef __SWITCH__
     snprintf((char*)buffer, 255, "swapAB=%d\n",mainMenu_swapAB);
     fputs(buffer,f);
@@ -2152,7 +2156,9 @@ void loadconfig(int general)
         if (mainMenu_screenOffsetX < -128) mainMenu_screenOffsetX = -128;
         if (mainMenu_screenOffsetX > 128) mainMenu_screenOffsetX = 128;
         if (fscanf(f,"autoCrop=%d\n",&mainMenu_autoCrop) != 1)
-            mainMenu_autoCrop = 0; /* default: Disabled (Manual) */
+            mainMenu_autoCrop = 0;
+        if (fscanf(f,"displayAuto=%d\n",&mainMenu_displayAuto) != 1)
+            mainMenu_displayAuto = 1;
 #ifdef __SWITCH__ 
         fscanf(f,"swapAB=%d\n",&mainMenu_swapAB);
         fscanf(f,"singleJoycons=%d\n",&mainMenu_singleJoycons);

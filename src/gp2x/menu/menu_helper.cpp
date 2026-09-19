@@ -236,8 +236,60 @@ int vita_shader_cycle(int shader_enum, int direction)
     return vita_shader_order[current];
 }
 
+#if defined(__PSP2__)
+static void auto_display_supported_mode(int *w, int *h)
+{
+    int need_w = AUTO_DISPLAY_SURFACE_WIDTH;
+    int need_h = AUTO_DISPLAY_SURFACE_HEIGHT;
+    SDL_PixelFormat format;
+    SDL_Rect **modes;
+    int i, best_w = 0, best_h = 0;
+
+    *w = need_w;
+    *h = need_h;
+
+    memset(&format, 0, sizeof(format));
+    format.BitsPerPixel = 16;
+    modes = SDL_ListModes(&format, SDL_HWSURFACE);
+    if (modes == NULL || modes == (SDL_Rect **)-1)
+        return;
+
+    for (i = 0; modes[i] != NULL; i++) {
+        if (modes[i]->w < need_w || modes[i]->h < need_h)
+            continue;
+        if (best_w == 0 || (long)modes[i]->w * (long)modes[i]->h < (long)best_w * (long)best_h) {
+            best_w = modes[i]->w;
+            best_h = modes[i]->h;
+        }
+    }
+
+    if (best_w != 0) {
+        *w = best_w;
+        *h = best_h;
+    }
+}
+#endif
+
 void vita_get_display_geometry(int *x, int *y, float *sw, float *sh)
 {
+    if (displayAutoMode) {
+        struct AutoDisplayRect rect = autoDisplayRect;
+        float fx, fy, fsw, fsh;
+        int surface_w = prSDLScreen != NULL ? prSDLScreen->w : AUTO_DISPLAY_SURFACE_WIDTH;
+        int surface_h = prSDLScreen != NULL ? prSDLScreen->h : AUTO_DISPLAY_SURFACE_HEIGHT;
+        if (!rect.valid)
+            auto_display_window(diwfirstword, diwlastword, plffirstline, plflastline,
+                minfirstline, maxvpos, max_diwlastword, AUTO_DISPLAY_SURFACE_HEIGHT,
+                mainMenu_displayHires, &rect);
+        auto_display_fit_surface(&rect, surface_w, surface_h, max_diwlastword);
+        auto_display_geometry(&rect, 960, 544, surface_w, surface_h, &fx, &fy, &fsw, &fsh);
+        if (x) *x = (int)fx;
+        if (y) *y = (int)fy;
+        if (sw) *sw = fsw;
+        if (sh) *sh = fsh;
+        return;
+    }
+
     int preset_variant = presetModeId % 10;
     bool fullscreen_scaling = (preset_variant == 7);
     bool five_four_scaling = (preset_variant == 8);
@@ -274,6 +326,31 @@ void vita_get_display_geometry(int *x, int *y, float *sw, float *sh)
     if (sw) *sw = out_sw;
     if (sh) *sh = out_sh;
 }
+
+void vita_apply_auto_display_scaling(void)
+{
+    static int last_enabled = 0;
+    static int last_x = 0, last_y = 0;
+    static float last_sw = 0.0f, last_sh = 0.0f;
+    int x, y;
+    float sw, sh;
+
+    if (!displayAutoMode || prSDLScreen == NULL) {
+        last_enabled = 0;
+        return;
+    }
+
+    vita_get_display_geometry(&x, &y, &sw, &sh);
+    if (last_enabled && x == last_x && y == last_y && sw == last_sw && sh == last_sh)
+        return;
+
+    last_enabled = 1;
+    last_x = x;
+    last_y = y;
+    last_sw = sw;
+    last_sh = sh;
+    SDL_SetVideoModeScaling(x, y, sw, sh);
+}
 #endif
 
 void update_display() {
@@ -303,62 +380,98 @@ void update_display() {
 #endif
 
 #if defined(__PSP2__) || defined(__SWITCH__)
-#if defined(__PSP2__)
-    if (prSDLScreen != NULL) {
-        write_log("[VITA] update_display: releasing previous video surface\n");
-        vita2d_wait_rendering_done();
-        SDL_FreeSurface(prSDLScreen);
-        prSDLScreen = NULL;
-        write_log("[VITA] update_display: previous video surface released\n");
-    }
-
-    vita2d_texture_set_alloc_memblock_type(SCE_KERNEL_MEMBLOCK_TYPE_USER_RW);
-#endif
+    int surface_w = visibleAreaWidth;
+    int surface_h = mainMenu_displayedLines;
 	displaying_menu = 0;
 
-    prSDLScreen = SDL_SetVideoMode(visibleAreaWidth, mainMenu_displayedLines, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
-    printf("update_display: SDL_SetVideoMode(%i, %i, 16)\n", visibleAreaWidth, mainMenu_displayedLines);
 #if defined(__PSP2__)
-    write_log("[VITA] update_display: hardware SDL_SetVideoMode returned %p\n", (void *)prSDLScreen);
-    if (prSDLScreen == NULL) {
-        write_log("[VITA] update_display: retrying hardware surface without doublebuf\n");
-        prSDLScreen = SDL_SetVideoMode(visibleAreaWidth, mainMenu_displayedLines, 16, SDL_HWSURFACE);
+    if (mainMenu_displayAuto) {
+        displayAutoMode = 1;
+        auto_display_supported_mode(&surface_w, &surface_h);
+        visibleAreaWidth = surface_w;
+        mainMenu_displayedLines = AUTO_DISPLAY_SURFACE_HEIGHT;
+        if (surface_h < mainMenu_displayedLines)
+            mainMenu_displayedLines = surface_h;
+        reset_auto_display();
+    } else {
+        if (displayAutoMode)
+            SetPresetMode(presetModeId);
+        displayAutoMode = 0;
+        surface_w = visibleAreaWidth;
+        surface_h = mainMenu_displayedLines;
     }
-    if (prSDLScreen == NULL) {
-        write_log("[VITA] update_display: retrying software framebuffer\n");
-        prSDLScreen = SDL_SetVideoMode(visibleAreaWidth, mainMenu_displayedLines, 16, SDL_SWSURFACE);
-        write_log("[VITA] update_display: software SDL_SetVideoMode returned %p\n", (void *)prSDLScreen);
+
+    bool need_new_surface = (prSDLScreen == NULL || prSDLScreen->w != surface_w || prSDLScreen->h != surface_h);
+
+    if (need_new_surface) {
+        if (prSDLScreen != NULL) {
+            write_log("[VITA] update_display: releasing previous video surface (%dx%d -> %dx%d)\n",
+                      prSDLScreen->w, prSDLScreen->h, surface_w, surface_h);
+            vita2d_wait_rendering_done();
+            SDL_FreeSurface(prSDLScreen);
+            prSDLScreen = NULL;
+            write_log("[VITA] update_display: previous video surface released\n");
+        }
+
+        vita2d_texture_set_alloc_memblock_type(SCE_KERNEL_MEMBLOCK_TYPE_USER_RW);
+
+        prSDLScreen = SDL_SetVideoMode(surface_w, surface_h, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
+        printf("update_display: SDL_SetVideoMode(%i, %i, 16)\n", surface_w, surface_h);
+        write_log("[VITA] update_display: hardware SDL_SetVideoMode returned %p\n", (void *)prSDLScreen);
+        if (prSDLScreen == NULL) {
+            write_log("[VITA] update_display: retrying hardware surface without doublebuf\n");
+            prSDLScreen = SDL_SetVideoMode(surface_w, surface_h, 16, SDL_HWSURFACE);
+        }
+        if (prSDLScreen == NULL) {
+            write_log("[VITA] update_display: retrying software framebuffer\n");
+            prSDLScreen = SDL_SetVideoMode(surface_w, surface_h, 16, SDL_SWSURFACE);
+            write_log("[VITA] update_display: software SDL_SetVideoMode returned %p\n", (void *)prSDLScreen);
+        }
+        if (prSDLScreen == NULL && surface_w != 320) {
+            write_log("[VITA] update_display: resolution unsupported by SDL driver, falling back to 320x%d\n", surface_h);
+            visibleAreaWidth = 320;
+            surface_w = 320;
+            if (mainMenu_displayedLines > surface_h)
+                mainMenu_displayedLines = surface_h;
+            mainMenu_displayHires = 0;
+            prSDLScreen = SDL_SetVideoMode(320, surface_h, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
+            if (prSDLScreen == NULL)
+                prSDLScreen = SDL_SetVideoMode(320, surface_h, 16, SDL_SWSURFACE);
+        }
+        if (prSDLScreen == NULL && surface_h != 240) {
+            write_log("[VITA] update_display: lines unsupported, falling back to 320x240\n");
+            surface_w = 320;
+            surface_h = 240;
+            visibleAreaWidth = 320;
+            if (mainMenu_displayedLines > surface_h)
+                mainMenu_displayedLines = surface_h;
+            mainMenu_displayHires = 0;
+            prSDLScreen = SDL_SetVideoMode(320, 240, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
+            if (prSDLScreen == NULL)
+                prSDLScreen = SDL_SetVideoMode(320, 240, 16, SDL_SWSURFACE);
+        }
+        if (prSDLScreen == NULL) {
+            write_log("[VITA] update_display: fallback to 320x200\n");
+            surface_w = 320;
+            surface_h = 200;
+            visibleAreaWidth = 320;
+            if (mainMenu_displayedLines > surface_h)
+                mainMenu_displayedLines = surface_h;
+            mainMenu_displayHires = 0;
+            prSDLScreen = SDL_SetVideoMode(320, 200, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
+            if (prSDLScreen == NULL)
+                prSDLScreen = SDL_SetVideoMode(320, 200, 16, SDL_SWSURFACE);
+        }
+        if (prSDLScreen == NULL) {
+            write_log("[VITA] update_display: SDL_SetVideoMode failed: %s\n", SDL_GetError());
+            return;
+        }
+    } else {
+        write_log("[VITA] update_display: reusing existing surface (%dx%d)\n", prSDLScreen->w, prSDLScreen->h);
     }
-    if (prSDLScreen == NULL && visibleAreaWidth != 320) {
-        write_log("[VITA] update_display: resolution unsupported by SDL driver, falling back to 320x%d\n", mainMenu_displayedLines);
-        visibleAreaWidth = 320;
-        mainMenu_displayHires = 0;
-        prSDLScreen = SDL_SetVideoMode(320, mainMenu_displayedLines, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
-        if (prSDLScreen == NULL)
-            prSDLScreen = SDL_SetVideoMode(320, mainMenu_displayedLines, 16, SDL_SWSURFACE);
-    }
-    if (prSDLScreen == NULL && mainMenu_displayedLines != 240) {
-        write_log("[VITA] update_display: lines unsupported, falling back to 320x240\n");
-        mainMenu_displayedLines = 240;
-        visibleAreaWidth = 320;
-        mainMenu_displayHires = 0;
-        prSDLScreen = SDL_SetVideoMode(320, 240, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
-        if (prSDLScreen == NULL)
-            prSDLScreen = SDL_SetVideoMode(320, 240, 16, SDL_SWSURFACE);
-    }
-    if (prSDLScreen == NULL) {
-        write_log("[VITA] update_display: fallback to 320x200\n");
-        mainMenu_displayedLines = 200;
-        visibleAreaWidth = 320;
-        mainMenu_displayHires = 0;
-        prSDLScreen = SDL_SetVideoMode(320, 200, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
-        if (prSDLScreen == NULL)
-            prSDLScreen = SDL_SetVideoMode(320, 200, 16, SDL_SWSURFACE);
-    }
-    if (prSDLScreen == NULL) {
-        write_log("[VITA] update_display: SDL_SetVideoMode failed: %s\n", SDL_GetError());
-        return;
-    }
+#else
+    prSDLScreen = SDL_SetVideoMode(surface_w, surface_h, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
+    printf("update_display: SDL_SetVideoMode(%i, %i, 16)\n", surface_w, surface_h);
 #endif
 
     float sh;
@@ -406,12 +519,18 @@ void update_display() {
 #endif
 
     // clear screen
+#if defined(__PSP2__)
+    for (int i=0; i<3; i++)
+    {
+        SDL_FillRect(prSDLScreen,NULL,SDL_MapRGB(prSDLScreen->format, 0, 0, 0));
+        SDL_Flip(prSDLScreen);
+    }
+    write_log("[VITA] update_display: clear done\n");
+#else
     for (int i=0; i<2; i++)
 	{        SDL_FillRect(prSDLScreen,NULL,SDL_MapRGB(prSDLScreen->format, 0, 0, 0));
         SDL_Flip(prSDLScreen);
     }
-#if defined(__PSP2__)
-    write_log("[VITA] update_display: clear done\n");
 #endif
 
 #else

@@ -57,6 +57,16 @@ static __inline__ int coord_window_to_diw_x (int x)
 
 extern int framecnt;
 
+#include "auto_display.h"
+
+#define AUTO_DISPLAY_SURFACE_WIDTH (max_diwlastword * 2)
+#define AUTO_DISPLAY_SURFACE_HEIGHT gfxHeight
+#define AUTO_DISPLAY_SHRINK_FRAMES 90
+
+extern int displayAutoMode;
+extern struct AutoDisplayRect autoDisplayRect;
+extern void reset_auto_display(void);
+
 /* color values in two formats: 12 (OCS/ECS) or 24 (AJA) bit Amiga RGB (color_uae_regs),
  * and the native color value; both for each Amiga hardware color register. 
  *
@@ -206,6 +216,7 @@ extern void drawing_init (void);
 extern void moveVertical(int value);
 
 extern void InitDisplayArea(int newWidth);
+extern int init_display_area_auto(int newWidth);
 
 extern unsigned long time_per_frame;
 extern void adjust_idletime(unsigned long ns_waited);
@@ -217,3 +228,60 @@ extern int diwfirstword,diwlastword;
 void check_all_prefs(void);
 void init_row_map(void);
 void reset_auto_crop(void);
+
+static inline void auto_display_scan_decisions(const struct decision *decisions,
+        const struct draw_info *drawinfos, int count,
+        int diw_hleft, int diw_hright, int diw_vfirst, int diw_vlast,
+        int min_line, int max_line, int max_window, int max_lines,
+        struct AutoDisplayRect *out)
+{
+    int first = -1, last = -1;
+    int active = 0, hires = 0, i;
+
+    out->left = 0;
+    out->width = 0;
+    out->top = 0;
+    out->height = 0;
+    out->hires = 0;
+    out->valid = 0;
+
+    for (i = min_line; i < count; i++) {
+        const struct decision *d = &decisions[i];
+        const struct draw_info *dinfo = &drawinfos[i];
+        if ((d->plfleft >= 0 && d->nr_planes > 0) || dinfo->nr_sprites > 0) {
+            if (first < 0)
+                first = i;
+            last = i;
+            active++;
+            if (d->bplres >= 1)
+                hires++;
+        }
+    }
+
+    if (active == 0)
+        return;
+
+    if (diw_vfirst >= min_line && diw_vlast > diw_vfirst) {
+        if (first < 0 || diw_vfirst < first)
+            first = diw_vfirst;
+        if (last < 0 || diw_vlast - 1 > last)
+            last = diw_vlast - 1;
+    }
+    if (first < min_line)
+        first = min_line;
+    if (last > max_line)
+        last = max_line;
+    if (last < first)
+        return;
+    if (last - first + 1 > max_lines)
+        last = first + max_lines - 1;
+    if (last < first)
+        return;
+
+    auto_display_hwindow (diw_hleft, diw_hright, max_window, &out->left, &out->width);
+    out->width -= out->left;
+    out->top = first;
+    out->height = last - first + 1;
+    out->hires = (hires * 2 > active) ? 1 : 0;
+    out->valid = 1;
+}

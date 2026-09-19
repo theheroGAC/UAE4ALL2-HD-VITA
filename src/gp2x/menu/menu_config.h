@@ -14,6 +14,7 @@ extern void UpdateChipsetSettings();
 extern void SetPresetMode(int mode);
 #if defined(__PSP2__)
 extern void vita_get_display_geometry(int *x, int *y, float *sw, float *sh);
+extern void vita_apply_auto_display_scaling(void);
 extern const char *vita_shader_label(int shader_enum);
 extern int vita_shader_cycle(int shader_enum, int direction);
 #endif
@@ -86,6 +87,7 @@ extern int mainMenu_footerSize;
 extern int mainMenu_screenOffsetY;
 extern int mainMenu_screenOffsetX;
 extern int mainMenu_autoCrop;
+extern int mainMenu_displayAuto;
 extern int mainMenu_ntsc;
 extern int mainMenu_frameskip;
 extern int mainMenu_vkbdLanguage;
