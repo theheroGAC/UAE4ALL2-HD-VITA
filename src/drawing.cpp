@@ -77,11 +77,36 @@ static int var_LINETOSCR_X_ADJUST_BYTES = 144;
 static char screenshot_filename_default[255] = { "" };
 char *screenshot_filename = (char *) &screenshot_filename_default[0];
 
+int init_display_area_auto(int newWidth)
+{
+	int max_units = max_diwlastword;
+	if (!displayAutoMode)
+		return 0;
+	if (max_units < 2)
+		max_units = 412;
+	if (prSDLScreen != NULL) {
+		int pitch_units = (int)(prSDLScreen->pitch / GFXVIDINFO_PIXBYTES);
+		int surface_units = mainMenu_displayHires ? (pitch_units >> 1) : pitch_units;
+		if (surface_units < max_units)
+			max_units = surface_units;
+	}
+	if (max_units < 1)
+		max_units = 1;
+	var_GFXVIDINFO_WIDTH = max_units;
+	var_VISIBLE_LEFT_BORDER = 0;
+	var_VISIBLE_RIGHT_BORDER = max_units;
+	var_LINETOSCR_X_ADJUST_BYTES = 0;
+	return 1;
+}
+
 // newWidth is always in LORES
 void InitDisplayArea(int newWidth)
 {
 	int deltaToBorder = newWidth - 320;
-	
+
+	if (init_display_area_auto (newWidth))
+		return;
+
 	var_GFXVIDINFO_WIDTH = newWidth;
 	var_VISIBLE_LEFT_BORDER = 73 - (deltaToBorder >> 1);
 	var_VISIBLE_RIGHT_BORDER = 393 + (deltaToBorder >> 1);
@@ -169,6 +194,29 @@ static int thisframe_y_adjust;
 static int thisframe_y_adjust_real, max_ypos_thisframe, min_ypos_for_screen;
 static int extra_y_adjust;
 int moveX = 0, moveY = 0;
+
+int displayAutoMode = 0;
+struct AutoDisplayRect autoDisplayRect;
+static int auto_display_timer = 0;
+static int auto_display_status_width = 0;
+static int auto_display_area_lines = 0;
+static struct AutoDisplayRect last_cleared_auto_rect;
+int auto_display_needs_clear = 1;
+
+void reset_auto_display (void)
+{
+    autoDisplayRect.left = 0;
+    autoDisplayRect.width = 0;
+    autoDisplayRect.top = 0;
+    autoDisplayRect.height = 0;
+    autoDisplayRect.hires = 0;
+    autoDisplayRect.valid = 0;
+    auto_display_timer = 0;
+    auto_display_status_width = 0;
+    auto_display_area_lines = 0;
+    auto_display_needs_clear = 1;
+    memset(&last_cleared_auto_rect, 0, sizeof(last_cleared_auto_rect));
+}
 
 /* A frame counter that forces a redraw after at least one skipped frame in
    interlace mode.  */
@@ -485,13 +533,13 @@ static __inline__ void fill_line (void)
 	}
 	else
 	{
-		nints = var_GFXVIDINFO_WIDTH /2;
+		nints = (var_GFXVIDINFO_WIDTH + 1) / 2;
 		start = (int *)(((char *)xlinebuffer) + (var_VISIBLE_LEFT_BORDER << 1));
 	}
 
 	val = colors_for_drawing.acolors[0];
 	val |= val << 16;
-	for (; nints > 0; nints -= 8, start += 8) {
+	for (; nints >= 8; nints -= 8, start += 8) {
 		*start = val;
 		*(start+1) = val;
 		*(start+2) = val;
@@ -501,6 +549,8 @@ static __inline__ void fill_line (void)
 		*(start+6) = val;
 		*(start+7) = val;
 	}
+	for (; nints > 0; nints--, start++)
+		*start = val;
 }
 
 static void dummy_worker (int start, int stop)
@@ -2171,6 +2221,11 @@ static _INLINE_ void write_tdletter (int x, int y, char ch)
     }
 }
 
+static _INLINE_ int status_area_lines (void)
+{
+    return auto_display_area_lines > 0 ? auto_display_area_lines : mainMenu_displayedLines;
+}
+
 static _INLINE_ void draw_status_line (int line, int top_mode)
 {
     int x, y, i, j, led, on;
@@ -2178,19 +2233,34 @@ static _INLINE_ void draw_status_line (int line, int top_mode)
     int track;
     int gfxvid_width;
 
-    if (mainMenu_displayHires)
+    if (auto_display_status_width > 0)
+        gfxvid_width = auto_display_status_width;
+    else if (mainMenu_displayHires)
         gfxvid_width = var_GFXVIDINFO_WIDTH * 2;
     else
         gfxvid_width = var_GFXVIDINFO_WIDTH;
+
+    if (prSDLScreen != NULL) {
+        int row_pixels = (int)(prSDLScreen->pitch / GFXVIDINFO_PIXBYTES);
+        if (gfxvid_width > row_pixels)
+            gfxvid_width = row_pixels;
+    }
+    if (gfxvid_width < TD_PADX + TD_LED_WIDTH)
+        gfxvid_width = TD_PADX + TD_LED_WIDTH;
 
     if (td_pos & TD_RIGHT)
         x = gfxvid_width - TD_PADX - 6 * TD_WIDTH;
     else
         x = TD_PADX;
 
-    y = top_mode ? line : line - (mainMenu_displayedLines - TD_TOTAL_HEIGHT);
+    y = top_mode ? line : line - (status_area_lines() - TD_TOTAL_HEIGHT);
     xlinebuffer = row_map[line];
     x += 100 - (TD_WIDTH * (mainMenu_drives - 1)) - TD_WIDTH;
+
+    if (x + TD_LED_WIDTH + TD_WIDTH * (mainMenu_drives + 2) > gfxvid_width)
+        x = gfxvid_width - TD_LED_WIDTH - TD_WIDTH * (mainMenu_drives + 2);
+    if (x < TD_PADX)
+        x = TD_PADX;
 
     uae4all_memclr(xlinebuffer + (x - 4) * GFXVIDINFO_PIXBYTES, (gfxvid_width - x + 4) * GFXVIDINFO_PIXBYTES);
 
@@ -2242,16 +2312,28 @@ static _INLINE_ void draw_status_vertical (int line)
     int off_rgb;
     int c;
 
-    if (mainMenu_displayHires)
+    if (auto_display_status_width > 0)
+        gfxvid_width = auto_display_status_width;
+    else if (mainMenu_displayHires)
         gfxvid_width = var_GFXVIDINFO_WIDTH * 2;
     else
         gfxvid_width = var_GFXVIDINFO_WIDTH;
 
+    if (prSDLScreen != NULL) {
+        int row_pixels = (int)(prSDLScreen->pitch / GFXVIDINFO_PIXBYTES);
+        if (gfxvid_width > row_pixels)
+            gfxvid_width = row_pixels;
+    }
+    if (gfxvid_width < TD_PADX + 24)
+        gfxvid_width = TD_PADX + 24;
+
     if (count < 3) count = 3;
     if (count > 8) count = 8;
     total_h = count * segment_h + (count - 1) * segment_gap;
-    first_y = (mainMenu_displayedLines - total_h) / 2;
+    first_y = (status_area_lines() - total_h) / 2;
     x = gfxvid_width - TD_PADX - 10;
+    if (x < TD_PADX)
+        x = TD_PADX;
     xlinebuffer = row_map[line];
 
     uae4all_memclr(xlinebuffer + (x - 2) * GFXVIDINFO_PIXBYTES, 14 * GFXVIDINFO_PIXBYTES);
@@ -2291,6 +2373,7 @@ void reset_auto_crop(void)
     auto_crop_shrink_timer = 0;
     auto_crop_cached_start = -1;
     auto_crop_throttle = 0;
+    reset_auto_display();
 }
 
 static _INLINE_ void finish_drawing_frame (void)
@@ -2298,6 +2381,66 @@ static _INLINE_ void finish_drawing_frame (void)
 	int i;
 
 	lockscr();
+
+	int auto_display = 0;
+	int auto_start_line = -1;
+
+	if (auto_display_needs_clear > 0 && !displayAutoMode) {
+		uae4all_memclr (gfx_mem, gfx_rowbytes * (unsigned)(prSDLScreen != NULL ? prSDLScreen->h : mainMenu_displayedLines));
+		auto_display_needs_clear--;
+	}
+
+	if (displayAutoMode) {
+		int auto_scan_end = linestate_first_undecided;
+		if (auto_scan_end > maxvpos + 1)
+			auto_scan_end = maxvpos + 1;
+		if (auto_scan_end < minfirstline)
+			auto_scan_end = minfirstline;
+
+		struct AutoDisplayRect frameRect;
+		auto_display_scan_decisions (line_decisions, curr_drawinfo, auto_scan_end,
+			diwfirstword, diwlastword, plffirstline, plflastline,
+			minfirstline, maxvpos, max_diwlastword,
+			AUTO_DISPLAY_SURFACE_HEIGHT, &frameRect);
+		auto_display_commit (&autoDisplayRect, &frameRect, minfirstline, maxvpos,
+			AUTO_DISPLAY_SURFACE_HEIGHT, AUTO_DISPLAY_SHRINK_FRAMES, &auto_display_timer);
+		if (autoDisplayRect.valid) {
+			int vleft, vright, vadj;
+			int max_units = max_diwlastword;
+			if (prSDLScreen != NULL) {
+				int surface_units = autoDisplayRect.hires ? (prSDLScreen->w >> 1) : prSDLScreen->w;
+				if (surface_units < max_units)
+					max_units = surface_units;
+			}
+			auto_display = 1;
+			mainMenu_displayHires = autoDisplayRect.hires;
+			auto_display_source (&autoDisplayRect, max_units, &vleft, &vright, &vadj, &auto_start_line);
+			var_GFXVIDINFO_WIDTH = vright - vleft;
+			var_VISIBLE_LEFT_BORDER = vleft;
+			var_VISIBLE_RIGHT_BORDER = vright;
+			var_LINETOSCR_X_ADJUST_BYTES = vadj - moveX;
+			auto_display_status_width = (vright - vleft) * (autoDisplayRect.hires ? 2 : 1);
+
+			int rect_changed = (auto_display_needs_clear > 0) ||
+				last_cleared_auto_rect.left != autoDisplayRect.left ||
+				last_cleared_auto_rect.width != autoDisplayRect.width ||
+				last_cleared_auto_rect.top != autoDisplayRect.top ||
+				last_cleared_auto_rect.height != autoDisplayRect.height ||
+				last_cleared_auto_rect.hires != autoDisplayRect.hires ||
+				!last_cleared_auto_rect.valid;
+
+			if (rect_changed) {
+				uae4all_memclr (gfx_mem, gfx_rowbytes * (unsigned)(prSDLScreen != NULL ? prSDLScreen->h : mainMenu_displayedLines));
+				last_cleared_auto_rect = autoDisplayRect;
+				if (auto_display_needs_clear > 0)
+					auto_display_needs_clear--;
+				write_log ("[VITA] auto geometry: rect %d,%d %dx%d hires=%d w=%d ladj=%d\n",
+					autoDisplayRect.left, autoDisplayRect.top, autoDisplayRect.width,
+					autoDisplayRect.height, autoDisplayRect.hires, var_GFXVIDINFO_WIDTH,
+					var_LINETOSCR_X_ADJUST_BYTES);
+			}
+		}
+	}
 
 	if(mainMenu_displayHires)
 	{
@@ -2317,7 +2460,7 @@ static _INLINE_ void finish_drawing_frame (void)
 		default_start = window_first;
 	int start_line = default_start;
 
-	if (mainMenu_autoCrop && mainMenu_displayedLines < 286) {
+	if (!auto_display && mainMenu_autoCrop && mainMenu_displayedLines < 286) {
 		if (auto_crop_cached_start != -1 && (++auto_crop_throttle % 16) != 0) {
 			start_line = auto_crop_cached_start;
 		} else {
@@ -2406,22 +2549,37 @@ static _INLINE_ void finish_drawing_frame (void)
 		}
 	}
 
+	if (auto_display) {
+		start_line = auto_start_line;
+		if (start_line < window_first)
+			start_line = window_first;
+		if (start_line + autoDisplayRect.height - 1 > window_last)
+			start_line = window_last - autoDisplayRect.height + 1;
+		if (start_line < window_first)
+			start_line = window_first;
+	} else {
 #if defined(__PSP2__)
-	int screen_offset_lines = (mainMenu_screenOffsetY * mainMenu_displayedLines) / 544;
-	start_line += moveY - screen_offset_lines;
+		int screen_offset_lines = (mainMenu_screenOffsetY * mainMenu_displayedLines) / 544;
+		start_line += moveY - screen_offset_lines;
 #else
-	start_line += moveY;
+		start_line += moveY;
 #endif
 
-	if (start_line < window_first)
-		start_line = window_first;
-	int max_start_line = window_last - mainMenu_displayedLines + 1;
-	if (max_start_line < window_first)
-		max_start_line = window_first;
-	if (start_line > max_start_line)
-		start_line = max_start_line;
+		if (start_line < window_first)
+			start_line = window_first;
+		int max_start_line = window_last - mainMenu_displayedLines + 1;
+		if (max_start_line < window_first)
+			max_start_line = window_first;
+		if (start_line > max_start_line)
+			start_line = max_start_line;
+	}
 
-	for (i = 0; i < mainMenu_displayedLines; i++) {
+	int draw_lines = auto_display ? autoDisplayRect.height : mainMenu_displayedLines;
+	if (draw_lines > mainMenu_displayedLines)
+		draw_lines = mainMenu_displayedLines;
+	auto_display_area_lines = auto_display ? draw_lines : 0;
+
+	for (i = 0; i < draw_lines; i++) {
 		int active_line = start_line + i;
 		if (active_line < minfirstline || active_line >= linestate_first_undecided || active_line > maxvpos)
 			pfield_draw_line (minfirstline, i);
@@ -2456,14 +2614,14 @@ static _INLINE_ void finish_drawing_frame (void)
 	if (mainMenu_showStatus == 0 || mainMenu_showStatus == 1)
 	{
 		int top_mode = mainMenu_showStatus == 1;
-		int first_line = top_mode ? 0 : mainMenu_displayedLines - TD_TOTAL_HEIGHT;
+		int first_line = top_mode ? 0 : status_area_lines() - TD_TOTAL_HEIGHT;
 		if (first_line < 0) first_line = 0;
-		for (i = 0; i < TD_TOTAL_HEIGHT && first_line + i < mainMenu_displayedLines; i++)
+		for (i = 0; i < TD_TOTAL_HEIGHT && first_line + i < status_area_lines(); i++)
 			draw_status_line(first_line + i, top_mode);
 	}
 	else if (mainMenu_showStatus == 3)
 	{
-		for (i = 0; i < mainMenu_displayedLines; i++)
+		for (i = 0; i < status_area_lines(); i++)
 			draw_status_vertical(i);
 	}
 	drawfinished=1;

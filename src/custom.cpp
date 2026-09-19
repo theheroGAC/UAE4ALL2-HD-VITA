@@ -2999,7 +2999,10 @@ int cd32_get_bit(int port, int shift)
         case 3: return (buttonA[host] || (port == 1 && buttonA[0])) ? 0 : 1;
         case 4: return (triggerR[host] || (port == 1 && triggerR[0])) ? 0 : 1;
         case 5: return (triggerL[host] || (port == 1 && triggerL[0])) ? 0 : 1;
-        case 6: return (buttonStart[host] || (port == 1 && buttonStart[0])) ? 0 : 1;
+        case 6:
+            if (!is_cd32_mode())
+                return 1;
+            return (buttonStart[host] || (port == 1 && buttonStart[0])) ? 0 : 1;
         case 7: return 1;
         case 8: return 0;
         default: return 0;

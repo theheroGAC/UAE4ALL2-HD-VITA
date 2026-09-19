@@ -109,53 +109,32 @@ static const unsigned char s_osd_font_8x8[96][8] = {
     {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}
 };
 
-static void draw_activity_lights(SDL_Surface *surface)
-{
-    int size = surface->w / 960 * 8;
-    int gap = surface->w / 960 * 3;
-    int total = (size + gap) * 5 - gap;
-    int start_x = surface->w - total - surface->w / 960 * 10;
-    int y = surface->h / 544 * 8;
-    int i;
+#if defined(__PSP2__) || defined(__SWITCH__)
+#include "auto_display.h"
+extern int mainMenu_displayAuto;
+extern int auto_display_needs_clear;
+extern struct AutoDisplayRect autoDisplayRect;
+#endif
 
-    if (size < 4) size = 4;
-    if (gap < 2) gap = 2;
-    if (start_x < 0) start_x = 0;
-    if (y < 2) y = 2;
-
-    for (i = 0; i < 4; i++) {
-        SDL_Rect rect;
-        Uint32 color = gui_data.drive_motor[i]
-            ? SDL_MapRGB(surface->format, 0, 255, 80)
-            : SDL_MapRGB(surface->format, 0, 50, 20);
-        rect.x = (Sint16)(start_x + i * (size + gap));
-        rect.y = (Sint16)y;
-        rect.w = (Uint16)size;
-        rect.h = (Uint16)size;
-        SDL_FillRect(surface, &rect, color);
-    }
-
-    {
-        SDL_Rect rect;
-        Uint32 color;
-        int state = is_cd32_mode() ? ((gui_data.cdled != HDLED_OFF) ? gui_data.cdled : gui_data.hdled) : gui_data.hdled;
-        if (state == HDLED_WRITE)
-            color = SDL_MapRGB(surface->format, 255, 50, 30);
-        else if (state == HDLED_READ)
-            color = SDL_MapRGB(surface->format, 40, 120, 255);
-        else
-            color = SDL_MapRGB(surface->format, 15, 25, 70);
-        rect.x = (Sint16)(start_x + 4 * (size + gap));
-        rect.y = (Sint16)y;
-        rect.w = (Uint16)size;
-        rect.h = (Uint16)size;
-        SDL_FillRect(surface, &rect, color);
-    }
-}
+static SDL_Rect s_dirty_rect[2] = {};
+static int s_needs_erase = 0;
+static int s_buf_idx = 0;
 
 static void draw_osd_message(SDL_Surface *surface)
 {
     if (show_message <= 0 || !show_message_str || show_message_str[0] == '\0') {
+        if (s_needs_erase > 0) {
+            if (s_dirty_rect[s_buf_idx].w > 0 && s_dirty_rect[s_buf_idx].h > 0) {
+                SDL_FillRect(surface, &s_dirty_rect[s_buf_idx], 0);
+                s_dirty_rect[s_buf_idx].w = 0;
+                s_dirty_rect[s_buf_idx].h = 0;
+            }
+            s_buf_idx = 1 - s_buf_idx;
+            s_needs_erase--;
+#if defined(__PSP2__) || defined(__SWITCH__)
+            auto_display_needs_clear = 2;
+#endif
+        }
         return;
     }
 
@@ -165,31 +144,61 @@ static void draw_osd_message(SDL_Surface *surface)
         return;
     }
 
-    int scale = (surface->w >= 640) ? 2 : 1;
+    int scale = 1;
     int char_w = 8 * scale;
     int char_h = 8 * scale;
-    int pad_x = 8 * scale;
-    int pad_y = 5 * scale;
+    int pad_x = 5 * scale;
+    int pad_y = 2 * scale;
 
     int text_w = len * char_w;
     int box_w = text_w + pad_x * 2;
     int box_h = char_h + pad_y * 2;
 
-    if (box_w > surface->w - 8) {
-        box_w = surface->w - 8;
+    int active_w = surface->w;
+#if defined(__PSP2__) || defined(__SWITCH__)
+    if (mainMenu_displayAuto && autoDisplayRect.valid && autoDisplayRect.width > 0) {
+        active_w = autoDisplayRect.hires ? (autoDisplayRect.width * 2) : autoDisplayRect.width;
+        if (active_w > surface->w)
+            active_w = surface->w;
+    }
+#endif
+
+    if (box_w > active_w - 4) {
+        box_w = active_w - 4;
+    }
+    if (box_w > surface->w - 4) {
+        box_w = surface->w - 4;
     }
 
-    int box_x = (surface->w - box_w) / 2;
-    int box_y = 12 * scale;
+    int box_x = (active_w - box_w) / 2;
+    if (box_x < 2)
+        box_x = 2;
+    if (box_x + box_w > surface->w - 2)
+        box_x = surface->w - box_w - 2;
+
+    int box_y = 4 * scale;
     if (box_y + box_h > surface->h) {
         box_y = surface->h - box_h - 2;
     }
+    if (box_y < 0)
+        box_y = 0;
 
     SDL_Rect bg_rect;
     bg_rect.x = (Sint16)box_x;
     bg_rect.y = (Sint16)box_y;
     bg_rect.w = (Uint16)box_w;
     bg_rect.h = (Uint16)box_h;
+
+    SDL_Rect clear_rect;
+    clear_rect.x = (Sint16)(box_x > 0 ? box_x - 1 : 0);
+    clear_rect.y = (Sint16)(box_y > 0 ? box_y - 1 : 0);
+    clear_rect.w = (Uint16)(box_w + 2);
+    clear_rect.h = (Uint16)(box_h + 2);
+    s_dirty_rect[s_buf_idx] = clear_rect;
+    s_dirty_rect[1 - s_buf_idx] = clear_rect;
+    s_buf_idx = 1 - s_buf_idx;
+    s_needs_erase = 2;
+
     Uint32 bg_col = SDL_MapRGB(surface->format, 16, 20, 28);
     SDL_FillRect(surface, &bg_rect, bg_col);
 
@@ -274,7 +283,6 @@ void OSD_Render(SDL_Surface *surface)
                        surface->w, surface->h, surface->format ? (int)surface->format->BitsPerPixel : -1, s_osd_visible ? 1 : 0);
         }
     }
-    draw_activity_lights(surface);
     draw_osd_message(surface);
     if (!s_osd_visible) return;
 

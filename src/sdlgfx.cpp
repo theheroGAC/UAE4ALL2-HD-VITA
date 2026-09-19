@@ -181,6 +181,9 @@ void flush_block ()
 #else
 			usleep((next_synctime - start) - 1000);
 #endif
+#if defined(__PSP2__)
+		vita_apply_auto_display_scaling();
+#endif
 		OSD_Render(prSDLScreen);
 		SDL_Flip(prSDLScreen);
 		last_synctime = read_processor_time();
@@ -239,8 +242,12 @@ void flush_block ()
 
 void black_screen_now(void)
 {
-	SDL_FillRect(prSDLScreen,NULL,0);
-	SDL_Flip(prSDLScreen);
+	if (prSDLScreen != NULL) {
+		for (int i = 0; i < 3; i++) {
+			SDL_FillRect(prSDLScreen, NULL, 0);
+			SDL_Flip(prSDLScreen);
+		}
+	}
 }
 
 static __inline__ int bitsInMask (unsigned long mask)

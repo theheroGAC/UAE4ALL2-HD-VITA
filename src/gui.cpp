@@ -1154,26 +1154,55 @@ if(!vkbd_mode)
 	if(triggerL[0] && triggerR[0])
 #endif
 	{
+#if defined(__PSP2__) || defined(__SWITCH__)
+#ifdef USE_UAE4ALL_VKBD
+		if (vkbd_mode) {
+			vkbd_mode = 0;
+			extern int auto_display_needs_clear;
+			auto_display_needs_clear = 2;
+		}
+#endif
+#endif
 		//up
 		if(dpadUp[0])
 		{
+#if defined(__PSP2__) || defined(__SWITCH__)
+			if (mainMenu_displayAuto != 0)
+			{
+				gui_set_message("Auto Display: Centered", 40);
+			}
+			else
+			{
+				moveVertical(1);
+				moved_y += 2;
+				char msg[64];
+				snprintf(msg, sizeof(msg), "Offset Y: %+d", moveY);
+				gui_set_message(msg, 45);
+			}
+#else
 			moveVertical(1);
 			moved_y += 2;
-#if defined(__PSP2__) || defined(__SWITCH__)
-			char msg[64];
-			snprintf(msg, sizeof(msg), "Offset Y: %+d", moveY);
-			gui_set_message(msg, 45);
 #endif
 		}
 		//down
 		else if(dpadDown[0])
 		{
+#if defined(__PSP2__) || defined(__SWITCH__)
+			if (mainMenu_displayAuto != 0)
+			{
+				gui_set_message("Auto Display: Centered", 40);
+			}
+			else
+			{
+				moveVertical(-1);
+				moved_y -= 2;
+				char msg[64];
+				snprintf(msg, sizeof(msg), "Offset Y: %+d", moveY);
+				gui_set_message(msg, 45);
+			}
+#else
 			moveVertical(-1);
 			moved_y -= 2;
-#if defined(__PSP2__) || defined(__SWITCH__)
-			char msg[64];
-			snprintf(msg, sizeof(msg), "Offset Y: %+d", moveY);
-			gui_set_message(msg, 45);
 #endif
 		}
 		//left
@@ -1184,26 +1213,34 @@ if(!vkbd_mode)
 // quickSwitch resolution presets
 			if (can_change_quickSwitchModeID)
 			{			
-				static const int vita_quick_presets[] = { 0, 1, 2, 3, 4, 5, 7, 8 };
-				const int preset_count = (int)(sizeof(vita_quick_presets) / sizeof(vita_quick_presets[0]));
-				int width_group = (presetModeId / 10) * 10;
-				int cur_var = presetModeId % 10;
-				int cur_idx = 0;
-				for (int p = 0; p < preset_count; p++) {
-					if (vita_quick_presets[p] == cur_var) {
-						cur_idx = p;
-						break;
-					}
+				if (mainMenu_displayAuto != 0)
+				{
+					gui_set_message("Auto Display: Locked", 50);
+					can_change_quickSwitchModeID = 0;
 				}
-				cur_idx = (cur_idx - 1 + preset_count) % preset_count;
-				SetPresetMode(width_group + vita_quick_presets[cur_idx]);
-				getChanges();
-				check_all_prefs();
-				update_display();
-				char msg[128];
-				snprintf(msg, sizeof(msg), "%s", presetMode);
-				gui_set_message(msg, 60);
-				can_change_quickSwitchModeID = 0;
+				else
+				{
+					static const int vita_quick_presets[] = { 0, 1, 2, 3, 4, 5, 7, 8 };
+					const int preset_count = (int)(sizeof(vita_quick_presets) / sizeof(vita_quick_presets[0]));
+					int width_group = (presetModeId / 10) * 10;
+					int cur_var = presetModeId % 10;
+					int cur_idx = 0;
+					for (int p = 0; p < preset_count; p++) {
+						if (vita_quick_presets[p] == cur_var) {
+							cur_idx = p;
+							break;
+						}
+					}
+					cur_idx = (cur_idx - 1 + preset_count) % preset_count;
+					SetPresetMode(width_group + vita_quick_presets[cur_idx]);
+					getChanges();
+					check_all_prefs();
+					update_display();
+					char msg[128];
+					snprintf(msg, sizeof(msg), "%s", presetMode);
+					gui_set_message(msg, 60);
+					can_change_quickSwitchModeID = 0;
+				}
 			}
 #else
 			screenWidth -=10;
@@ -1218,26 +1255,34 @@ if(!vkbd_mode)
 #if defined(__PSP2__) || defined(__SWITCH__)
 			if (can_change_quickSwitchModeID)
 			{
-				static const int vita_quick_presets[] = { 0, 1, 2, 3, 4, 5, 7, 8 };
-				const int preset_count = (int)(sizeof(vita_quick_presets) / sizeof(vita_quick_presets[0]));
-				int width_group = (presetModeId / 10) * 10;
-				int cur_var = presetModeId % 10;
-				int cur_idx = 0;
-				for (int p = 0; p < preset_count; p++) {
-					if (vita_quick_presets[p] == cur_var) {
-						cur_idx = p;
-						break;
-					}
+				if (mainMenu_displayAuto != 0)
+				{
+					gui_set_message("Auto Display: Locked", 50);
+					can_change_quickSwitchModeID = 0;
 				}
-				cur_idx = (cur_idx + 1) % preset_count;
-				SetPresetMode(width_group + vita_quick_presets[cur_idx]);
-				getChanges();
-				check_all_prefs();
-				update_display();
-				char msg[128];
-				snprintf(msg, sizeof(msg), "%s", presetMode);
-				gui_set_message(msg, 60);
-				can_change_quickSwitchModeID = 0;
+				else
+				{
+					static const int vita_quick_presets[] = { 0, 1, 2, 3, 4, 5, 7, 8 };
+					const int preset_count = (int)(sizeof(vita_quick_presets) / sizeof(vita_quick_presets[0]));
+					int width_group = (presetModeId / 10) * 10;
+					int cur_var = presetModeId % 10;
+					int cur_idx = 0;
+					for (int p = 0; p < preset_count; p++) {
+						if (vita_quick_presets[p] == cur_var) {
+							cur_idx = p;
+							break;
+						}
+					}
+					cur_idx = (cur_idx + 1) % preset_count;
+					SetPresetMode(width_group + vita_quick_presets[cur_idx]);
+					getChanges();
+					check_all_prefs();
+					update_display();
+					char msg[128];
+					snprintf(msg, sizeof(msg), "%s", presetMode);
+					gui_set_message(msg, 60);
+					can_change_quickSwitchModeID = 0;
+				}
 			}
 #else
 			screenWidth +=10;
@@ -2174,6 +2219,39 @@ if(!vkbd_mode)
 #endif // __PSP2__
 
 	static int justPressedStart[MAX_NUM_CONTROLLERS] = {};
+#if defined(__PSP2__) || defined(__SWITCH__)
+	static int start_hold_frames = 0;
+	if (buttonStart[0] && !triggerR[0] && !triggerL[0] && !buttonSelect[0])
+	{
+		start_hold_frames++;
+		if (!justPressedStart[0] && start_hold_frames >= 3)
+		{
+#ifdef USE_UAE4ALL_VKBD
+			vkbd_mode = 1;
+			justLK = 1;
+#endif
+			if (is_cd32_mode())
+			{
+				uae4all_keystate[AK_P] = 1;
+				record_key(AK_P << 1);
+			}
+			justPressedStart[0] = 1;
+		}
+	}
+	else
+	{
+		start_hold_frames = 0;
+		if (justPressedStart[0])
+		{
+			if (is_cd32_mode())
+			{
+				uae4all_keystate[AK_P] = 0;
+				record_key((AK_P << 1) | 1);
+			}
+			justPressedStart[0] = 0;
+		}
+	}
+#else
 	if (buttonStart[0] && !triggerR[0] && !triggerL[0] && !buttonSelect[0] && !mainMenu_customControls)
 	{
 		if (!justPressedStart[0])
@@ -2202,6 +2280,7 @@ if(!vkbd_mode)
 		}
 		justPressedStart[0] = 0;
 	}
+#endif
 
 } // if(!vkbd_mode)
 
@@ -2214,6 +2293,8 @@ if(!vkbd_mode)
 			vkbd_mode = 0;
 			buttonStart[0] = 0;
 			justLK = 1;
+			extern int auto_display_needs_clear;
+			auto_display_needs_clear = 2;
 		}
 	}
 	else if ((buttonSelect[0] && buttonStart[0]) || (buttonSelect[0] && triggerR[0]))
@@ -2224,9 +2305,11 @@ if(!vkbd_mode)
 			buttonSelect[0] = 0;
 			buttonStart[0] = 0;
 			justLK = 1;
+			extern int auto_display_needs_clear;
+			auto_display_needs_clear = 2;
 		}
 	}
-	else if (justLK)
+	else if (justLK && !buttonStart[0] && !buttonSelect[0] && !triggerR[0])
 		justLK = 0;
 #else
 	//L+K: virtual keyboard

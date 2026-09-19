@@ -9,8 +9,11 @@
 #include "vkbd.h"
 
 #include "keyboard.h"
+#include "auto_display.h"
 #if defined(__PSP2__)
 #include "menu_config.h"
+extern struct AutoDisplayRect autoDisplayRect;
+extern int mainMenu_displayAuto;
 #endif
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
@@ -755,11 +758,36 @@ void vkbd_redraw(void)
 		}
 	}
 
-	if (vkbd_y>prSDLScreen->h-myCanvas->h) 
-		vkbd_y=prSDLScreen->h-myCanvas->h;
-		
-	vkbd_x=(prSDLScreen->w-myCanvas->w)/2;
-	
+	int visible_w = prSDLScreen->w;
+	int visible_h = prSDLScreen->h;
+#if defined(__PSP2__)
+	if (mainMenu_displayAuto && autoDisplayRect.valid && autoDisplayRect.height > 0) {
+		visible_h = autoDisplayRect.height;
+		if (autoDisplayRect.width > 0)
+			visible_w = autoDisplayRect.width;
+	}
+#endif
+
+	if (mainMenu_vkbdPosition == 1)
+		vkbd_y = 0;
+	else if (mainMenu_vkbdPosition == 2)
+		vkbd_y = (visible_h - myCanvas->h) / 2;
+	else {
+		// default / bottom
+		if (vkbd_y > visible_h - myCanvas->h || vkbd_y <= 0)
+			vkbd_y = visible_h - myCanvas->h;
+	}
+	if (vkbd_y < 0)
+		vkbd_y = 0;
+	if (vkbd_y > prSDLScreen->h - myCanvas->h)
+		vkbd_y = prSDLScreen->h - myCanvas->h;
+
+	vkbd_x = (visible_w - myCanvas->w) / 2;
+	if (vkbd_x < 0)
+		vkbd_x = 0;
+	if (vkbd_x > prSDLScreen->w - myCanvas->w)
+		vkbd_x = prSDLScreen->w - myCanvas->w;
+
 	r.x=vkbd_x;	
 	r.y=vkbd_y;	
 	r.w=myCanvas->w;
@@ -843,10 +871,15 @@ void vkbd_displace_up(void)
 
 void vkbd_displace_down(void)
 {
-	if (vkbd_y<prSDLScreen->h-ksur->h-3)
-		vkbd_y+=4;
+	int visible_h = prSDLScreen ? prSDLScreen->h : mainMenu_displayedLines;
+#if defined(__PSP2__)
+	if (mainMenu_displayAuto && autoDisplayRect.valid && autoDisplayRect.height > 0)
+		visible_h = autoDisplayRect.height;
+#endif
+	if (vkbd_y < visible_h - ksur->h - 3)
+		vkbd_y += 4;
 	else
-		vkbd_y=prSDLScreen->h-ksur->h;
+		vkbd_y = visible_h - ksur->h;
 }		
 
 int vkbd_touch_xy_to_actual(float touch_x, float touch_y)
@@ -888,8 +921,10 @@ int vkbd_touch_xy_to_actual(float touch_x, float touch_y)
 	x_offset = (display_width - scaled_width) / 2;
 	y_offset = (display_height - scaled_height) / 2;
 #endif
-	x = (((touch_x * display_width) - x_offset) * visibleAreaWidth) / scaled_width;
-	y = (((touch_y * display_height) - y_offset) * mainMenu_displayedLines) / scaled_height;
+	int surface_w = (prSDLScreen != NULL) ? prSDLScreen->w : visibleAreaWidth;
+	int surface_h = (prSDLScreen != NULL) ? prSDLScreen->h : mainMenu_displayedLines;
+	x = (((touch_x * display_width) - x_offset) * surface_w) / scaled_width;
+	y = (((touch_y * display_height) - y_offset) * surface_h) / scaled_height;
 	x -= vkbd_x;
 	y -= vkbd_y;
 	if (mainMenu_displayHires)
