@@ -1278,7 +1278,7 @@ void vita_show_about_box(void)
 {
     static const CreditLine credits[] = {
         { "UAE4ALL2 HD Vita", CR_TITLE },
-        { "Version 1.09 - Amiga Emulator for PS Vita", CR_SUBTITLE },
+        { "Version 1.10 - Amiga Emulator for PS Vita", CR_SUBTITLE },
         { "", CR_EMPTY },
         { "A high-definition port of the classic UAE4ALL Amiga emulator,", CR_TEXT },
         { "now with WHDLoad, HDF, IPF and CD32 support on the Vita.", CR_TEXT },
@@ -1378,7 +1378,7 @@ void vita_show_about_box(void)
         rot_x += 0.045f;
         rot_y += 0.065f;
         vita_draw_boing_ball_3d(dx + 46.0f, dy + 40.0f, 24.0f, rot_x, rot_y);
-        vita_draw_text(dx + 92.0f, dy + 20.0f, VITA_COLOR_AMIGA_RED, 1.15f, "UAE4ALL2 HD Vita v1.09");
+        vita_draw_text(dx + 92.0f, dy + 20.0f, VITA_COLOR_AMIGA_RED, 1.15f, "UAE4ALL2 HD Vita v1.10");
         vita_draw_text(dx + 92.0f, dy + 44.0f, VITA_COLOR_AMIGA_ORANGE, 0.85f, "About & Credits - WHDLoad Edition");
 
         vita_draw_rounded_rect_outline(dx + 16.0f, dy + 76.0f, dw - 32.0f, 1.0f, 0.0f, 1.0f, VITA_COLOR_CARD_BORDER);
@@ -1508,6 +1508,38 @@ void vita_gui_draw_progress(const char *title, const char *subtitle, float fract
     }
 
     SDL_Flip(prSDLScreen);
+}
+
+void vita_gui_show_launch_loading(const char *game_name)
+{
+    if (!prSDLScreen) return;
+    vita_gui_init();
+    SDL_SetVideoModeScaling(0, 0, VITA_SCREEN_W, VITA_SCREEN_H);
+    SDL_SetVideoModeBilinear(1);
+
+    const char *title = "Caricamento in corso...";
+    const char *sub = (game_name && game_name[0]) ? game_name : "Avvio Amiga...";
+
+    float dw = 580.0f, dh = 180.0f;
+    float dx = (VITA_SCREEN_W - dw) * 0.5f;
+    float dy = (VITA_SCREEN_H - dh) * 0.5f;
+    float bar_x = dx + 36.0f;
+    float bar_y = dy + 114.0f;
+    float bar_w = dw - 72.0f;
+    float bar_h = 18.0f;
+
+    for (int flip = 0; flip < 3; flip++) {
+        SDL_FillRect(prSDLScreen, NULL, 0);
+        vita_draw_card_custom(dx, dy, dw, dh, VITA_COLOR_CARD, VITA_COLOR_AMIGA_ORANGE);
+        vita_draw_text_centered(dx + (dw * 0.5f), dy + 24.0f, VITA_COLOR_AMIGA_RED, 1.15f, title);
+        vita_draw_text_centered(dx + (dw * 0.5f), dy + 68.0f, VITA_COLOR_TEXT_WHITE, 1.00f, sub);
+
+        vita_draw_rounded_rect(bar_x, bar_y, bar_w, bar_h, 4.0f, VITA_COLOR_CARD_BORDER);
+        vita_draw_rounded_rect(bar_x + 1.0f, bar_y + 1.0f, bar_w - 2.0f, bar_h - 2.0f, 3.0f, VITA_COLOR_BG);
+        vita_draw_rounded_rect(bar_x + 2.0f, bar_y + 2.0f, bar_w - 4.0f, bar_h - 4.0f, 2.0f, VITA_COLOR_AMIGA_ORANGE);
+
+        SDL_Flip(prSDLScreen);
+    }
 }
 
 bool vita_show_confirm_box(const char *title, const char *message, const char *yes_label, const char *no_label)
@@ -1894,6 +1926,9 @@ int run_mainMenu_vita(void)
                 break;
         }
 
+        if (mainMenu_case >= 0)
+            break;
+
         vita_draw_footer(NULL, NULL);
 
         SDL_Flip(prSDLScreen);
@@ -1907,6 +1942,18 @@ int run_mainMenu_vita(void)
     inside_menu = 0;
     setCpuSpeed();
     write_log("[VITA] run_mainMenu_vita: exit menu (case=%d)\n", mainMenu_case);
+
+    if (mainMenu_case == MAIN_MENU_CASE_RUN) {
+        const char *game_name = NULL;
+        if (mainMenu_whdload_game[0])
+            game_name = mainMenu_whdload_game;
+        else if (uae4all_image_file0[0]) {
+            const char *slash = strrchr(uae4all_image_file0, '/');
+            game_name = slash ? slash + 1 : uae4all_image_file0;
+        }
+        vita_gui_show_launch_loading(game_name);
+    }
+
     vita_gui_shutdown();
 
     return (mainMenu_case == MAIN_MENU_CASE_RESET) ? 2 : (mainMenu_case == MAIN_MENU_CASE_QUIT ? 0 : 1);

@@ -136,6 +136,7 @@ void vita_show_message_box(const char *title, const char *message, const char *b
 void vita_show_about_box(void);
 bool vita_show_confirm_box(const char *title, const char *message, const char *yes_label, const char *no_label);
 void vita_gui_draw_progress(const char *title, const char *subtitle, float fraction, const char *item_name);
+void vita_gui_show_launch_loading(const char *game_name);
 
 void vita_view_floppy(VitaInputState *input, int *selected_item);
 void vita_view_hard_disk(VitaInputState *input, int *selected_item);

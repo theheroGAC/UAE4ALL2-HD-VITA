@@ -94,6 +94,7 @@ extern int mainMenu_cutRight;
 extern int mainMenu_screenOffsetY;
 extern int mainMenu_screenOffsetX;
 extern int mainMenu_autoCrop;
+extern int mainMenu_displayAuto;
 extern int visibleAreaWidth;
 extern int mainMenu_displayHires;
 extern int mainMenu_case;
@@ -1363,10 +1364,12 @@ void vita_view_whdload(VitaInputState *input, int *selected_item)
             s_whdload_filter = (s_whdload_filter + 1) % 3;
         } else {
             const char *game_name = games[vis_index[*selected_item - 5]];
-            if (vita_whdload_prepare_launch(game_name)) {
-                if (!vita_confirm_eject_for_whdload_launch())
-                    return;
+            if (!vita_confirm_eject_for_whdload_launch())
+                return;
 
+            vita_gui_show_launch_loading(game_name);
+
+            if (vita_whdload_prepare_launch(game_name)) {
                 strncpy(mainMenu_whdload_game, game_name, sizeof(mainMenu_whdload_game) - 1);
                 mainMenu_whdload_game[sizeof(mainMenu_whdload_game) - 1] = '\0';
                 whdload_ensure_game_dir(game_name);
@@ -1383,6 +1386,8 @@ void vita_view_whdload(VitaInputState *input, int *selected_item)
 
                 gui_update();
                 mainMenu_case = MAIN_MENU_CASE_RUN;
+                vita_gui_show_launch_loading(game_name);
+                return;
             } else {
                 vita_show_message_box("WHDLoad Error", "No .slave file was found or the startup script could not be prepared.", "OK (X)");
             }
@@ -1950,7 +1955,7 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
 
 void vita_view_display(VitaInputState *input, int *selected_item)
 {
-    const int total_items = 12;
+    const int total_items = 13;
     const float start_y = VITA_LIST_START_Y;
     const float item_h = VITA_LIST_ITEM_H;
     const float item_gap = VITA_LIST_ITEM_GAP;
@@ -1974,58 +1979,73 @@ void vita_view_display(VitaInputState *input, int *selected_item)
     if (dir != 0) {
         switch (*selected_item) {
             case 0:
-                mainMenu_shader = vita_shader_cycle(mainMenu_shader, dir);
+                mainMenu_displayAuto = (mainMenu_displayAuto + dir + 2) % 2;
                 break;
             case 1:
-                mainMenu_ntsc = (mainMenu_ntsc + dir + 2) % 2;
+                mainMenu_shader = vita_shader_cycle(mainMenu_shader, dir);
                 break;
             case 2:
+                mainMenu_ntsc = (mainMenu_ntsc + dir + 2) % 2;
+                break;
+            case 3:
                 mainMenu_showStatus = (mainMenu_showStatus + dir + 4) % 4;
                 break;
-            case 3: {
-                int width_group = (presetModeId / 10 + dir + 6) % 6;
-                int height_mode = presetModeId % 10;
-                SetPresetMode(width_group * 10 + height_mode);
-                break;
-            }
             case 4: {
-                int width_group = (presetModeId / 10) * 10;
-                int height_mode = (presetModeId % 10 + dir + 9) % 9;
-                SetPresetMode(width_group + height_mode);
+                if (!mainMenu_displayAuto) {
+                    int width_group = (presetModeId / 10 + dir + 6) % 6;
+                    int height_mode = presetModeId % 10;
+                    SetPresetMode(width_group * 10 + height_mode);
+                }
                 break;
             }
-            case 5:
-                mainMenu_autoCrop = (mainMenu_autoCrop + dir + 2) % 2;
+            case 5: {
+                if (!mainMenu_displayAuto) {
+                    int width_group = (presetModeId / 10) * 10;
+                    int height_mode = (presetModeId % 10 + dir + 9) % 9;
+                    SetPresetMode(width_group + height_mode);
+                }
                 break;
+            }
             case 6:
+                if (!mainMenu_displayAuto) {
+                    mainMenu_autoCrop = (mainMenu_autoCrop + dir + 2) % 2;
+                }
+                break;
+            case 7:
                 mainMenu_frameskip += dir;
                 if (mainMenu_frameskip < 0) mainMenu_frameskip = 8;
                 if (mainMenu_frameskip > 8) mainMenu_frameskip = 0;
                 break;
-            case 7:
+            case 8:
                 mainMenu_cutLeft += dir;
                 if (mainMenu_cutLeft < 0) mainMenu_cutLeft = 0;
                 if (mainMenu_cutLeft > 100) mainMenu_cutLeft = 100;
                 break;
-            case 8:
+            case 9:
                 mainMenu_cutRight += dir;
                 if (mainMenu_cutRight < 0) mainMenu_cutRight = 0;
                 if (mainMenu_cutRight > 100) mainMenu_cutRight = 100;
                 break;
-            case 9:
-                moveY += dir;
-                if (moveY < -40) moveY = -40;
-                if (moveY > 128) moveY = 128;
-                break;
             case 10:
-                mainMenu_screenOffsetY += dir * 8;
-                if (mainMenu_screenOffsetY < -128) mainMenu_screenOffsetY = -128;
-                if (mainMenu_screenOffsetY > 128) mainMenu_screenOffsetY = 128;
+                if (!mainMenu_displayAuto) {
+                    moveY += dir;
+                    if (moveY < -40) moveY = -40;
+                    if (moveY > 128) moveY = 128;
+                }
                 break;
             case 11:
-                mainMenu_screenOffsetX += dir * 8;
-                if (mainMenu_screenOffsetX < -128) mainMenu_screenOffsetX = -128;
-                if (mainMenu_screenOffsetX > 128) mainMenu_screenOffsetX = 128;
+                if (!mainMenu_displayAuto) {
+                    mainMenu_screenOffsetY += dir * 8;
+                    if (mainMenu_screenOffsetY < -128) mainMenu_screenOffsetY = -128;
+                    if (mainMenu_screenOffsetY > 128) mainMenu_screenOffsetY = 128;
+                }
+                break;
+            case 12:
+                if (!mainMenu_displayAuto) {
+                    mainMenu_screenOffsetX += dir * 8;
+                    if (mainMenu_screenOffsetX < -128) mainMenu_screenOffsetX = -128;
+                    if (mainMenu_screenOffsetX > 128) mainMenu_screenOffsetX = 128;
+                }
                 break;
         }
         getChanges();
@@ -2078,7 +2098,8 @@ void vita_view_display(VitaInputState *input, int *selected_item)
     char cut_right_value[16];
     snprintf(cut_right_value, sizeof(cut_right_value), "%d px", mainMenu_cutRight);
 
-    const char *item_titles[12] = {
+    const char *item_titles[13] = {
+        "Game Display Mode",
         "Hardware Vita Shader",
         "Screen Refresh & Region",
         "Status Bar (Floppy LED/FPS)",
@@ -2092,19 +2113,20 @@ void vita_view_display(VitaInputState *input, int *selected_item)
         "Game Screen Offset Y",
         "Game Screen Offset X"
     };
-    const char *item_values[12] = {
+    const char *item_values[13] = {
+        mainMenu_displayAuto ? "Auto (DIW / Overscan Fit)" : "Manual",
         vita_shader_label(mainMenu_shader),
         ntsc_names[mainMenu_ntsc % 2],
         status_names[mainMenu_showStatus % 4],
-        width_names[(presetModeId / 10) % 6],
-        aspect_mode,
-        mainMenu_autoCrop ? "Enabled (Auto Fit)" : "Disabled (Manual)",
+        mainMenu_displayAuto ? "[Auto Dynamic]" : width_names[(presetModeId / 10) % 6],
+        mainMenu_displayAuto ? "[Auto Fit]" : aspect_mode,
+        mainMenu_displayAuto ? "[Auto Managed]" : (mainMenu_autoCrop ? "Enabled (Auto Fit)" : "Disabled (Manual)"),
         frameskip_value,
         cut_left_value,
         cut_right_value,
-        vertical_position,
-        screen_offset_y,
-        screen_offset_x
+        mainMenu_displayAuto ? "[Auto Centered]" : vertical_position,
+        mainMenu_displayAuto ? "[Auto Centered]" : screen_offset_y,
+        mainMenu_displayAuto ? "[Auto Centered]" : screen_offset_x
     };
 
     for (int i = 0; i < visible_items; i++) {
@@ -3016,7 +3038,7 @@ void vita_view_system(VitaInputState *input, int *selected_item)
                 }
                 break;
             case 10:
-                if (vita_show_confirm_box("About", "Open UAE4All2 HD v1.09 and credits?", "Yes", "No")) {
+                if (vita_show_confirm_box("About", "Open UAE4All2 HD v1.10 and credits?", "Yes", "No")) {
                     vita_show_about_box();
                 }
                 break;
@@ -3042,7 +3064,7 @@ void vita_view_system(VitaInputState *input, int *selected_item)
         "Reboot Amiga Emulation",
         "Take Screenshot",
         "FTP File Transfer",
-        "About UAE4All2 HD v1.09"
+        "About UAE4All2 HD v1.10"
     };
     static const char *system_subtitles[11] = {
         "Save all disk, display, and hardware settings for current game",
