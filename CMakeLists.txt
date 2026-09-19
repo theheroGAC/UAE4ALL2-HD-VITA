@@ -4,6 +4,7 @@ set(CMAKE_VERBOSE_MAKEFILE OFF)
 set(VERSION_MAJOR 2)
 set(VERSION_MINOR 12)
 option(BUILD_CDROM_TESTS "Build CD-ROM backend tests" OFF)
+option(BUILD_DISPLAY_TESTS "Build automatic display geometry tests" OFF)
 
 if(vita OR DEFINED ENV{VITASDK})
     set(BUILD_PSP2 ON)
@@ -235,7 +236,7 @@ if(BUILD_PSP2)
   add_custom_target(${PROJECT_NAME}.vpk
           DEPENDS ${PROJECT_NAME}.self-self
           COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Generating param.sfo"
-          COMMAND ${VITASDK}/bin/vita-mksfoex -d ATTRIBUTE2=12 -s TITLE_ID=${TITLEID} -s APP_VER=01.09 "UAE4All2 HD" param.sfo
+          COMMAND ${VITASDK}/bin/vita-mksfoex -d ATTRIBUTE2=12 -s TITLE_ID=${TITLEID} -s APP_VER=01.10 "UAE4All2 HD" param.sfo
           COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Packaging uae4all2hd.vpk"
           COMMAND ${VITASDK}/bin/vita-pack-vpk -s param.sfo -b ${PROJECT_NAME}.self -a ${CMAKE_SOURCE_DIR}/psp2data/data=data -a ${CMAKE_SOURCE_DIR}/psp2data/sce_sys=sce_sys uae4all2hd.vpk
   )
@@ -374,5 +375,12 @@ if(BUILD_CDROM_TESTS AND NOT BUILD_PSP2 AND NOT BUILD_NX)
   target_include_directories(cdrom_tests PRIVATE src src/include src/libchdr/include)
   target_link_libraries(cdrom_tests PRIVATE chdr-static)
   add_test(NAME cdrom_backend COMMAND cdrom_tests)
+endif()
+
+if(BUILD_DISPLAY_TESTS AND NOT BUILD_PSP2 AND NOT BUILD_NX)
+  enable_testing()
+  add_executable(auto_display_tests tests/auto_display_tests.cpp)
+  target_include_directories(auto_display_tests PRIVATE src/include)
+  add_test(NAME auto_display COMMAND auto_display_tests)
 endif()
 
