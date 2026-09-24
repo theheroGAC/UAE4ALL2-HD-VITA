@@ -1,4 +1,4 @@
-# UAE4ALL2 HD — PlayStation Vita 1.10
+# UAE4ALL2 HD — PlayStation Vita 1.11
 
 A cleaned PlayStation Vita build of UAE4ALL2 HD, an Amiga emulator based on the UAE4ALL2 project.
 
@@ -18,7 +18,7 @@ uae4all2hd.vpk
 - IPF floppy images through the latest upstream CAPS decoder
 - ZIP, LHA and LZH archives containing Amiga disk images
 - HDF hard-disk images and HD directories (4 HDF slots, boot order selection)
-- Integrated HDF Manager (create, format, and prepare FFS hard-disk images from 50 MB to 4000 MB)
+- Integrated HDF Manager (create, format, and prepare FFS hard-disk images from 50 MB to 8192 MB)
 - Dedicated WHDLoad tab with one-click game launch and automatic A1200 AGA preset configuration
 - Automatic alphabetical (A-Z) library sorting for installed WHDLoad games with support for up to 256 games
 - Custom WHDLoad Arguments editor with native PS Vita OSK keyboard support
@@ -37,9 +37,13 @@ uae4all2hd.vpk
 - Seamless game launch: clean black transition screen displaying "Caricamento in corso..." and game title, eliminating menu ghosting and 1-second freezes during WHDLoad loading
 - Fixed START button handling: toggles the virtual keyboard (VKBD) in non-CD32 games without triggering CD32 Play/Pause
 - Streamlined on-screen indicators: removed redundant top-right activity boxes so only the native UAE status bar renders when enabled
-- Vita menu with floppy, hard disk, WHDLoad, presets, hardware, display, controls, savestates and system tabs
-- About screen with version 1.10 and automatic scrolling credits
-- CD32 Akiko CD controller with native CHD (Compressed Hunks of Data), ISO, raw BIN and multi-track CUE images
+- Vita menu with game library, floppy, hard disk, WHDLoad, presets, hardware, display, controls, savestates and system tabs
+- Game Library tab with recursive scan of the configured folders, cached index, automatic stale check and per-type filtering (All, Favourites, Floppy, WHDLoad, Hard Disk, CD32)
+- One-press game launch from the Library for ADF/IPF, HDF, WHDLoad, LHA and CD32 images, plus TRIANGLE favourites shared with the WHDLoad tab
+- Custom library folders through `ux0:/data/uae4all/library_roots.txt` (up to 8 roots, one per line)
+- Animated Boing Ball startup splash with real initialization stages and progress bar
+- About screen with version 1.11 and automatic scrolling credits
+- CD32 Akiko CD controller with native CHD (Compressed Hunks of Data), ISO, raw BIN, multi-track CUE images and M3U playlists for multi-disc games
 - CD32 in-game status bar with active blue "CD" read/write activity indicator and timeout
 - CD32 internal 1KB NVRAM (24C08 I2C EEPROM) emulation for native in-game saves (`ux0:/data/uae4all/saves/cd32.nvram`)
 - CD32 Quick Menu and 10-slot Savestates with preview thumbnails
@@ -150,7 +154,11 @@ ux0:/data/uae4all/roms/workbench.hdf
 3. In the Hard Disk tab insert it in **HDF1** and set **Boot HD -> HDF Files**.
 4. Press **START**. The emulator boots `DH0:` from the HDF.
 
-The classic installation path is also supported on the Vita itself: mount an empty HDF, boot the Workbench Install ADF in DF0, use HDToolBox with `SCSI_DEVICE_NAME=uaehf.device` (set via the Workbench Icon Information window), create `DH0:`, format it, and run HDSetup. The emulated `uaehf.device` does not answer the SCSI INQUIRY command, so define the drive geometry manually (32 blocks per track, 1 surface, 2 reserved blocks, 512-byte blocks).
+The classic installation path is also supported on the Vita itself: mount an empty HDF, boot the Workbench Install ADF in DF0, use HDToolBox with `SCSI_DEVICE_NAME=uaehf.device` (set via the Workbench Icon Information window), create `DH0:`, format it, and run HDSetup. The emulated `uaehf.device` does not answer the SCSI INQUIRY command, so define the drive geometry manually; the HDF Manager screen shows the exact values to enter (blocks per track, surfaces, reserved blocks, block size and cylinders) for the currently mounted image. Blocks are always 512 bytes, there are 32 sectors per track and 2 reserved blocks; the number of surfaces scales with capacity (1 below 1 GB, 2 up to 2 GB, 4 up to 4 GB, 8 up to 8 GB, 16 from 8 GB).
+
+An empty or unformatted HDF is not bootable, so a floppy image can stay in DF0 while the HDF is mounted as a secondary disk: press **START** with the Workbench/installer ADF in DF0 and the blank HDF mounted to boot from the floppy, partition and format the HDF from HDToolBox, and install onto it. The eject prompt only appears when hard-disk boot is enabled (**Boot HD** set to *HD Directory* or *HDF Files*), a mounted HDF already contains a valid bootblock (`DOS\x`) or partition table (`RDSK`), and a floppy is inserted, because only then does the emulator need the floppy drives free.
+
+The HDF container can be up to 8192 MB (8 GB). Note that the emulated Amiga hard-disk device interface addresses the device with a 32-bit byte offset, so a single Amiga partition remains limited to 4 GB, as on classic UAE/WinUAE and real Amiga hardware. An 8 GB image is valid as a container and can hold multiple partitions created and managed from HDToolBox.
 
 HDF activity is shown by the hard-disk LED and mixed with the emulator audio as a synthesized drive sound.
 
@@ -174,13 +182,14 @@ The dedicated **WHDLoad** tab automates game installation, configuration, and on
 
 ## Supported disk images
 
-The browser recognizes common Amiga disk formats including ADF, ADZ, DMS, IPF, ZIP, LHA and LZH. ZIP and LHA/LZH archives selected from the Floppy tab must contain a supported disk image. LHA archives selected from the WHDLoad tab are extracted as game files. IPF images are decoded through the included CAPS image library as read-only media, with protected and variable-density data handled where compatible with the Vita floppy timing path. Compatibility still depends on the quality and variant of the IPF dump.
+The browser recognizes common Amiga disk formats including ADF, ADZ, DMS, IPF, ZIP, LHA and LZH. ZIP and LHA/LZH archives selected from the Floppy tab must contain a supported disk image. LHA archives selected from the WHDLoad tab are extracted as game files. DMS archives are decompressed to a temporary ADF when they are mounted, so the game can read and write the disk during the session but changes are not written back into the archive; password-protected archives are refused. IPF images are decoded through the included CAPS image library as read-only media, with protected and variable-density data handled where compatible with the Vita floppy timing path. Compatibility still depends on the quality and variant of the IPF dump.
 
 ## CD32 support
 
-- Open `Hardware -> CD32 CD Image` and select an `.iso`, raw `.bin`, or `.cue`.
+- Open `Hardware -> CD32 CD Image` and select an `.iso`, raw `.bin`, `.cue`, `.chd` or `.m3u`.
 - Mounting a CD image automatically selects the CD32 Kickstart pair, AGA chipset, 2 MiB chip RAM, 68020 CPU mode and one floppy drive; the settings can still be changed before rebooting.
 - CUE files can reference separate data and audio BIN files and can contain multiple tracks with INDEX 00/01, PREGAP and POSTGAP.
+- M3U playlists behave like WinUAE: every line lists a CD image (`.cue`, `.bin`, `.iso` or `.chd`), relative paths are resolved against the playlist folder and empty lines, `#` comments and missing entries are skipped. The item shows `Disc n/N` and LEFT / RIGHT switch disc while the game keeps running.
 - CD audio is mixed through the Vita SDL audio output.
 - The Hardware tab can eject or replace the mounted image while the emulator is paused in the menu.
 - Savestates include the mounted CD image and the playback position.
@@ -235,7 +244,7 @@ The packaged copies are `psp2data/data/sounds/floppy_drive.ogg` and `psp2data/da
 - **Restore Default Settings**: resets CPU, chipset, memory, Kickstart, floppies, HDFs, CD, display, audio and controls to factory defaults in memory (does not write any file).
 - **Reboot Amiga Emulation**: hard resets the Amiga with the current settings.
 - **Take Screenshot**: captures the next emulated frame as a PNG.
-- **About**: version 1.10 with scrolling credits.
+- **About**: version 1.11 with scrolling credits.
 - **Startup**: displays `Loading UAE4ALL2 HD...` before the main interface is opened.
 - **Release notes**: see [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -251,7 +260,7 @@ cmake .. -DBUILD_PSP2=ON -DCMAKE_BUILD_TYPE=Release
 ninja uae4all2.vpk
 ```
 
-The build output is `uae4all2hd.vpk`. The Vita package uses Title ID `UAE4ALLHD` and application version `01.10`, so it installs separately from the legacy UAE4ALL2.
+The build output is `uae4all2hd.vpk`. The Vita package uses Title ID `UAE4ALLHD` and application version `01.11`, so it installs separately from the legacy UAE4ALL2.
 
 The FTP implementation links the VitaSDK `ftpvita` library, matching the service integration used by VitaArchive. Ensure the VitaSDK installation includes the `ftpvita` development library before building.
 

@@ -5,6 +5,8 @@ set(VERSION_MAJOR 2)
 set(VERSION_MINOR 12)
 option(BUILD_CDROM_TESTS "Build CD-ROM backend tests" OFF)
 option(BUILD_DISPLAY_TESTS "Build automatic display geometry tests" OFF)
+option(BUILD_HDF_TESTS "Build HDF backend tests" OFF)
+option(BUILD_LIBRARY_TESTS "Build game library index tests" OFF)
 
 if(vita OR DEFINED ENV{VITASDK})
     set(BUILD_PSP2 ON)
@@ -68,6 +70,7 @@ set(SRC_FILES
         src/savestate.cpp
         src/custom.cpp
         src/disk.cpp
+        src/dms.cpp
         src/drawing.cpp
         src/ersatz.cpp
         src/expansion.cpp
@@ -77,6 +80,7 @@ set(SRC_FILES
         src/fsusage.cpp
         src/gfxutil.cpp
         src/hardfile.cpp
+        src/rdb.cpp
         src/keybuf.cpp
         src/main.cpp
         src/memory.cpp
@@ -168,6 +172,7 @@ if(BUILD_PSP2)
     src/psp2/uae_gui_browser.cpp
     src/psp2/hdf_manager.cpp
     src/psp2/whdload_manager.cpp
+    src/psp2/library_manager.cpp
     src/psp2/cover_downloader.cpp
     src/psp2/ftp_server.cpp
     src/psp2/psp2_shader.cpp
@@ -236,7 +241,7 @@ if(BUILD_PSP2)
   add_custom_target(${PROJECT_NAME}.vpk
           DEPENDS ${PROJECT_NAME}.self-self
           COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Generating param.sfo"
-          COMMAND ${VITASDK}/bin/vita-mksfoex -d ATTRIBUTE2=12 -s TITLE_ID=${TITLEID} -s APP_VER=01.10 "UAE4All2 HD" param.sfo
+          COMMAND ${VITASDK}/bin/vita-mksfoex -d ATTRIBUTE2=12 -s TITLE_ID=${TITLEID} -s APP_VER=01.11 "UAE4All2 HD" param.sfo
           COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Packaging uae4all2hd.vpk"
           COMMAND ${VITASDK}/bin/vita-pack-vpk -s param.sfo -b ${PROJECT_NAME}.self -a ${CMAKE_SOURCE_DIR}/psp2data/data=data -a ${CMAKE_SOURCE_DIR}/psp2data/sce_sys=sce_sys uae4all2hd.vpk
   )
@@ -382,5 +387,27 @@ if(BUILD_DISPLAY_TESTS AND NOT BUILD_PSP2 AND NOT BUILD_NX)
   add_executable(auto_display_tests tests/auto_display_tests.cpp)
   target_include_directories(auto_display_tests PRIVATE src/include)
   add_test(NAME auto_display COMMAND auto_display_tests)
+endif()
+
+if(BUILD_HDF_TESTS AND NOT BUILD_PSP2 AND NOT BUILD_NX)
+  enable_testing()
+  add_executable(hdf_tests tests/hdf_tests.cpp src/psp2/hdf_manager.cpp src/rdb.cpp)
+  target_include_directories(hdf_tests PRIVATE src src/include src/psp2)
+  add_test(NAME hdf_backend COMMAND hdf_tests)
+endif()
+
+if(BUILD_LIBRARY_TESTS AND NOT BUILD_PSP2 AND NOT BUILD_NX)
+  enable_testing()
+  add_executable(library_tests tests/library_tests.cpp src/psp2/library_manager.cpp)
+  target_include_directories(library_tests PRIVATE src/psp2)
+  add_test(NAME library_index COMMAND library_tests)
+endif()
+
+if(BUILD_DMS_TESTS AND NOT BUILD_PSP2 AND NOT BUILD_NX)
+  enable_testing()
+  add_executable(dms_tests tests/dms_tests.cpp src/dms.cpp)
+  target_include_directories(dms_tests PRIVATE src src/include)
+  target_compile_definitions(dms_tests PRIVATE DMS_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
+  add_test(NAME dms_archive COMMAND dms_tests)
 endif()
 
