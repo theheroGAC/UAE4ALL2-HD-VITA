@@ -37,7 +37,7 @@ static inline Uint32 to_sdl_color(unsigned int col)
 typedef struct {
     char name[256];
     bool is_dir;
-    size_t size;
+    unsigned long long size;
 } FileEntry;
 
 static FileEntry s_entries[MAX_ENTRIES];
@@ -68,6 +68,7 @@ static bool is_supported_ext(const char *name)
     if (s_cd_mode) {
         return (strcasecmp(ext, ".iso") == 0 ||
                 strcasecmp(ext, ".cue") == 0 ||
+                strcasecmp(ext, ".m3u") == 0 ||
                 strcasecmp(ext, ".chd") == 0 ||
                 strcasecmp(ext, ".bin") == 0 ||
                 strcasecmp(ext, ".zip") == 0 ||
@@ -97,6 +98,7 @@ static bool is_supported_ext(const char *name)
         strcasecmp(ext, ".bz2") == 0 ||
         strcasecmp(ext, ".iso") == 0 ||
         strcasecmp(ext, ".cue") == 0 ||
+        strcasecmp(ext, ".m3u") == 0 ||
         strcasecmp(ext, ".chd") == 0 ||
         strcasecmp(ext, ".fdi") == 0) {
         return true;
@@ -146,7 +148,7 @@ static void scan_directory(const char *path)
                 strncpy(s_entries[s_num_entries].name, dir.d_name, sizeof(s_entries[s_num_entries].name) - 1);
                 s_entries[s_num_entries].name[sizeof(s_entries[s_num_entries].name) - 1] = '\0';
                 s_entries[s_num_entries].is_dir = is_dir;
-                s_entries[s_num_entries].size = (size_t)dir.d_stat.st_size;
+                s_entries[s_num_entries].size = (unsigned long long)dir.d_stat.st_size;
                 s_num_entries++;
             }
         }
@@ -448,10 +450,12 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
                     vita_draw_text(list_x + 62.0f, item_y + 11.0f, is_sel ? VITA_COLOR_TEXT_WHITE : RGBA8(220, 230, 245, 255), 0.95f, name_buf);
 
                     char sz_buf[32];
-                    if (entry->size >= 1024 * 1024) {
-                        snprintf(sz_buf, sizeof(sz_buf), "%.1f MB", (float)entry->size / (1024.0f * 1024.0f));
+                    if (entry->size >= 1073741824ULL) {
+                        snprintf(sz_buf, sizeof(sz_buf), "%.2f GB", (double)entry->size / 1073741824.0);
+                    } else if (entry->size >= 1048576ULL) {
+                        snprintf(sz_buf, sizeof(sz_buf), "%.1f MB", (double)entry->size / 1048576.0);
                     } else {
-                        snprintf(sz_buf, sizeof(sz_buf), "%u KB", (unsigned int)(entry->size / 1024));
+                        snprintf(sz_buf, sizeof(sz_buf), "%llu KB", entry->size / 1024ULL);
                     }
                     vita_draw_text_right(list_x + list_w - 14.0f, item_y + 11.0f, VITA_COLOR_TEXT_MUTED, 0.85f, sz_buf);
                 }
@@ -521,6 +525,7 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
                     else if (!strcasecmp(ext, ".ipf")) type_desc = "CAPS / IPF Image";
                     else if (!strcasecmp(ext, ".adz")) type_desc = "Compressed ADF";
                     else if (!strcasecmp(ext, ".dms")) type_desc = "DMS Disk";
+                    else if (!strcasecmp(ext, ".m3u")) type_desc = "CD Image Playlist (M3U)";
                     else if (!strcasecmp(ext, ".iso") || !strcasecmp(ext, ".cue") || !strcasecmp(ext, ".chd")) type_desc = "CD Image (CHD/ISO)";
                     else if (!strcasecmp(ext, ".lha") || !strcasecmp(ext, ".lzh")) type_desc = "LHA Archive";
                     else if (!strcasecmp(ext, ".zip")) type_desc = "ZIP Archive";
@@ -528,7 +533,12 @@ int vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_i
                     else if (!strcasecmp(ext, ".conf")) type_desc = "UAE4All Configuration";
                     else if (!strcasecmp(ext, ".asf")) type_desc = "Amiga Save State";
                 }
-                snprintf(size_txt, sizeof(size_txt), "Size: %u KB (%s)", (unsigned int)(sel_entry->size / 1024), type_desc);
+                if (sel_entry->size >= 1073741824ULL)
+                    snprintf(size_txt, sizeof(size_txt), "Size: %.2f GB (%llu bytes) (%s)", (double)sel_entry->size / 1073741824.0, sel_entry->size, type_desc);
+                else if (sel_entry->size >= 1048576ULL)
+                    snprintf(size_txt, sizeof(size_txt), "Size: %.1f MB (%llu bytes) (%s)", (double)sel_entry->size / 1048576.0, sel_entry->size, type_desc);
+                else
+                    snprintf(size_txt, sizeof(size_txt), "Size: %llu KB (%s)", sel_entry->size / 1024ULL, type_desc);
                 vita_truncate_text(size_txt, preview_w - 32.0f, 0.85f, size_buf, sizeof(size_buf));
                 vita_draw_text(preview_x + 16.0f, preview_y + 326.0f, VITA_COLOR_TEXT_MUTED, 0.85f, size_buf);
             } else {

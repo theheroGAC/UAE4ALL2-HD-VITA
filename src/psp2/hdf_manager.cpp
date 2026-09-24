@@ -7,13 +7,18 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#ifdef __PSP2__
+#include <psp2/io/devctl.h>
+#endif
 
 #include "hdf_manager.h"
+#include "hdf_io64.h"
 
 #define HDF_DEFAULT_SECTORS 32
 #define HDF_DEFAULT_RESERVED 2
 #define HDF_DEFAULT_BLOCKSIZE 512
 #define HDF_MAX_BLOCKSIZE 4096
+#define HDF_MAX_SIZE_MB 8192ULL
 
 static void hdf_set_error(char *err, size_t errsz, const char *fmt, ...)
 {
@@ -31,11 +36,41 @@ static void hdf_set_error(char *err, size_t errsz, const char *fmt, ...)
     snprintf(err, errsz, "%s", tmp);
 }
 
-static int hdf_read_block(FILE *f, unsigned long block, int blocksize, unsigned char *buf)
+static int hdf_read_block(hdf_fd f, unsigned long long block, int blocksize, unsigned char *buf)
 {
-    if (fseek(f, (long)((unsigned long long)block * (unsigned long)blocksize), SEEK_SET) != 0)
+    if (hdf_file_seek64(f, (long long)(block * (unsigned long long)blocksize)) != 0)
         return 0;
-    return (int)fread(buf, 1, (size_t)blocksize, f) == blocksize;
+    return hdf_file_read(f, buf, blocksize) == blocksize;
+}
+
+static long long hdf_free_space_mb(const char *path)
+{
+#ifdef __PSP2__
+    char dev[8];
+    const char *colon;
+    SceIoDevInfo info;
+    size_t len;
+
+    if (!path)
+        return -1;
+    colon = strchr(path, ':');
+    if (!colon)
+        return -1;
+    len = (size_t)(colon - path);
+    if (len == 0 || len >= sizeof(dev) - 1)
+        return -1;
+    memcpy(dev, path, len);
+    dev[len] = ':';
+    dev[len + 1] = '\0';
+
+    memset(&info, 0, sizeof(info));
+    if (sceIoDevctl(dev, 0x3001, NULL, 0, &info, sizeof(info)) < 0)
+        return -1;
+    return (long long)((unsigned long long)info.free_size / (1024ULL * 1024ULL));
+#else
+    (void)path;
+    return -1;
+#endif
 }
 
 static unsigned int hdf_get_u32(const unsigned char *b)
@@ -62,9 +97,9 @@ static void hdf_strip_geometry_prefix(const char *src, char *dst, size_t dstsz)
 
 int hdf_analyze(const char *path, HdfInfo *info)
 {
-    FILE *f;
+    hdf_fd f;
     unsigned char hdr[HDF_MAX_BLOCKSIZE];
-    unsigned long size;
+    unsigned long long size;
     char clean[512];
 
     if (!path || !info)
@@ -78,38 +113,37 @@ int hdf_analyze(const char *path, HdfInfo *info)
     info->reserved = HDF_DEFAULT_RESERVED;
     info->surfaces = 1;
 
-    f = fopen(clean, "rb");
-    if (f == NULL) {
+    f = hdf_open_readonly(clean);
+    if (!hdf_is_open(f)) {
         hdf_set_error(info->error, sizeof(info->error), "Unable to open HDF file: %s", path);
         return 0;
     }
 
-    if (fseek(f, 0, SEEK_END) != 0) {
-        fclose(f);
-        hdf_set_error(info->error, sizeof(info->error), "Unable to read HDF file: %s", path);
-        return 0;
-    }
-    size = (unsigned long)ftell(f);
-    if (size == 0) {
-        fclose(f);
-        hdf_set_error(info->error, sizeof(info->error), "Invalid HDF size: the file is empty");
-        return 0;
+    {
+        long long fsize = hdf_file_size64(f);
+        if (fsize <= 0) {
+            hdf_close(f);
+            hdf_set_error(info->error, sizeof(info->error), "Invalid HDF size: the file is empty or unreadable");
+            return 0;
+        }
+        size = (unsigned long long)fsize;
     }
     if (size < 512) {
-        fclose(f);
-        hdf_set_error(info->error, sizeof(info->error), "Invalid HDF size: too small (%lu bytes)", size);
+        hdf_close(f);
+        hdf_set_error(info->error, sizeof(info->error), "Invalid HDF size: too small (%llu bytes)", size);
         return 0;
     }
     if (size % HDF_DEFAULT_BLOCKSIZE != 0) {
-        fclose(f);
+        hdf_close(f);
         hdf_set_error(info->error, sizeof(info->error),
-                      "Invalid HDF size: %lu bytes is not a multiple of %d", size, HDF_DEFAULT_BLOCKSIZE);
+                      "Invalid HDF size: %llu bytes is not a multiple of %d", size, HDF_DEFAULT_BLOCKSIZE);
         return 0;
     }
-    if (size >= 0x80000000UL) {
-        fclose(f);
+    if (size > HDF_MAX_SIZE_MB * 1024ULL * 1024ULL) {
+        hdf_close(f);
         hdf_set_error(info->error, sizeof(info->error),
-                      "HDF too large: maximum supported size on PS Vita is 2 GB (%lu bytes)", size);
+                      "HDF too large: maximum supported size on PS Vita is %llu MB (%llu bytes)",
+                      HDF_MAX_SIZE_MB, size);
         return 0;
     }
 
@@ -117,9 +151,9 @@ int hdf_analyze(const char *path, HdfInfo *info)
     info->total_blocks = size / HDF_DEFAULT_BLOCKSIZE;
 
     {
-        FILE *rw = fopen(path, "r+b");
-        if (rw != NULL) {
-            fclose(rw);
+        hdf_fd rw = hdf_open_readwrite(clean);
+        if (hdf_is_open(rw)) {
+            hdf_close(rw);
             info->is_readonly = 0;
         } else {
             info->is_readonly = 1;
@@ -127,7 +161,7 @@ int hdf_analyze(const char *path, HdfInfo *info)
     }
 
     if (!hdf_read_block(f, 0, HDF_DEFAULT_BLOCKSIZE, hdr)) {
-        fclose(f);
+        hdf_close(f);
         hdf_set_error(info->error, sizeof(info->error), "Read error while inspecting HDF");
         return 0;
     }
@@ -137,12 +171,12 @@ int hdf_analyze(const char *path, HdfInfo *info)
         snprintf(info->filesystem, sizeof(info->filesystem), "RDB");
         info->dostype = 0;
         info->valid = 1;
-        fclose(f);
+        hdf_close(f);
         return 1;
     }
 
     if (info->total_blocks > 0) {
-        unsigned long mid = info->total_blocks / 2;
+        unsigned long long mid = info->total_blocks / 2;
         unsigned char root_buf[HDF_DEFAULT_BLOCKSIZE];
         unsigned int t, st;
 
@@ -162,7 +196,6 @@ int hdf_analyze(const char *path, HdfInfo *info)
     }
 
     {
-        unsigned long boot_off = (unsigned long)info->reserved * HDF_DEFAULT_BLOCKSIZE;
         unsigned char boot[HDF_DEFAULT_BLOCKSIZE];
         if (hdf_read_block(f, info->reserved, HDF_DEFAULT_BLOCKSIZE, boot)) {
             if (boot[0] == 'D' && boot[1] == 'O' && boot[2] == 'S' && boot[3] <= 5) {
@@ -180,13 +213,45 @@ int hdf_analyze(const char *path, HdfInfo *info)
     else
         snprintf(info->filesystem, sizeof(info->filesystem), "Unknown");
 
-    if (info->size >= 1073741824UL && info->size < 2147483648UL)
+    if (info->size >= 1073741824ULL && info->size < 2147483648ULL)
         info->surfaces = 2;
-    info->cylinders = (int)((info->total_blocks / info->sectors_per_track) / info->surfaces);
+    else if (info->size >= 2147483648ULL && info->size <= 4294967296ULL)
+        info->surfaces = 4;
+    else if (info->size > 4294967296ULL && info->size < 8589934592ULL)
+        info->surfaces = 8;
+    else if (info->size >= 8589934592ULL)
+        info->surfaces = 16;
+    info->cylinders = (int)((info->total_blocks / (unsigned long long)info->sectors_per_track) / (unsigned long long)info->surfaces);
 
     info->valid = 1;
-    fclose(f);
+    hdf_close(f);
     return 1;
+}
+
+int hdf_is_bootable(const char *path)
+{
+    hdf_fd f;
+    unsigned char hdr[HDF_DEFAULT_BLOCKSIZE];
+    char clean[512];
+    int bootable = 0;
+
+    if (!path || path[0] == '\0')
+        return 0;
+
+    hdf_strip_geometry_prefix(path, clean, sizeof(clean));
+    f = hdf_open_readonly(clean);
+    if (!hdf_is_open(f))
+        return 0;
+
+    if (hdf_read_block(f, 0, HDF_DEFAULT_BLOCKSIZE, hdr)) {
+        if (hdr[0] == 'R' && hdr[1] == 'D' && hdr[2] == 'S' && hdr[3] == 'K')
+            bootable = 1;
+        else if (hdr[0] == 'D' && hdr[1] == 'O' && hdr[2] == 'S' && hdr[3] <= 5)
+            bootable = 1;
+    }
+
+    hdf_close(f);
+    return bootable;
 }
 
 int hdf_backup(const char *path, const char *dest_dir, char *err, size_t errsz)
@@ -279,8 +344,8 @@ int hdf_create_blank(const char *path, unsigned long megabytes, char *err, size_
     unsigned long long written = 0;
     int last_percent = -1;
 
-    if (!path || path[0] == '\0' || megabytes == 0 || megabytes > 65536) {
-        hdf_set_error(err, errsz, "Invalid size or path");
+    if (!path || path[0] == '\0' || megabytes == 0 || megabytes > (unsigned long)HDF_MAX_SIZE_MB) {
+        hdf_set_error(err, errsz, "Invalid size or path (maximum %llu MB)", HDF_MAX_SIZE_MB);
         return -1;
     }
 
@@ -289,13 +354,21 @@ int hdf_create_blank(const char *path, unsigned long megabytes, char *err, size_
         return -2;
     }
 
+    total = (unsigned long long)megabytes * 1024ULL * 1024ULL;
+    {
+        long long free_mb = hdf_free_space_mb(path);
+        if (free_mb >= 0 && (unsigned long long)free_mb < (unsigned long long)megabytes) {
+            hdf_set_error(err, errsz,
+                          "Not enough free space: %lld MB available, %lu MB required", free_mb, megabytes);
+            return -1;
+        }
+    }
+
     dst = fopen(path, "wb");
     if (dst == NULL) {
         hdf_set_error(err, errsz, "Unable to create HDF file (free space on ux0?)");
         return -1;
     }
-
-    total = (unsigned long long)megabytes * 1024ULL * 1024ULL;
     buf = (unsigned char *)malloc(1024 * 1024);
     if (!buf) {
         fclose(dst);

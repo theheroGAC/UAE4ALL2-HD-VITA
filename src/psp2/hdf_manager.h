@@ -10,8 +10,8 @@ extern "C" {
 
 typedef struct {
     char path[512];
-    unsigned long size;
-    unsigned long total_blocks;
+    unsigned long long size;
+    unsigned long long total_blocks;
     int sectors_per_track;
     int surfaces;
     int reserved;
@@ -26,6 +26,8 @@ typedef struct {
 } HdfInfo;
 
 int hdf_analyze(const char *path, HdfInfo *info);
+
+int hdf_is_bootable(const char *path);
 
 int hdf_backup(const char *path, const char *dest_dir, char *err, size_t errsz);
 

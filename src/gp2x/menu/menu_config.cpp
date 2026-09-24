@@ -674,6 +674,8 @@ void ApplyA500Profile(void)
     mainMenu_fastMemory = 0;
     mainMenu_bootHD = 0;
     mainMenu_autoCrop = 0;
+    if (mainMenu_drives < 1)
+        mainMenu_drives = DEFAULT_DRIVES;
     UpdateCPUModelSettings();
     UpdateMemorySettings();
     UpdateChipsetSettings();
@@ -696,6 +698,8 @@ void ApplyA1200Profile(void)
     mainMenu_fastMemory = 3;
     mainMenu_bootHD = has_hdf_files() ? 2 : 0;
     mainMenu_autoCrop = 0;
+    if (mainMenu_drives < 1)
+        mainMenu_drives = DEFAULT_DRIVES;
     UpdateCPUModelSettings();
     UpdateMemorySettings();
     UpdateChipsetSettings();
@@ -1235,6 +1239,7 @@ void reset_hdConf()
         }
         break;
     }
+    mainMenu_filesysUnits = nr_units(currprefs.mountinfo);
 }
 
 

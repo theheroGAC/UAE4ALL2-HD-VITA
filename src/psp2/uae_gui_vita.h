@@ -47,7 +47,8 @@ extern "C" {
 #define VITA_COLOR_OVERLAY_BG    RGBA8(8, 10, 16, 210)        /* Modal/Dark backdrop */
 
 typedef enum {
-    VITA_TAB_FLOPPY = 0,
+    VITA_TAB_LIBRARY = 0,
+    VITA_TAB_FLOPPY,
     VITA_TAB_HARD_DISK,
     VITA_TAB_WHDLOAD,
     VITA_TAB_PRESETS,
@@ -80,7 +81,11 @@ typedef struct {
 } VitaSystemInfo;
 
 int  vita_set_kickstart(int index, int load_rom);
+int  vita_apply_media_preset(int media_type);
+int  vita_kickstart_ready(void);
+int  vita_prepare_floppy_media(int fresh_start);
 int  vita_confirm_eject_for_hard_disk_launch(void);
+int  vita_confirm_eject_for_floppy_launch(void);
 int  vita_gui_init(void);
 void vita_gui_shutdown(void);
 void vita_gui_shutdown_final(void);
@@ -121,6 +126,7 @@ int  vita_get_text_height(float scale);
 
 void vita_draw_button_glyph(float x, float y, VitaButtonGlyph glyph);
 void vita_draw_hint_item(float x, float y, VitaButtonGlyph glyph, const char *label);
+float vita_hint_item_end_x(float x, VitaButtonGlyph glyph, const char *label);
 void vita_draw_badge(float x, float y, const char *label, unsigned int bg_col, unsigned int text_col);
 void vita_draw_boing_ball_icon(float cx, float cy, float radius, float rot_angle);
 void vita_draw_led(float x, float y, const char *label, bool state, unsigned int led_col);
@@ -137,6 +143,10 @@ void vita_show_about_box(void);
 bool vita_show_confirm_box(const char *title, const char *message, const char *yes_label, const char *no_label);
 void vita_gui_draw_progress(const char *title, const char *subtitle, float fraction, const char *item_name);
 void vita_gui_show_launch_loading(const char *game_name);
+void vita_gui_show_boot_splash(const char *stage, float progress);
+int  vita_start_action(void);
+int  vita_start_action_restart(void);
+void vita_set_launch_media(int media);
 
 void vita_view_floppy(VitaInputState *input, int *selected_item);
 void vita_view_hard_disk(VitaInputState *input, int *selected_item);
@@ -148,6 +158,7 @@ void vita_view_controls(VitaInputState *input, int *selected_item);
 void vita_view_savestates(VitaInputState *input, int *selected_item);
 void vita_view_system(VitaInputState *input, int *selected_item);
 void vita_view_ftp(VitaInputState *input, int *selected_item);
+void vita_view_library(VitaInputState *input, int *selected_item);
 
 int  vita_gui_run_browser(char *out_path, const char *start_dir, int disk_drive_idx);
 
