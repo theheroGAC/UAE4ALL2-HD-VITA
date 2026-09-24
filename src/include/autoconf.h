@@ -52,10 +52,14 @@ extern char *add_filesys_unit (struct uaedev_mount_info *mountinfo,
 			       char *volname, char *rootdir, int readonly,
 			       int secs, int surfaces, int reserved,
 			       int blocksize);
+extern char *add_hardfile_spec_units (struct uaedev_mount_info *mountinfo,
+			       char *rootdir, int readonly,
+			       int secs, int surfaces, int reserved,
+			       int blocksize);
 extern char *get_filesys_unit (struct uaedev_mount_info *mountinfo, int nr,
 			       char **volname, char **rootdir, int *readonly,
 			       int *secspertrack, int *surfaces, int *reserved,
-			       int *cylinders, int *size, int *blocksize);
+			       int *cylinders, unsigned long long *size, int *blocksize);
 extern int kill_filesys_unit (struct uaedev_mount_info *mountinfo, int);
 extern int move_filesys_unit (struct uaedev_mount_info *mountinfo, int nr, int to);
 extern int sprintf_filesys_unit (struct uaedev_mount_info *mountinfo, char *buffer, int num);

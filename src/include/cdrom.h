@@ -16,6 +16,10 @@ extern int cdrom_is_inserted;
 
 int cdrom_open_image(const char *path);
 void cdrom_close_image(void);
+int cdrom_get_disc_count(void);
+int cdrom_get_current_disc(void);
+const char *cdrom_get_disc_path(int index);
+int cdrom_select_disc(int index);
 int cdrom_read_sector(uae_u32 lba, uae_u8 *buffer);
 int cdrom_read_raw_sector(uae_u32 lba, uae_u8 *buffer);
 uae_u32 cdrom_get_capacity(void);
