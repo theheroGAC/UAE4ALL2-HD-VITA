@@ -15,6 +15,7 @@
 #include "m68k/debug_m68k.h"
 
 static unsigned short mimemoriadummy[65536/2];
+static int illegal_instruction_reported = 0;
 
 void clear_fame_mem_dummy(void)
 {
@@ -84,7 +85,13 @@ void uae_chk_handler(unsigned vector)
 		return;
 	}
 
-	write_log ("Illegal instruction: %04x at %08lx\n", opcode, pc);
+	if (illegal_instruction_reported < 32) {
+		if (illegal_instruction_reported == 31)
+			write_log ("Illegal instruction: %04x at %08lx (further messages suppressed)\n", opcode, pc);
+		else
+			write_log ("Illegal instruction: %04x at %08lx\n", opcode, pc);
+	}
+	illegal_instruction_reported++;
 	process_exception(0x4);
 }
 
