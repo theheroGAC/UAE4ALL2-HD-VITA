@@ -17,6 +17,7 @@
 
 #include "savedisk.h"
 #include "menu_config.h"
+#include "dms.h"
 
 #include <zlib.h>
 
@@ -423,6 +424,8 @@ static int uncompress (const char *name, char *dest)
 	     return unzip (name, dest);
 	if (strcasecmp (ext, "rp9") == 0)
 	     return unzip (name, dest);
+	if (strcasecmp (ext, "dms") == 0)
+	     return dms_uncompress (name, dest);
     }
 
     if (access (strcat (strcpy (nam, name), ".z"), 0) >= 0
@@ -455,6 +458,9 @@ static int uncompress (const char *name, char *dest)
 	|| access (strcat (strcpy (nam, name),".rp9"),0) >= 0
 	|| access (strcat (strcpy (nam, name),".RP9"),0) >= 0)      
        return unzip (nam, dest);
+
+    if (access (name, 0) >= 0 && dms_is_archive (name))
+	return dms_uncompress (name, dest);
 
     return 0;
 }

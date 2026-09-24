@@ -64,6 +64,10 @@ static uae_u8 cd_audio_sector[2352];
 static FILE *cd_audio_file = NULL;
 static int cd_audio_file_index = -1;
 static uae_u32 cd_last_lba = 0;
+#define CDROM_MAX_DISCS 32
+static char cd_disc_paths[CDROM_MAX_DISCS][512];
+static int cd_disc_count = 0;
+static int cd_disc_current = -1;
 
 static int has_extension(const char *path, const char *extension)
 {
@@ -578,45 +582,14 @@ static int read_track_raw(struct cdrom_track_entry *track, uae_u32 lba, uae_u8 *
     return track->sector_size == 2352 ? read_bytes == 2352 : read_bytes == 2048;
 }
 
-int cdrom_open_image(const char *path)
+static void clear_disc_list(void)
 {
-    int i;
-
-    cdrom_close_image();
-    write_log("[CDROM] open path=%s\n", path ? path : "(null)");
-    if (!path || path[0] == '\0') return 0;
-    if (has_extension(path, ".chd")) {
-        if (!open_chd(path)) {
-            cdrom_close_image();
-            return 0;
-        }
-    } else if (has_extension(path, ".cue")) {
-        if (!open_cue(path)) {
-            cdrom_close_image();
-            return 0;
-        }
-    } else if (!open_plain_image(path)) {
-        cdrom_close_image();
-        return 0;
-    }
-
-    cd_total_sectors = 0;
-    for (i = 0; i < cd_track_count; i++) {
-        if (cd_tracks[i].end_lba > cd_total_sectors)
-            cd_total_sectors = cd_tracks[i].end_lba;
-    }
-    strncpy(current_cd_image, path, sizeof(current_cd_image) - 1);
-    current_cd_image[sizeof(current_cd_image) - 1] = '\0';
-    cdrom_is_inserted = cd_total_sectors > 0;
-    write_log("[CDROM] opened tracks=%d sectors=%u inserted=%d image=%s\n",
-        cd_track_count, cd_total_sectors, cdrom_is_inserted, current_cd_image);
-    return cdrom_is_inserted;
+    cd_disc_count = 0;
+    cd_disc_current = -1;
 }
 
-void cdrom_close_image(void)
+static void close_image_data(void)
 {
-    if (current_cd_image[0] != '\0')
-        write_log("[CDROM] close image=%s\n", current_cd_image);
     if (cd_chd) {
         chd_close(cd_chd);
         cd_chd = NULL;
@@ -638,13 +611,154 @@ void cdrom_close_image(void)
         cd_audio_file = NULL;
         cd_audio_file_index = -1;
     }
-    current_cd_image[0] = '\0';
-    cdrom_is_inserted = 0;
     cd_file_count = 0;
     cd_track_count = 0;
     cd_total_sectors = 0;
     cd_last_lba = 0;
     cdrom_audio_stop();
+}
+
+static int open_image_file(const char *path)
+{
+    int i;
+
+    if (has_extension(path, ".chd")) {
+        if (!open_chd(path))
+            return 0;
+    } else if (has_extension(path, ".cue")) {
+        if (!open_cue(path))
+            return 0;
+    } else if (!open_plain_image(path)) {
+        return 0;
+    }
+
+    cd_total_sectors = 0;
+    for (i = 0; i < cd_track_count; i++) {
+        if (cd_tracks[i].end_lba > cd_total_sectors)
+            cd_total_sectors = cd_tracks[i].end_lba;
+    }
+    return cd_total_sectors > 0;
+}
+
+static int open_disc(int index)
+{
+    if (index < 0 || index >= cd_disc_count)
+        return 0;
+
+    close_image_data();
+    if (!open_image_file(cd_disc_paths[index])) {
+        close_image_data();
+        return 0;
+    }
+    cd_disc_current = index;
+    write_log("[CDROM] disc %d/%d opened name=%s image=%s tracks=%d sectors=%u\n",
+        index + 1, cd_disc_count, current_cd_image, cd_disc_paths[index],
+        cd_track_count, cd_total_sectors);
+    return 1;
+}
+
+static int load_m3u_list(const char *m3u_path)
+{
+    FILE *m3u;
+    char directory[512];
+    char line[512];
+
+    clear_disc_list();
+    m3u = fopen(m3u_path, "rb");
+    if (!m3u) return 0;
+    get_directory(m3u_path, directory, sizeof(directory));
+
+    while (cd_disc_count < CDROM_MAX_DISCS && fgets(line, sizeof(line), m3u)) {
+        char *entry = line;
+        char resolved[512];
+        FILE *probe;
+
+        if (cd_disc_count == 0 && (unsigned char)entry[0] == 0xef &&
+            (unsigned char)entry[1] == 0xbb && (unsigned char)entry[2] == 0xbf)
+            entry += 3;
+        trim_line(entry);
+        if (entry[0] == '\0' || entry[0] == '#' || entry[0] == ';')
+            continue;
+        if (entry[0] == '/' || (strlen(entry) > 1 && entry[1] == ':'))
+            snprintf(resolved, sizeof(resolved), "%s", entry);
+        else
+            snprintf(resolved, sizeof(resolved), "%s/%s", directory, entry);
+        probe = fopen(resolved, "rb");
+        if (!probe)
+            continue;
+        fclose(probe);
+        strncpy(cd_disc_paths[cd_disc_count], resolved, sizeof(cd_disc_paths[cd_disc_count]) - 1);
+        cd_disc_paths[cd_disc_count][sizeof(cd_disc_paths[cd_disc_count]) - 1] = '\0';
+        cd_disc_count++;
+    }
+    fclose(m3u);
+    return cd_disc_count;
+}
+
+int cdrom_open_image(const char *path)
+{
+    cdrom_close_image();
+    write_log("[CDROM] open path=%s\n", path ? path : "(null)");
+    if (!path || path[0] == '\0') return 0;
+
+    if (has_extension(path, ".m3u")) {
+        if (load_m3u_list(path) <= 0)
+            return 0;
+    } else {
+        strncpy(cd_disc_paths[0], path, sizeof(cd_disc_paths[0]) - 1);
+        cd_disc_paths[0][sizeof(cd_disc_paths[0]) - 1] = '\0';
+        cd_disc_count = 1;
+    }
+
+    strncpy(current_cd_image, path, sizeof(current_cd_image) - 1);
+    current_cd_image[sizeof(current_cd_image) - 1] = '\0';
+
+    if (!open_disc(0)) {
+        cdrom_close_image();
+        return 0;
+    }
+
+    cdrom_is_inserted = 1;
+    write_log("[CDROM] opened tracks=%d sectors=%u inserted=%d image=%s\n",
+        cd_track_count, cd_total_sectors, cdrom_is_inserted, current_cd_image);
+    return cdrom_is_inserted;
+}
+
+int cdrom_get_disc_count(void)
+{
+    return cd_disc_count;
+}
+
+int cdrom_get_current_disc(void)
+{
+    return cd_disc_current;
+}
+
+const char *cdrom_get_disc_path(int index)
+{
+    if (index < 0 || index >= cd_disc_count)
+        return NULL;
+    return cd_disc_paths[index];
+}
+
+int cdrom_select_disc(int index)
+{
+    if (cd_disc_count <= 0)
+        return 0;
+    index = ((index % cd_disc_count) + cd_disc_count) % cd_disc_count;
+    if (index == cd_disc_current)
+        return 1;
+    return open_disc(index);
+}
+
+void cdrom_close_image(void)
+{
+    if (current_cd_image[0] != '\0')
+        write_log("[CDROM] close image=%s\n", current_cd_image);
+    close_image_data();
+    clear_disc_list();
+    current_cd_image[0] = '\0';
+    cdrom_is_inserted = 0;
 }
 
 int cdrom_read_raw_sector(uae_u32 lba, uae_u8 *buffer)

@@ -39,6 +39,8 @@
 #include "filesys.h"
 #include "autoconf.h"
 #include "fsusage.h"
+#include "hdf_io64.h"
+#include "rdb.h"
 #include "native2amiga.h"
 #include "scsidev.h"
 #include "fsdb.h"
@@ -155,8 +157,7 @@ int is_hardfile (struct uaedev_mount_info *mountinfo, int unit_no)
 
 static void close_filesys_unit (UnitInfo *uip)
 {
-    if (uip->hf.fd != 0)
- 	fclose (uip->hf.fd);
+    hdf_close (uip->hf.fd);
     if (uip->volname != 0)
 	free (uip->volname);
     if (uip->devname != 0)
@@ -171,16 +172,14 @@ static void close_filesys_unit (UnitInfo *uip)
     uip->unit_pipe = 0;
     uip->back_pipe = 0;
 
-    uip->hf.fd = 0;
+    uip->hf.fd = HDF_FD_INVALID;
     uip->volname = 0;
     uip->devname = 0;
     uip->rootdir = 0;
-}
-
-char *get_filesys_unit (struct uaedev_mount_info *mountinfo, int nr,
+}	char *get_filesys_unit (struct uaedev_mount_info *mountinfo, int nr,
 			char **volname, char **rootdir, int *readonly,
 			int *secspertrack, int *surfaces, int *reserved,
-			int *cylinders, int *size, int *blocksize)
+			int *cylinders, unsigned long long *size, int *blocksize)
 {
     UnitInfo *uip = mountinfo->ui + nr;
 
@@ -202,16 +201,20 @@ char *get_filesys_unit (struct uaedev_mount_info *mountinfo, int nr,
 static char *set_filesys_unit_1 (struct uaedev_mount_info *mountinfo, int nr,
 				 char *volname, char *rootdir, int readonly,
 				 int secspertrack, int surfaces, int reserved,
-				 int blocksize)
+				 int blocksize, unsigned long long base_offset,
+				 unsigned long long byte_size, int bootpri,
+				 unsigned int dostype)
 {
     UnitInfo *ui = mountinfo->ui + nr;
 
     if (nr >= mountinfo->num_units)
 	return "No slot allocated for this unit";
 
-    ui->hf.fd = 0;
+    ui->hf.fd = HDF_FD_INVALID;
     
     ui->hf.size = 0;
+    ui->hf.offset = 0;
+    ui->hf.bootpri = 0;
     ui->hf.nrcyls = 0;
     ui->hf.secspertrack = 0;
     ui->hf.surfaces = 0;
@@ -226,15 +229,15 @@ static char *set_filesys_unit_1 (struct uaedev_mount_info *mountinfo, int nr,
 
     if (volname != 0) {
 	ui->volname = my_strdup (volname);
-	ui->hf.fd = 0;
+	ui->hf.fd = HDF_FD_INVALID;
     } else {
 	ui->volname = 0;
-	ui->hf.fd = fopen (rootdir, "r+b");
-	if (ui->hf.fd == 0) {
+	ui->hf.fd = hdf_open_readwrite (rootdir);
+	if (!hdf_is_open (ui->hf.fd)) {
 	    readonly = 1;
-	    ui->hf.fd = fopen (rootdir, "rb");
+	    ui->hf.fd = hdf_open_readonly (rootdir);
 	}
-	if (ui->hf.fd == 0)
+	if (!hdf_is_open (ui->hf.fd))
 	    return "Hardfile not found";
 
 	if (secspertrack < 1 || secspertrack > 32767
@@ -244,23 +247,35 @@ static char *set_filesys_unit_1 (struct uaedev_mount_info *mountinfo, int nr,
 	{
 	    return "Bad hardfile geometry";
 	}
-	fseek (ui->hf.fd, 0, SEEK_END);
-	ui->hf.size = ftell (ui->hf.fd);
+	long long hfsize = hdf_file_size64 (ui->hf.fd);
+	if (hfsize <= 0)
+	    return "Bad hardfile size";
+	if (base_offset > (unsigned long long)hfsize)
+	    return "Bad hardfile offset";
+	ui->hf.offset = base_offset;
+	ui->hf.size = (unsigned long long)hfsize - base_offset;
+	if (byte_size != 0 && byte_size < ui->hf.size)
+	    ui->hf.size = byte_size;
+	ui->hf.bootpri = bootpri;
 	ui->hf.secspertrack = secspertrack;
 	ui->hf.surfaces = surfaces;
 	ui->hf.reservedblocks = reserved;
 	ui->hf.nrcyls = (secspertrack * surfaces
-			 ? (ui->hf.size / blocksize) / (secspertrack * surfaces)
+			 ? (int)((ui->hf.size / (unsigned long long)blocksize) / (unsigned long long)(secspertrack * surfaces))
 			 : 0);
 	ui->hf.blocksize = blocksize;
 
-	unsigned char bhdr[4];
-	fseek (ui->hf.fd, 0, SEEK_SET);
-	if (fread (bhdr, 1, 4, ui->hf.fd) == 4 && bhdr[0] == 'D' && bhdr[1] == 'O' && bhdr[2] == 'S'
-	    && bhdr[3] <= 5) {
-	    ui->hf.dostype = ((uae_u32)bhdr[0] << 24) | ((uae_u32)bhdr[1] << 16) | ((uae_u32)bhdr[2] << 8) | (uae_u32)bhdr[3];
+	if (dostype != 0) {
+	    ui->hf.dostype = dostype;
 	} else {
-	    ui->hf.dostype = 0x444f5300; /* DOS\0 = OFS */
+	    unsigned char bhdr[4];
+	    hdf_file_seek64 (ui->hf.fd, base_offset);
+	    if (hdf_file_read (ui->hf.fd, bhdr, 4) == 4 && bhdr[0] == 'D' && bhdr[1] == 'O' && bhdr[2] == 'S'
+		&& bhdr[3] <= 5) {
+		ui->hf.dostype = ((uae_u32)bhdr[0] << 24) | ((uae_u32)bhdr[1] << 16) | ((uae_u32)bhdr[2] << 8) | (uae_u32)bhdr[3];
+	    } else {
+		ui->hf.dostype = 0x444f5300;
+	    }
 	}
     }
     ui->self = 0;
@@ -282,7 +297,8 @@ char *set_filesys_unit (struct uaedev_mount_info *mountinfo, int nr,
 {
     UnitInfo ui = mountinfo->ui[nr];
     char *result = set_filesys_unit_1 (mountinfo, nr, volname, rootdir, readonly,
-				       secspertrack, surfaces, reserved, blocksize);
+				       secspertrack, surfaces, reserved, blocksize,
+				       0, 0, 0, 0);
     if (result)
 	mountinfo->ui[nr] = ui;
     else
@@ -305,10 +321,59 @@ char *add_filesys_unit (struct uaedev_mount_info *mountinfo,
 
     mountinfo->num_units++;
     retval = set_filesys_unit_1 (mountinfo, nr, volname, rootdir, readonly,
-				 secspertrack, surfaces, reserved, blocksize);
+				 secspertrack, surfaces, reserved, blocksize,
+				 0, 0, 0, 0);
     if (retval)
 	mountinfo->num_units--;
     return retval;
+}
+
+static char *add_hardfile_unit (struct uaedev_mount_info *mountinfo, char *rootdir,
+				int readonly, int secspertrack, int surfaces,
+				int reserved, int blocksize,
+				unsigned long long base_offset, unsigned long long byte_size,
+				int bootpri, unsigned int dostype)
+{
+    char *retval;
+    int nr = mountinfo->num_units;
+
+    if (nr >= MAX_UNITS)
+	return "Maximum number of file systems mounted";
+
+    mountinfo->num_units++;
+    retval = set_filesys_unit_1 (mountinfo, nr, 0, rootdir, readonly,
+				 secspertrack, surfaces, reserved, blocksize,
+				 base_offset, byte_size, bootpri, dostype);
+    if (retval)
+	mountinfo->num_units--;
+    return retval;
+}
+
+char *add_hardfile_spec_units (struct uaedev_mount_info *mountinfo, char *rootdir,
+			       int readonly, int secspertrack, int surfaces,
+			       int reserved, int blocksize)
+{
+    RdbPartition parts[RDB_MAX_PARTITIONS];
+    char *err;
+    int i, n;
+
+    n = rdb_parse (rootdir, parts, RDB_MAX_PARTITIONS);
+    if (n <= 0)
+	return add_hardfile_unit (mountinfo, rootdir, readonly, secspertrack, surfaces,
+				  reserved, blocksize, 0, 0, 0, 0);
+
+    err = 0;
+    for (i = 0; i < n; i++) {
+	err = add_hardfile_unit (mountinfo, rootdir, readonly,
+				 parts[i].sectors_per_track, parts[i].heads,
+				 parts[i].reserved, parts[i].blocksize,
+				 parts[i].start_block * (unsigned long long)parts[i].blocksize,
+				 parts[i].total_blocks * (unsigned long long)parts[i].blocksize,
+				 parts[i].bootpri, parts[i].dostype);
+	if (err)
+	    break;
+    }
+    return err;
 }
 
 int kill_filesys_unit (struct uaedev_mount_info *mountinfo, int nr)
@@ -359,7 +424,7 @@ int sprintf_filesys_unit (struct uaedev_mount_info *mountinfo, char *buffer, int
 	sprintf (buffer, "(DH%d:) Filesystem, %s: %s %s", num, uip[num].volname,
 		 uip[num].rootdir, uip[num].readonly ? "ro" : "");
     else
-	sprintf (buffer, "(DH%d:) Hardfile, \"%s\", size %d bytes", num,
+	sprintf (buffer, "(DH%d:) Hardfile, \"%s\", size %llu bytes", num,
 		 uip[num].rootdir, uip[num].hf.size);
     return 0;
 }
@@ -374,7 +439,7 @@ struct uaedev_mount_info *alloc_mountinfo (void)
     
     ui = info->ui;
     
-    ui->hf.fd = 0;
+    ui->hf.fd = HDF_FD_INVALID;
     ui->hf.size = 0;
     ui->hf.nrcyls = 0;
     ui->hf.secspertrack = 0;
@@ -3348,7 +3413,7 @@ static uae_u32 filesys_dev_storeinfo (void)
     put_long (parmpacket + 72, ~1); /* addMask (?) */
 //    put_long (parmpacket + 76, (uae_u32)-1); /* bootPri */
     /* WinUAE code */
-    put_long (parmpacket + 76, 0/*uip[unit_no].bootpri*/); /* bootPri */
+    put_long (parmpacket + 76, uip[unit_no].hf.bootpri);
     /***************/
     put_long (parmpacket + 80, uip[unit_no].hf.dostype ? uip[unit_no].hf.dostype : 0x444f5300); /* DosType */
     put_long (parmpacket + 84, 0); /* pad */

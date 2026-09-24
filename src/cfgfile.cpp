@@ -18,6 +18,7 @@
 #include "uae.h"
 #include "autoconf.h"
 #include "gui.h"
+#include "hdf_io64.h"
 
 
 
@@ -68,23 +69,26 @@ char * make_hard_file_cfg_line (char *dst) {
     int reserved = 2;
     int blocksize = 512;
 
-    FILE *myFile = fopen(filepath, "rb");
-    if (myFile == NULL) {
-        myFile = fopen(dst, "rb");
-        if (myFile == NULL)
+    hdf_fd myFile = hdf_open_readonly(filepath);
+    if (!hdf_is_open(myFile)) {
+        myFile = hdf_open_readonly(dst);
+        if (!hdf_is_open(myFile))
             return dst;
         strncpy(filepath, dst, sizeof(filepath) - 1);
         filepath[sizeof(filepath) - 1] = '\0';
     }
 
-    fseek(myFile, 0, SEEK_END);
-    unsigned long mySize = ftell(myFile);
-    fclose(myFile);
+    long long mySize = hdf_file_size64(myFile);
+    hdf_close(myFile);
 
-    if (mySize >= 1073741824UL && mySize < 2147483648UL)
+    if (mySize >= 1073741824LL && mySize < 2147483648LL)
         surfaces = 2;
-    else if (mySize >= 2147483648UL)
+    else if (mySize >= 2147483648LL && mySize <= 4294967296LL)
         surfaces = 4;
+    else if (mySize > 4294967296LL && mySize < 8589934592LL)
+        surfaces = 8;
+    else if (mySize >= 8589934592LL)
+        surfaces = 16;
 
     snprintf(buffer, sizeof(buffer), "%d:%d:%d:%d:%s", sectors, surfaces, reserved, blocksize, filepath);
     strncpy(dst, buffer, 255);
@@ -141,7 +145,7 @@ char * make_hard_file_cfg_line (char *dst) {
     if (x4 == NULL)
 	goto argh;
     *x4++ = '\0';
-    x4 = add_filesys_unit (currprefs.mountinfo, 0, x4, readonly, atoi (x0), atoi (x1), atoi (x2), atoi (x3));
+    x4 = add_hardfile_spec_units (currprefs.mountinfo, x4, readonly, atoi (x0), atoi (x1), atoi (x2), atoi (x3));
     if (x4)
 	fprintf (stderr, "%s\n", x4);
 

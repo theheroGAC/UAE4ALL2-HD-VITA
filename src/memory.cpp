@@ -1093,6 +1093,7 @@ static void reload_kickstart(void)
 {
    load_extendedkickstart ();
    if (!load_kickstart ()) {
+      memset (kickmemory, 0, kickmem_size);
       init_ersatz_rom (kickmemory);
       ersatzkickfile = 1;
    }

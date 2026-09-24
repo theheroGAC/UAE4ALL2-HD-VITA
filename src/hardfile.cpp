@@ -17,6 +17,7 @@
 #include "disk.h"
 #include "autoconf.h"
 #include "filesys.h"
+#include "hdf_io64.h"
 #include "execlib.h"
 #include "gui.h"
 
@@ -29,7 +30,7 @@ static uae_u32 hardfile_open (void)
     struct hardfiledata *hfd = get_hardfile_data (unit);
 
     /* Check unit number */
-    if (hfd && hfd->fd) {
+    if (hfd && hdf_is_open (hfd->fd)) {
 	opencount++;
 	put_word (m68k_areg(regs, 6)+32, get_word (m68k_areg(regs, 6)+32) + 1);
 	put_long (tmp1 + 24, m68k_dreg (regs, 0)); /* io_Unit */
@@ -58,7 +59,8 @@ static uae_u32 hardfile_expunge (void)
 
 static uae_u32 hardfile_beginio (void)
 {
-	uae_u32 tmp1, tmp2, dataptr, offset;
+	uae_u32 tmp1, tmp2, dataptr;
+	unsigned long long offset;
 	uae_u32 retval = m68k_dreg(regs, 0);
 	int unit;
 	struct hardfiledata *hfd;
@@ -72,7 +74,7 @@ static uae_u32 hardfile_beginio (void)
 	put_byte (tmp1+31, 0); /* no error yet */
 	tmp2 = get_word (tmp1+28); /* io_Command */
 
-	if (!hfd || !hfd->fd) {
+	if (!hfd || !hdf_is_open (hfd->fd)) {
 		put_byte (tmp1+31, (uae_u8)-3);
 		return 0;
 	}
@@ -82,18 +84,18 @@ static uae_u32 hardfile_beginio (void)
 			gui_data.hdled = HDLED_READ;
 			
 			dataptr = get_long (tmp1 + 40);
-			offset = get_long (tmp1 + 44);
+			offset = (unsigned long long)(uae_u32)get_long (tmp1 + 44);
 			tmp2 = get_long (tmp1 + 36); /* io_Length */
 
-			if (dataptr & 1 || offset & 511 || tmp2 & 511 || tmp2 + offset > (uae_u32)hfd->size)
+			if (dataptr & 1 || offset & 511 || tmp2 & 511 || offset + (unsigned long long)tmp2 > hfd->size)
 				goto bad_command;
 			
 			put_long (tmp1 + 32, tmp2); /* set io_Actual */
-			fseek (hfd->fd, offset, SEEK_SET);
+			hdf_file_seek64 (hfd->fd, hfd->offset + offset);
 			while (tmp2) {
 				int i;
 				char buffer[512];
-				fread (buffer, 1, 512, hfd->fd);
+				hdf_file_read (hfd->fd, buffer, 512);
 				for (i = 0; i < 512; i++, dataptr++)
 					put_byte(dataptr, buffer[i]);
 				tmp2 -= 512;
@@ -105,20 +107,20 @@ static uae_u32 hardfile_beginio (void)
 			gui_data.hdled = HDLED_WRITE;
 			
 			dataptr = get_long (tmp1 + 40);
-			offset = get_long (tmp1 + 44);
+			offset = (unsigned long long)(uae_u32)get_long (tmp1 + 44);
 			tmp2 = get_long (tmp1 + 36); /* io_Length */
 
-			if (dataptr & 1 || offset & 511 || tmp2 & 511 || tmp2 + offset > (uae_u32)hfd->size)
+			if (dataptr & 1 || offset & 511 || tmp2 & 511 || offset + (unsigned long long)tmp2 > hfd->size)
 				goto bad_command;
 			
 			put_long (tmp1 + 32, tmp2); /* set io_Actual */
-			fseek (hfd->fd, offset, SEEK_SET);
+			hdf_file_seek64 (hfd->fd, hfd->offset + offset);
 			while (tmp2) {
 				char buffer[512];
 				int i;
 				for (i=0; i < 512; i++, dataptr++)
 					buffer[i] = get_byte(dataptr);
-				fwrite (buffer, 1, 512, hfd->fd);
+				hdf_file_write (hfd->fd, buffer, 512);
 				tmp2 -= 512;
 			}
 			break;
@@ -149,7 +151,34 @@ static uae_u32 hardfile_beginio (void)
 			put_long (tmp1+32, 0); /* io_Actual */
 			retval = 0;
 			break;
-			
+
+		case 22:
+		{
+			uae_u32 gptr = get_long (tmp1 + 40);
+			uae_u32 glen = get_long (tmp1 + 36);
+			int i;
+
+			if (gptr == 0 || glen < 24) {
+				put_long (tmp1 + 32, 0);
+				put_byte (tmp1 + 31, (uae_u8)-3);
+				retval = 0;
+				break;
+			}
+			if (glen > 96)
+				glen = 96;
+			for (i = 0; i < (int)glen; i++)
+				put_byte (gptr + i, 0);
+			put_long (gptr + 0, (uae_u32)hfd->blocksize);
+			put_long (gptr + 4, (uae_u32)(hfd->size / (unsigned long long)hfd->blocksize));
+			put_long (gptr + 8, hfd->nrcyls > 0 ? (uae_u32)hfd->nrcyls : 0);
+			put_long (gptr + 12, (uae_u32)(hfd->surfaces * hfd->secspertrack));
+			put_long (gptr + 16, (uae_u32)hfd->surfaces);
+			put_long (gptr + 20, (uae_u32)hfd->secspertrack);
+			put_long (tmp1 + 32, glen);
+			retval = 0;
+			break;
+		}
+
 		default:
 			/* Command not understood. */
 			put_byte (tmp1+31, (uae_u8)-3); /* io_Error */
