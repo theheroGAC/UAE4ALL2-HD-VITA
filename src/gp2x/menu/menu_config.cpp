@@ -713,7 +713,7 @@ void ApplyCd32Profile(void)
     mainMenu_CPU_model = 1;
     mainMenu_chipset = 2;
     mainMenu_chipMemory = 2;
-    mainMenu_fastMemory = 0;
+    mainMenu_fastMemory = 4;
     mainMenu_slowMemory = 0;
     mainMenu_bootHD = 0;
     mainMenu_drives = 0;

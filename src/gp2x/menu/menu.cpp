@@ -42,6 +42,7 @@ typedef struct private_hwdata {
 extern int mainMenu_background;
 extern int mainMenu_font;
 extern int bReloadKickstart;
+extern int kickstart;
 
 #ifdef USE_GUICHAN
 extern int mainMenu_displayHires;
@@ -424,13 +425,44 @@ void text_flip(void)
 
 void init_kickstart()
 {
+#ifdef __PSP2__
+	if (vita_set_kickstart(kickstart, 1) != 0 && !kickstart_warning)
+	{
+		kickstart_warning = 0;
+		bReloadKickstart = 1;
+		return;
+	}
+
+	static const int preferred_order[] = { 1, 3, 14, 12, 16, 13, 15, 2, 11, 0, 9, 10, 6, 17, 4, 5, 7, 8 };
+	for (int k = 0; k < KICKSTART_ROM_COUNT; k++) {
+		int idx = preferred_order[k];
+		if (vita_kickstart_available(idx)) {
+			kickstart = idx;
+			if (vita_set_kickstart(kickstart, 1) != 0 && !kickstart_warning) {
+				kickstart_warning = 0;
+				bReloadKickstart = 1;
+				return;
+			}
+		}
+	}
+
+	vita_gui_init();
+	vita_show_message_box("Kickstart Missing",
+		"Kickstart ROM not found!\n"
+		"Copy at least one ROM to ux0:/data/uae4all/kickstarts/\n\n"
+		"Supported ROMs:\n"
+		"A500/A2000: kick13.rom, kick34005.A500 (KS 1.3)\n"
+		"A500+: kick20.rom, kick37175.A500 (KS 2.04)\n"
+		"A600: kick37350.A600 (KS 2.05), kick40063.A600 (KS 3.1)\n"
+		"A1200: kick39106.A1200 (KS 3.0), kick40068.A1200 (KS 3.1)\n"
+		"A4000: kick39106.A4000 (KS 3.0), kick40068.A4000 (KS 3.1)\n"
+		"CD32: kick40060.CD32 + kick40060.CD32.ext\n"
+		"CDTV: kick13.rom + kick34005.CDTV",
+		"OK (X)");
+	kickstart_warning = 1;
+#else
 	if (uae4all_init_rom(romfile))
 	{
-#ifdef __PSP2__
-		vita_gui_init();
-		vita_show_message_box("Kickstart Missing", "Kickstart ROM not found!\nPlease copy kick13.rom and kick31.rom to ux0:/data/uae4all/kickstarts/", "OK (X)");
-		kickstart_warning=1;
-#else
 		init_text(0);
 		text_draw_background();
 		text_draw_window(2, 6, 42, 12, "--- ERROR ---");
@@ -454,13 +486,13 @@ void init_kickstart()
 			SDL_Delay(10);
 		}
 		kickstart_warning=1;
-#endif
 	}
 	else
 	{
 		kickstart_warning=0;
 		bReloadKickstart=1;
 	}
+#endif
 }
 
 void init_text(int splash)
