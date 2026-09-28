@@ -1,4 +1,4 @@
-# UAE4ALL2 HD — PlayStation Vita 1.11
+# UAE4ALL2 HD — PlayStation Vita 1.12
 
 A cleaned PlayStation Vita build of UAE4ALL2 HD, an Amiga emulator based on the UAE4ALL2 project.
 
@@ -42,7 +42,13 @@ uae4all2hd.vpk
 - One-press game launch from the Library for ADF/IPF, HDF, WHDLoad, LHA and CD32 images, plus TRIANGLE favourites shared with the WHDLoad tab
 - Custom library folders through `ux0:/data/uae4all/library_roots.txt` (up to 8 roots, one per line)
 - Animated Boing Ball startup splash with real initialization stages and progress bar
-- About screen with version 1.11 and automatic scrolling credits
+- About screen with version 1.12 and automatic scrolling credits
+- Dedicated LHA filter in the Game Library tab with automatic extraction and launch
+- Enhanced IPF floppy compatibility with variable-density decoding and weak bit handling (CapsLib)
+- In-game menu seamless RESUME: changing display, control or audio settings resumes without restarting
+- Hot multi-disk floppy swapping: inserting Disk 2 into DF0 during play resumes without resetting the Amiga
+- Complete controller and drive state reset when switching between HDF/WHDLoad and floppy media
+- Complete WHDLoad base deployment with Devs/Kickstarts, RTB/PAT relocation tables, and multi-alias ROM lookup
 - CD32 Akiko CD controller with native CHD (Compressed Hunks of Data), ISO, raw BIN, multi-track CUE images and M3U playlists for multi-disc games
 - CD32 in-game status bar with active blue "CD" read/write activity indicator and timeout
 - CD32 internal 1KB NVRAM (24C08 I2C EEPROM) emulation for native in-game saves (`ux0:/data/uae4all/saves/cd32.nvram`)
@@ -244,7 +250,7 @@ The packaged copies are `psp2data/data/sounds/floppy_drive.ogg` and `psp2data/da
 - **Restore Default Settings**: resets CPU, chipset, memory, Kickstart, floppies, HDFs, CD, display, audio and controls to factory defaults in memory (does not write any file).
 - **Reboot Amiga Emulation**: hard resets the Amiga with the current settings.
 - **Take Screenshot**: captures the next emulated frame as a PNG.
-- **About**: version 1.11 with scrolling credits.
+- **About**: version 1.12 with scrolling credits.
 - **Startup**: displays `Loading UAE4ALL2 HD...` before the main interface is opened.
 - **Release notes**: see [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -260,7 +266,7 @@ cmake .. -DBUILD_PSP2=ON -DCMAKE_BUILD_TYPE=Release
 ninja uae4all2.vpk
 ```
 
-The build output is `uae4all2hd.vpk`. The Vita package uses Title ID `UAE4ALLHD` and application version `01.11`, so it installs separately from the legacy UAE4ALL2.
+The build output is `uae4all2hd.vpk`. The Vita package uses Title ID `UAE4ALLHD` and application version `01.12`, so it installs separately from the legacy UAE4ALL2.
 
 The FTP implementation links the VitaSDK `ftpvita` library, matching the service integration used by VitaArchive. Ensure the VitaSDK installation includes the `ftpvita` development library before building.
 
