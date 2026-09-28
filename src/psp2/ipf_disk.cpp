@@ -37,7 +37,7 @@ VitaIpfImage *vita_ipf_open(const char *filename)
 
     int result = CAPSLockImage(id, (PCHAR)filename);
     if (result == imgeOk)
-        result = CAPSLoadImage(id, 0);
+        result = CAPSLoadImage(id, DI_LOCK_DENALT | DI_LOCK_DENVAR | DI_LOCK_UPDATEFD);
     if (result != imgeOk) {
         CAPSUnlockImage(id);
         CAPSRemImage(id);
@@ -113,21 +113,26 @@ int vita_ipf_read_track(VitaIpfImage *image, int cylinder, int head,
     CapsTrackInfo track;
     memset(&track, 0, sizeof(track));
 
-    /* Use DI_LOCK_TRKBIT so that track.tracklen returns the real
-       bit count of the track instead of the byte size of the internal
-       buffer (which may include multi-revolution data and padding). */
     int result = CAPSLockTrack(&track, image->id, (UDWORD)caps_cylinder,
                                (UDWORD)caps_head,
                                DI_LOCK_INDEX | DI_LOCK_ALIGN |
-                               DI_LOCK_UPDATEFD | DI_LOCK_TRKBIT);
-    if (result != imgeOk || !track.trackbuf || track.tracklen == 0) {
+                               DI_LOCK_UPDATEFD | DI_LOCK_TRKBIT |
+                               DI_LOCK_DENVAR | DI_LOCK_DENAUTO |
+                               DI_LOCK_NOISE);
+    if (result != imgeOk || !track.trackbuf) {
         CAPSUnlockTrack(image->id, (UDWORD)caps_cylinder, (UDWORD)caps_head);
         return 0;
     }
 
-    /* track.tracklen is now in bits (thanks to DI_LOCK_TRKBIT).
-       Calculate how many bytes we need to copy for one revolution. */
     int real_bits = (int)track.tracklen;
+    if (real_bits <= 0 && track.tracksize[0] > 0)
+        real_bits = (int)(track.tracksize[0] * 8);
+    if (real_bits <= 0 && track.trackbuf)
+        real_bits = 100000;
+    if (real_bits <= 0) {
+        CAPSUnlockTrack(image->id, (UDWORD)caps_cylinder, (UDWORD)caps_head);
+        return 0;
+    }
     int bytes = (real_bits + 7) / 8;
     if (bytes > destination_size)
         bytes = destination_size;

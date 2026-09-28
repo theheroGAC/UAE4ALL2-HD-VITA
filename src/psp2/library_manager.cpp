@@ -12,8 +12,8 @@
 #include "library_manager.h"
 
 #define VITA_LIBRARY_MAGIC      "UAE4ALL-LIBRARY"
-#define VITA_LIBRARY_VERSION    4
-#define VITA_LIBRARY_MAX_DEPTH  5
+#define VITA_LIBRARY_VERSION    6
+#define VITA_LIBRARY_MAX_DEPTH  8
 #define VITA_LIBRARY_ZIP_TAIL   (64 * 1024)
 #define VITA_LIBRARY_MAX_COUNT  999999
 
@@ -42,10 +42,10 @@ int vita_library_kind_from_ext(const char *filename)
         return VITA_LIB_KIND_FLOPPY;
     if (!strcasecmp(ext, ".hdf") || !strcasecmp(ext, ".hda") || !strcasecmp(ext, ".vhd"))
         return VITA_LIB_KIND_HDF;
-    if (!strcasecmp(ext, ".lha") || !strcasecmp(ext, ".lzh"))
+    if (!strcasecmp(ext, ".lha") || !strcasecmp(ext, ".lzh") || !strcasecmp(ext, ".lzx"))
         return VITA_LIB_KIND_LHA;
     if (!strcasecmp(ext, ".chd") || !strcasecmp(ext, ".cue") || !strcasecmp(ext, ".iso") ||
-        !strcasecmp(ext, ".m3u") || !strcasecmp(ext, ".bin"))
+        !strcasecmp(ext, ".m3u"))
         return VITA_LIB_KIND_CD;
 
     return VITA_LIB_KIND_UNKNOWN;
@@ -262,21 +262,47 @@ int vita_library_drop_sidecar_bins(VitaLibraryEntry *entries, int count)
         int drop = 0;
 
         if (ext && !strcasecmp(ext, ".bin")) {
-            static const char *companions[] = { ".m3u", ".cue", ".iso", NULL };
-            size_t base_len = (size_t)(ext - entries[i].path);
+            const char *slash_i = strrchr(entries[i].path, '/');
+            const char *fname_i = slash_i ? slash_i + 1 : entries[i].path;
+            size_t dir_len_i = slash_i ? (size_t)(slash_i - entries[i].path) : 0;
 
-            for (int c = 0; companions[c] && !drop; c++) {
-                char candidate[VITA_LIBRARY_PATH_LEN];
+            if (!strcasecmp(fname_i, "loader.bin")) {
+                drop = 1;
+            }
 
-                if (base_len + strlen(companions[c]) >= sizeof(candidate))
-                    continue;
-                memcpy(candidate, entries[i].path, base_len);
-                snprintf(candidate + base_len, sizeof(candidate) - base_len, "%s", companions[c]);
-
-                for (int j = 0; j < count; j++) {
-                    if (j != i && strcasecmp(entries[j].path, candidate) == 0) {
+            for (int j = 0; j < count && !drop; j++) {
+                if (j == i) continue;
+                const char *ext_j = lib_ext_of(entries[j].path);
+                if (!ext_j) continue;
+                if (!strcasecmp(ext_j, ".cue") || !strcasecmp(ext_j, ".m3u") ||
+                    !strcasecmp(ext_j, ".iso") || !strcasecmp(ext_j, ".chd")) {
+                    const char *slash_j = strrchr(entries[j].path, '/');
+                    size_t dir_len_j = slash_j ? (size_t)(slash_j - entries[j].path) : 0;
+                    if (dir_len_i == dir_len_j &&
+                        (dir_len_i == 0 || strncasecmp(entries[i].path, entries[j].path, dir_len_i) == 0)) {
                         drop = 1;
                         break;
+                    }
+                }
+            }
+
+            if (!drop) {
+                static const char *companions[] = { ".m3u", ".cue", ".iso", NULL };
+                size_t base_len = (size_t)(ext - entries[i].path);
+
+                for (int c = 0; companions[c] && !drop; c++) {
+                    char candidate[VITA_LIBRARY_PATH_LEN];
+
+                    if (base_len + strlen(companions[c]) >= sizeof(candidate))
+                        continue;
+                    memcpy(candidate, entries[i].path, base_len);
+                    snprintf(candidate + base_len, sizeof(candidate) - base_len, "%s", companions[c]);
+
+                    for (int j = 0; j < count; j++) {
+                        if (j != i && strcasecmp(entries[j].path, candidate) == 0) {
+                            drop = 1;
+                            break;
+                        }
                     }
                 }
             }
@@ -295,11 +321,15 @@ int vita_library_drop_sidecar_bins(VitaLibraryEntry *entries, int count)
 int vita_library_parse_root_line(const char *line, char *out, size_t out_size)
 {
     size_t start, len;
+    char temp[VITA_LIBRARY_PATH_LEN];
 
     if (!line || !out || out_size == 0)
         return 0;
 
     out[0] = '\0';
+
+    if ((unsigned char)line[0] == 0xEF && (unsigned char)line[1] == 0xBB && (unsigned char)line[2] == 0xBF)
+        line += 3;
 
     while (*line == ' ' || *line == '\t' || *line == '\r' || *line == '\n')
         line++;
@@ -314,17 +344,60 @@ int vita_library_parse_root_line(const char *line, char *out, size_t out_size)
         start++;
     len -= start;
 
-    while (len > 1 && line[start + len - 1] == '/')
+    if (len >= 2 && ((line[start] == '"' && line[start + len - 1] == '"') ||
+                     (line[start] == '\'' && line[start + len - 1] == '\''))) {
+        start++;
+        len -= 2;
+    }
+
+    if (len == 0 || len >= sizeof(temp) - 1)
+        return 0;
+
+    memcpy(temp, line + start, len);
+    temp[len] = '\0';
+
+    for (size_t i = 0; i < len; i++) {
+        if (temp[i] == '\\')
+            temp[i] = '/';
+    }
+
+    while (len > 1 && temp[len - 1] == '/') {
+        temp[len - 1] = '\0';
         len--;
+    }
 
-    if (len == 0 || len >= out_size)
-        return 0;
-    if (strchr(line + start, ':') == NULL)
-        return 0;
+    if (strchr(temp, ':') == NULL) {
+        char cand[VITA_LIBRARY_PATH_LEN];
+        snprintf(cand, sizeof(cand), "ux0:/%s", temp[0] == '/' ? temp + 1 : temp);
+        SceIoStat st;
+        if (sceIoGetstat(cand, &st) >= 0 && SCE_S_ISDIR(st.st_mode))
+            snprintf(out, out_size, "%s", cand);
+        else
+            snprintf(out, out_size, "ux0:/data/uae4all/%s", temp[0] == '/' ? temp + 1 : temp);
+    } else {
+        char *colon = strchr(temp, ':');
+        if (colon && colon[1] != '/') {
+            char dev[16];
+            size_t devlen = (size_t)(colon - temp) + 1;
+            if (devlen < sizeof(dev)) {
+                memcpy(dev, temp, devlen);
+                dev[devlen] = '\0';
+                snprintf(out, out_size, "%s/%s", dev, colon + 1);
+            } else {
+                snprintf(out, out_size, "%s", temp);
+            }
+        } else {
+            snprintf(out, out_size, "%s", temp);
+        }
+    }
 
-    memcpy(out, line + start, len);
-    out[len] = '\0';
-    return 1;
+    len = strlen(out);
+    while (len > 1 && out[len - 1] == '/') {
+        out[len - 1] = '\0';
+        len--;
+    }
+
+    return (len > 0 && len < out_size) ? 1 : 0;
 }
 
 int vita_library_root_count(void)
@@ -397,13 +470,35 @@ static int lib_is_root_path(const char *path)
 static int lib_is_excluded_dir(const char *name)
 {
     static const char *excluded[] = {
-        "saves", "whdload", "covers", "thumbs", "conf", "kickstarts", "tmp", "data", NULL
+        "saves", "covers", "thumbs", "conf", "kickstarts", "tmp", "whdload", NULL
     };
 
     for (int i = 0; excluded[i]; i++) {
         if (!strcasecmp(name, excluded[i]))
             return 1;
     }
+    return 0;
+}
+
+static int lib_is_dir_path(const char *path)
+{
+    SceUID dfd;
+    SceIoStat st;
+
+    if (!path || path[0] == '\0')
+        return 0;
+
+    dfd = sceIoDopen(path);
+    if (dfd >= 0) {
+        sceIoDclose(dfd);
+        return 1;
+    }
+
+    if (sceIoGetstat(path, &st) >= 0) {
+        if (SCE_S_ISDIR(st.st_mode) || (st.st_attr & 0x0010))
+            return 1;
+    }
+
     return 0;
 }
 
@@ -424,6 +519,58 @@ static int lib_build_roots(void)
         fclose(f);
     }
 
+    static const char *default_candidates[] = {
+        VITA_LIBRARY_ROMS_DIR,
+        VITA_LIBRARY_HOME_DIR,
+        "ux0:/lha",
+        "ux0:/LHA",
+        "ux0:/roms/lha",
+        "ux0:/roms/LHA",
+        "ux0:/data/uae4all/lha",
+        "ux0:/data/uae4all/LHA",
+        "ux0:/data/uae4all/roms/lha",
+        "ux0:/data/uae4all/roms/LHA",
+        "ux0:/data/lha",
+        "ux0:/data/LHA",
+        "ux0:/roms/amiga",
+        "ux0:/roms",
+        "ux0:/games/amiga",
+        "ux0:/games/lha",
+        "ux0:/games/LHA",
+        "ux0:/games",
+        "ux0:/download/lha",
+        "ux0:/download/LHA",
+        "ux0:/download",
+        "ux0:/whdload/lha",
+        "ux0:/whdload/LHA",
+        "uma0:/data/uae4all/roms",
+        "uma0:/data/uae4all",
+        "uma0:/data/uae4all/lha",
+        "uma0:/data/uae4all/LHA",
+        "uma0:/roms/amiga",
+        "uma0:/roms",
+        "uma0:/lha",
+        "uma0:/LHA",
+        "uma0:/roms/lha",
+        "uma0:/roms/LHA",
+        "uma0:/data/lha",
+        "uma0:/data/LHA",
+        "uma0:/whdload/lha",
+        "uma0:/whdload/LHA",
+        "ur0:/lha",
+        "ur0:/LHA",
+        "ur0:/data/uae4all/lha",
+        "ur0:/data/uae4all/LHA",
+        "imc0:/lha",
+        "imc0:/LHA",
+        "xmc0:/lha",
+        "xmc0:/LHA",
+        NULL
+    };
+    for (int i = 0; default_candidates[i]; i++) {
+        if (lib_is_dir_path(default_candidates[i]))
+            lib_add_root(default_candidates[i]);
+    }
     if (s_lib_root_count == 0) {
         lib_add_root(VITA_LIBRARY_ROMS_DIR);
         lib_add_root(VITA_LIBRARY_HOME_DIR);
@@ -555,7 +702,15 @@ static void lib_scan_dir(const char *dir, int depth, int max_depth)
 
         snprintf(full, sizeof(full), "%s/%s", dir, entry.d_name);
 
-        if (SCE_S_ISDIR(entry.d_stat.st_mode)) {
+        int is_dir = SCE_S_ISDIR(entry.d_stat.st_mode) || (entry.d_stat.st_attr & 0x0010);
+        if (!is_dir) {
+            SceUID test_dfd = sceIoDopen(full);
+            if (test_dfd >= 0) {
+                sceIoDclose(test_dfd);
+                is_dir = 1;
+            }
+        }
+        if (is_dir) {
             if (depth < max_depth && !lib_is_excluded_dir(entry.d_name) && !lib_is_root_path(full))
                 lib_scan_dir(full, depth + 1, max_depth);
             continue;

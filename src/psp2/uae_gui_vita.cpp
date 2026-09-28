@@ -1038,8 +1038,8 @@ void vita_draw_footer(const char *left_hint, const char *right_hint)
 
     vita_draw_hint_item(610.0f, btn_y, VITA_BTN_L,     "");
     vita_draw_hint_item(660.0f, btn_y, VITA_BTN_R,     "TAB");
-    float start_x = (s_active_tab == VITA_TAB_FLOPPY) ? 745.0f : 780.0f;
-    const char *start_label = (s_active_tab == VITA_TAB_FLOPPY) ? "RESUME/START" : "RESUME";
+    const char *start_label = emulating ? "RESUME" : "START";
+    float start_x = emulating ? 780.0f : 790.0f;
     vita_draw_hint_item(start_x, btn_y, VITA_BTN_START, start_label);
 }
 
@@ -1319,7 +1319,7 @@ void vita_show_about_box(void)
 {
     static const CreditLine credits[] = {
         { "UAE4ALL2 HD Vita", CR_TITLE },
-        { "Version 1.11 - Amiga Emulator for PS Vita", CR_SUBTITLE },
+        { "Version 1.12 - Amiga Emulator for PS Vita", CR_SUBTITLE },
         { "", CR_EMPTY },
         { "A high-definition port of the classic UAE4ALL Amiga emulator,", CR_TEXT },
         { "now with WHDLoad, HDF, IPF and CD32 support on the Vita.", CR_TEXT },
@@ -1419,7 +1419,7 @@ void vita_show_about_box(void)
         rot_x += 0.045f;
         rot_y += 0.065f;
         vita_draw_boing_ball_3d(dx + 46.0f, dy + 40.0f, 24.0f, rot_x, rot_y);
-        vita_draw_text(dx + 92.0f, dy + 20.0f, VITA_COLOR_AMIGA_RED, 1.15f, "UAE4ALL2 HD Vita v1.11");
+        vita_draw_text(dx + 92.0f, dy + 20.0f, VITA_COLOR_AMIGA_RED, 1.15f, "UAE4ALL2 HD Vita v1.12");
         vita_draw_text(dx + 92.0f, dy + 44.0f, VITA_COLOR_AMIGA_ORANGE, 0.85f, "About & Credits - WHDLoad Edition");
 
         vita_draw_rounded_rect_outline(dx + 16.0f, dy + 76.0f, dw - 32.0f, 1.0f, 0.0f, 1.0f, VITA_COLOR_CARD_BORDER);
@@ -1665,6 +1665,153 @@ bool vita_show_confirm_box(const char *title, const char *message, const char *y
         SDL_Delay(20);
     }
     return false;
+}
+
+int vita_show_choice4_box(const char *title, const char *message, const char *b1_label, const char *b2_label, const char *b3_label, const char *b4_label)
+{
+    vita_gui_init();
+    VitaInputState input;
+    memset(&input, 0, sizeof(input));
+    int choice = 0;
+    int frame_count = 0;
+    int count = b4_label ? 4 : 3;
+
+    char t1[64], t2[64], t3[64], t4[64];
+    strncpy(t1, b1_label ? b1_label : "Option 1", sizeof(t1) - 1);
+    t1[sizeof(t1) - 1] = '\0';
+    strncpy(t2, b2_label ? b2_label : "Option 2", sizeof(t2) - 1);
+    t2[sizeof(t2) - 1] = '\0';
+    if (count == 4) {
+        strncpy(t3, b3_label ? b3_label : "Option 3", sizeof(t3) - 1);
+        t3[sizeof(t3) - 1] = '\0';
+        strncpy(t4, b4_label ? b4_label : "Cancel", sizeof(t4) - 1);
+        t4[sizeof(t4) - 1] = '\0';
+    } else {
+        strncpy(t3, b3_label ? b3_label : "Cancel", sizeof(t3) - 1);
+        t3[sizeof(t3) - 1] = '\0';
+        t4[0] = '\0';
+    }
+
+    char *p = strchr(t1, '(');
+    if (p) *p = '\0';
+    p = strchr(t2, '(');
+    if (p) *p = '\0';
+    p = strchr(t3, '(');
+    if (p) *p = '\0';
+    p = strchr(t4, '(');
+    if (p) *p = '\0';
+
+    size_t l = strlen(t1);
+    while (l > 0 && t1[l - 1] == ' ') t1[--l] = '\0';
+    l = strlen(t2);
+    while (l > 0 && t2[l - 1] == ' ') t2[--l] = '\0';
+    l = strlen(t3);
+    while (l > 0 && t3[l - 1] == ' ') t3[--l] = '\0';
+    l = strlen(t4);
+    while (l > 0 && t4[l - 1] == ' ') t4[--l] = '\0';
+
+    while (1) {
+        vita_gui_update_input(&input);
+        frame_count++;
+
+        if (frame_count > 6) {
+            if (input.pressed & SCE_CTRL_LEFT) {
+                choice = (choice + count - 1) % count;
+            }
+            if (input.pressed & SCE_CTRL_RIGHT) {
+                choice = (choice + 1) % count;
+            }
+            if (input.pressed & SCE_CTRL_CROSS) {
+                if (count == 4) {
+                    if (choice == 0) return 1;
+                    if (choice == 1) return 2;
+                    if (choice == 2) return 3;
+                    return 0;
+                } else {
+                    if (choice == 0) return 1;
+                    if (choice == 1) return 2;
+                    return 0;
+                }
+            }
+            if (input.pressed & SCE_CTRL_SQUARE) {
+                return 2;
+            }
+            if (count == 4 && (input.pressed & SCE_CTRL_TRIANGLE)) {
+                return 3;
+            }
+            if (input.pressed & SCE_CTRL_CIRCLE) {
+                return 0;
+            }
+        }
+
+        SDL_FillRect(prSDLScreen, NULL, to_sdl_color(VITA_COLOR_OVERLAY_BG));
+
+        float dw = 780.0f, dh = 270.0f;
+        float dx = (VITA_SCREEN_W - dw) * 0.5f;
+        float dy = (VITA_SCREEN_H - dh) * 0.5f;
+        vita_draw_card_custom(dx, dy, dw, dh, VITA_COLOR_HEADER, VITA_COLOR_FOCUS_BORDER);
+
+        vita_draw_text_centered(dx + (dw * 0.5f), dy + 22.0f, VITA_COLOR_AMIGA_RED, 1.10f, title ? title : "Choice");
+        vita_draw_text_wrapped(dx + 30.0f, dy + 70.0f, dw - 60.0f, VITA_COLOR_TEXT_WHITE, 0.90f, message ? message : "");
+
+        float bh = 38.0f;
+        float by = dy + dh - 54.0f;
+        float gap = count == 4 ? 12.0f : 16.0f;
+        float scale = count == 4 ? 0.78f : 0.85f;
+
+        float w1 = 50.0f + (float)vita_get_text_width(scale, t1) + 16.0f;
+        float w2 = 50.0f + (float)vita_get_text_width(scale, t2) + 16.0f;
+        float w3 = 50.0f + (float)vita_get_text_width(scale, t3) + 16.0f;
+        float w4 = count == 4 ? (50.0f + (float)vita_get_text_width(scale, t4) + 16.0f) : 0.0f;
+
+        if (count == 4) {
+            if (w1 < 140.0f) w1 = 140.0f;
+            if (w2 < 140.0f) w2 = 140.0f;
+            if (w3 < 95.0f) w3 = 95.0f;
+            if (w4 < 120.0f) w4 = 120.0f;
+        } else {
+            if (w1 < 160.0f) w1 = 160.0f;
+            if (w2 < 160.0f) w2 = 160.0f;
+            if (w3 < 120.0f) w3 = 120.0f;
+        }
+
+        float total_w = w1 + w2 + w3 + (count == 4 ? (w4 + gap * 3.0f) : (gap * 2.0f));
+        float b1_x = dx + ((dw - total_w) * 0.5f);
+        float b2_x = b1_x + w1 + gap;
+        float b3_x = b2_x + w2 + gap;
+        float b4_x = count == 4 ? (b3_x + w3 + gap) : 0.0f;
+
+        vita_draw_rounded_rect(b1_x, by, w1, bh, 6.0f, choice == 0 ? VITA_COLOR_AMIGA_RED : VITA_COLOR_CARD);
+        vita_draw_button_glyph(b1_x + 18.0f, by + 8.0f, VITA_BTN_CROSS);
+        vita_draw_text(b1_x + 48.0f, by + 11.0f, VITA_COLOR_TEXT_WHITE, scale, t1);
+
+        vita_draw_rounded_rect(b2_x, by, w2, bh, 6.0f, choice == 1 ? VITA_COLOR_AMIGA_RED : VITA_COLOR_CARD);
+        vita_draw_button_glyph(b2_x + 18.0f, by + 8.0f, VITA_BTN_SQUARE);
+        vita_draw_text(b2_x + 48.0f, by + 11.0f, VITA_COLOR_TEXT_WHITE, scale, t2);
+
+        if (count == 4) {
+            vita_draw_rounded_rect(b3_x, by, w3, bh, 6.0f, choice == 2 ? VITA_COLOR_AMIGA_RED : VITA_COLOR_CARD);
+            vita_draw_button_glyph(b3_x + 18.0f, by + 8.0f, VITA_BTN_TRIANGLE);
+            vita_draw_text(b3_x + 48.0f, by + 11.0f, VITA_COLOR_TEXT_WHITE, scale, t3);
+
+            vita_draw_rounded_rect(b4_x, by, w4, bh, 6.0f, choice == 3 ? VITA_COLOR_AMIGA_RED : VITA_COLOR_CARD);
+            vita_draw_button_glyph(b4_x + 18.0f, by + 8.0f, VITA_BTN_CIRCLE);
+            vita_draw_text(b4_x + 48.0f, by + 11.0f, VITA_COLOR_TEXT_WHITE, scale, t4);
+        } else {
+            vita_draw_rounded_rect(b3_x, by, w3, bh, 6.0f, choice == 2 ? VITA_COLOR_AMIGA_RED : VITA_COLOR_CARD);
+            vita_draw_button_glyph(b3_x + 18.0f, by + 8.0f, VITA_BTN_CIRCLE);
+            vita_draw_text(b3_x + 48.0f, by + 11.0f, VITA_COLOR_TEXT_WHITE, scale, t3);
+        }
+
+        SDL_Flip(prSDLScreen);
+        SDL_Delay(20);
+    }
+    return 0;
+}
+
+int vita_show_choice3_box(const char *title, const char *message, const char *b1_label, const char *b2_label, const char *b3_label)
+{
+    return vita_show_choice4_box(title, message, b1_label, b2_label, b3_label, NULL);
 }
 
 void vita_draw_boing_ball_icon(float cx, float cy, float radius, float rot_angle)
@@ -1919,6 +2066,12 @@ void vita_set_launch_media(int media)
 
 static int vita_start_action_impl(int force_restart)
 {
+    if (emulating && !force_restart && s_launch_media_override < 0) {
+        bReloadKickstart = 0;
+        mainMenu_case = MAIN_MENU_CASE_RUN;
+        return 1;
+    }
+
     int automatic_media = -1;
     int media_prepared = 0;
     int media_reboot = 0;
@@ -1926,6 +2079,12 @@ static int vita_start_action_impl(int force_restart)
     if (s_launch_media_override >= 0) {
         automatic_media = s_launch_media_override;
         s_launch_media_override = -1;
+        media_prepared = 1;
+    } else if (s_active_tab == VITA_TAB_FLOPPY && (uae4all_image_file0[0] != '\0' || uae4all_image_file1[0] != '\0')) {
+        automatic_media = 0;
+        media_prepared = 1;
+    } else if (s_active_tab == VITA_TAB_HARD_DISK && (uae4all_hard_file0[0] != '\0' || uae4all_hard_file1[0] != '\0')) {
+        automatic_media = 1;
         media_prepared = 1;
     } else if (current_cd_image[0] != '\0' || cdrom_is_inserted)
         automatic_media = 3;
@@ -1940,13 +2099,22 @@ static int vita_start_action_impl(int force_restart)
              uae4all_image_file2[0] != '\0' || uae4all_image_file3[0] != '\0')
         automatic_media = 0;
 
+    int eject_result = -1;
     if (automatic_media == 1 || automatic_media == 2) {
-        int eject_result = vita_confirm_eject_for_hard_disk_launch();
+        eject_result = vita_confirm_eject_for_hard_disk_launch();
         if (eject_result == 0)
             return 0;
-        if (eject_result == 2) {
+        if (eject_result == 1 || eject_result == 2) {
             media_prepared = 1;
             media_reboot = 1;
+            mainMenu_bootHD = (automatic_media == 1 ? 2 : 1);
+            reset_hdConf();
+        }
+        if (eject_result == 3) {
+            media_prepared = 1;
+            media_reboot = 0;
+            mainMenu_bootHD = (automatic_media == 1 ? 2 : 1);
+            reset_hdConf();
         }
     }
 
@@ -1960,22 +2128,47 @@ static int vita_start_action_impl(int force_restart)
             media_reboot = vita_prepare_floppy_media(!emulating);
         else {
             vita_apply_media_preset(automatic_media);
-            media_reboot = 1;
+            if (eject_result != 3)
+                media_reboot = 1;
         }
     }
 
-    if (automatic_media >= 0 && !vita_kickstart_ready())
-        kickstart_warning = 1;
+    if (automatic_media >= 0 && !vita_kickstart_ready()) {
+        static const int preferred_order[] = { 1, 3, 14, 12, 16, 13, 15, 2, 11, 0, 9, 10, 6, 17, 4, 5, 7, 8 };
+        for (int k = 0; k < KICKSTART_ROM_COUNT; k++) {
+            int idx = preferred_order[k];
+            if (vita_kickstart_available(idx)) {
+                kickstart = idx;
+                vita_set_kickstart(kickstart, 1);
+                kickstart_warning = 0;
+                break;
+            }
+        }
+        if (!vita_kickstart_ready())
+            kickstart_warning = 1;
+    }
 
     if (kickstart_warning) {
         if (kickstart == 6)
             vita_show_message_box("Kickstart CD32 Missing", "CD32 requires kick40060.CD32 AND kick40060.CD32.ext (or 1MB combined ROM) in ux0:/data/uae4all/kickstarts/.", "OK (X)");
         else
-            vita_show_message_box("Kickstart Missing", "Copy kick13.rom and kick31.rom for normal Amiga use, or kick40060.CD32 and kick40060.CD32.ext for CD32, to ux0:/data/uae4all/kickstarts/.", "OK (X)");
+            vita_show_message_box("Kickstart Missing",
+                "Kickstart ROM not found in ux0:/data/uae4all/kickstarts/\n\n"
+                "Supported ROMs:\n"
+                "A500/A2000: kick13.rom, kick34005.A500 (KS 1.3)\n"
+                "A500+: kick20.rom, kick37175.A500 (KS 2.04)\n"
+                "A600: kick37350.A600 (KS 2.05), kick40063.A600 (KS 3.1)\n"
+                "A1200: kick39106.A1200 (KS 3.0), kick40068.A1200 (KS 3.1)\n"
+                "A4000: kick39106.A4000 (KS 3.0), kick40068.A4000 (KS 3.1)\n"
+                "CD32: kick40060.CD32 + kick40060.CD32.ext\n"
+                "CDTV: kick13.rom + kick34005.CDTV",
+                "OK (X)");
         return 0;
     }
 
-    if ((media_prepared && emulating && media_reboot) || force_restart)
+    if (eject_result == 3)
+        bReloadKickstart = 0;
+    else if ((media_prepared && emulating && media_reboot) || force_restart)
         bReloadKickstart = 1;
 
     mainMenu_case = MAIN_MENU_CASE_RUN;

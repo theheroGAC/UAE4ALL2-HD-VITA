@@ -81,6 +81,7 @@ typedef struct {
 } VitaSystemInfo;
 
 int  vita_set_kickstart(int index, int load_rom);
+int  vita_kickstart_available(int index);
 int  vita_apply_media_preset(int media_type);
 int  vita_kickstart_ready(void);
 int  vita_prepare_floppy_media(int fresh_start);
@@ -141,6 +142,8 @@ void vita_draw_slider_item(float x, float y, float w, float h, const char *title
 void vita_show_message_box(const char *title, const char *message, const char *btn_label);
 void vita_show_about_box(void);
 bool vita_show_confirm_box(const char *title, const char *message, const char *yes_label, const char *no_label);
+int  vita_show_choice3_box(const char *title, const char *message, const char *b1_label, const char *b2_label, const char *b3_label);
+int  vita_show_choice4_box(const char *title, const char *message, const char *b1_label, const char *b2_label, const char *b3_label, const char *b4_label);
 void vita_gui_draw_progress(const char *title, const char *subtitle, float fraction, const char *item_name);
 void vita_gui_show_launch_loading(const char *game_name);
 void vita_gui_show_boot_splash(const char *stage, float progress);

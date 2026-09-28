@@ -113,10 +113,16 @@ int hdf_analyze(const char *path, HdfInfo *info)
     info->reserved = HDF_DEFAULT_RESERVED;
     info->surfaces = 1;
 
-    f = hdf_open_readonly(clean);
-    if (!hdf_is_open(f)) {
-        hdf_set_error(info->error, sizeof(info->error), "Unable to open HDF file: %s", path);
-        return 0;
+    f = hdf_open_readwrite(clean);
+    if (hdf_is_open(f)) {
+        info->is_readonly = 0;
+    } else {
+        f = hdf_open_readonly(clean);
+        if (!hdf_is_open(f)) {
+            hdf_set_error(info->error, sizeof(info->error), "Unable to open HDF file: %s", path);
+            return 0;
+        }
+        info->is_readonly = 1;
     }
 
     {
@@ -149,16 +155,6 @@ int hdf_analyze(const char *path, HdfInfo *info)
 
     info->size = size;
     info->total_blocks = size / HDF_DEFAULT_BLOCKSIZE;
-
-    {
-        hdf_fd rw = hdf_open_readwrite(clean);
-        if (hdf_is_open(rw)) {
-            hdf_close(rw);
-            info->is_readonly = 0;
-        } else {
-            info->is_readonly = 1;
-        }
-    }
 
     if (!hdf_read_block(f, 0, HDF_DEFAULT_BLOCKSIZE, hdr)) {
         hdf_close(f);
@@ -214,13 +210,13 @@ int hdf_analyze(const char *path, HdfInfo *info)
         snprintf(info->filesystem, sizeof(info->filesystem), "Unknown");
 
     if (info->size >= 1073741824ULL && info->size < 2147483648ULL)
-        info->surfaces = 2;
-    else if (info->size >= 2147483648ULL && info->size <= 4294967296ULL)
         info->surfaces = 4;
-    else if (info->size > 4294967296ULL && info->size < 8589934592ULL)
+    else if (info->size >= 2147483648ULL && info->size < 4294967296ULL)
         info->surfaces = 8;
-    else if (info->size >= 8589934592ULL)
+    else if (info->size >= 4294967296ULL && info->size < 8589934592ULL)
         info->surfaces = 16;
+    else if (info->size >= 8589934592ULL)
+        info->surfaces = 32;
     info->cylinders = (int)((info->total_blocks / (unsigned long long)info->sectors_per_track) / (unsigned long long)info->surfaces);
 
     info->valid = 1;

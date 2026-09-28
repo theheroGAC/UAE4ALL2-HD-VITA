@@ -409,7 +409,7 @@ static const char *vita_extended_rom_aliases[KICKSTART_ROM_COUNT][16] = {
     { NULL },
     { NULL },
     { NULL },
-    { "kick34005.CDTV", "amiga-os-130-cdtv.rom", "cdtv.rom", NULL }
+    { "kick34005.CDTV", "amiga-os-130-cdtv-ext.rom", "amiga-os-130-cdtv.rom", "cdtv.rom", NULL }
 };
 
 int vita_set_kickstart(int index, int load_rom)
@@ -497,7 +497,7 @@ int vita_set_kickstart(int index, int load_rom)
     return 1;
 }
 
-static int vita_kickstart_available(int index)
+int vita_kickstart_available(int index)
 {
     static const char *subdirs[] = { "kickstarts", "roms", "" };
     char candidate[256];
@@ -544,11 +544,39 @@ static int vita_preset_kickstart(int media_type)
 {
     switch (media_type) {
     case 0:
+        if (vita_kickstart_available(1))  return 1;
+        if (vita_kickstart_available(17)) return 17;
+        if (vita_kickstart_available(0))  return 0;
+        if (vita_kickstart_available(9))  return 9;
+        if (vita_kickstart_available(2))  return 2;
+        if (vita_kickstart_available(10)) return 10;
+        if (vita_kickstart_available(11)) return 11;
+        if (vita_kickstart_available(12)) return 12;
+        if (vita_kickstart_available(3))  return 3;
+        if (vita_kickstart_available(14)) return 14;
+        if (vita_kickstart_available(13)) return 13;
+        if (vita_kickstart_available(15)) return 15;
+        if (vita_kickstart_available(16)) return 16;
+        for (int i = 0; i < KICKSTART_ROM_COUNT; i++) {
+            if (vita_kickstart_available(i)) return i;
+        }
         return 1;
     case 1:
     case 2:
+        if (vita_kickstart_available(3))  return 3;
+        if (vita_kickstart_available(14)) return 14;
+        if (vita_kickstart_available(12)) return 12;
+        if (vita_kickstart_available(16)) return 16;
+        if (vita_kickstart_available(13)) return 13;
+        if (vita_kickstart_available(15)) return 15;
+        if (vita_kickstart_available(2))  return 2;
+        if (vita_kickstart_available(1))  return 1;
+        for (int i = 0; i < KICKSTART_ROM_COUNT; i++) {
+            if (vita_kickstart_available(i)) return i;
+        }
         return 3;
     case 3:
+        if (vita_kickstart_available(6)) return 6;
         return 6;
     default:
         return -1;
@@ -557,12 +585,20 @@ static int vita_preset_kickstart(int media_type)
 
 int vita_apply_media_preset(int media_type)
 {
-    if (vita_preset_kickstart(media_type) < 0)
+    int target_ks = vita_preset_kickstart(media_type);
+    if (target_ks < 0)
         return 0;
-    if (!vita_kickstart_available(vita_preset_kickstart(media_type)))
+    if (!vita_kickstart_available(target_ks))
         return 0;
 
     ApplyAutomaticGamePreset(media_type);
+    kickstart = target_ks;
+    if (kickstart == 3 || kickstart == 13 || kickstart == 14 || kickstart == 15 || kickstart == 16) {
+        mainMenu_CPU_model = 1;
+        mainMenu_chipset = 2 | 0x100;
+        UpdateCPUModelSettings();
+        UpdateChipsetSettings();
+    }
     vita_set_kickstart(kickstart, 0);
     return kickstart_warning ? 0 : 1;
 }
@@ -601,7 +637,8 @@ void vita_view_floppy(VitaInputState *input, int *selected_item)
             if (res == 1) {
                 if (*selected_item == 0) {
                     copy_drive_path(uae4all_image_file0, new_file);
-                    vita_set_launch_media(0);
+                    if (!emulating)
+                        vita_set_launch_media(0);
                 }
                 if (*selected_item == 1) copy_drive_path(uae4all_image_file1, new_file);
                 if (*selected_item == 2) copy_drive_path(uae4all_image_file2, new_file);
@@ -651,7 +688,9 @@ void vita_view_floppy(VitaInputState *input, int *selected_item)
     }
 
     if (input->pressed & SCE_CTRL_SQUARE) {
-        mainMenu_case = MAIN_MENU_CASE_RESET;
+        vita_prepare_floppy_media(1);
+        bReloadKickstart = 1;
+        mainMenu_case = MAIN_MENU_CASE_RUN;
     }
 
     float card_x = 20.0f;
@@ -1289,26 +1328,18 @@ static int vita_has_bootable_hdf(void)
     return 0;
 }
 
+static void vita_eject_all_hdf(void);
+
 int vita_prepare_floppy_media(int fresh_start)
 {
     if (mainMenu_drives < 1)
         mainMenu_drives = DEFAULT_DRIVES;
 
-    if (kickstart == 6) {
-        vita_apply_media_preset(0);
-        return 1;
-    }
-
-    if (mainMenu_bootHD == 0 && !fresh_start)
-        return 0;
-
-    if (mainMenu_bootHD != 0 && vita_has_mounted_hdf() && !vita_has_bootable_hdf())
-        return 1;
-
-    if (mainMenu_bootHD != 0) {
-        mainMenu_bootHD = 0;
-        reset_hdConf();
-    }
+    vita_eject_all_hdf();
+    uae4all_hard_dir[0] = '\0';
+    mainMenu_whdload_game[0] = '\0';
+    mainMenu_bootHD = 0;
+    reset_hdConf();
 
     vita_apply_media_preset(0);
     return 1;
@@ -1338,6 +1369,8 @@ static void vita_eject_all_hdf(void)
     uae4all_hard_file_ro[1] = 0;
     uae4all_hard_file_ro[2] = 0;
     uae4all_hard_file_ro[3] = 0;
+    uae4all_hard_dir[0] = '\0';
+    mainMenu_whdload_game[0] = '\0';
     reset_hdConf();
     gui_update();
 }
@@ -1360,17 +1393,23 @@ int vita_confirm_eject_for_hard_disk_launch(void)
         message = "A CD image is inserted. Eject it before launching this hard-disk game?";
     else
         message = "A floppy disk is inserted. Eject it before launching this hard-disk game?";
-    if (!vita_show_confirm_box("Media Detected",
+    int choice = vita_show_choice4_box("Media Detected",
             message,
-            "Eject and Launch (X)", "Cancel Launch (O)"))
+            "Eject and Launch (X)", "Keep and Launch ([])", "Keep (/\\)", "Cancel Launch (O)");
+    if (choice == 0)
         return 0;
-    if (eject_floppy)
-        vita_eject_all_floppies();
-    if (has_cd) {
-        cdrom_close_image();
-        cdrom_audio_stop();
+    if (choice == 1) {
+        if (eject_floppy)
+            vita_eject_all_floppies();
+        if (has_cd) {
+            cdrom_close_image();
+            cdrom_audio_stop();
+        }
+        return 2;
     }
-    return 2;
+    if (choice == 2)
+        return 1;
+    return 3;
 }
 
 static int vita_confirm_eject_for_whdload_launch(void)
@@ -1391,18 +1430,24 @@ static int vita_confirm_eject_for_whdload_launch(void)
         message = "An HDF image is mounted. Eject it before launching this WHDLoad game?";
     else
         message = "A floppy disk is inserted. Eject it before launching this WHDLoad game?";
-    if (!vita_show_confirm_box("Media Detected", message,
-            "Eject and Launch (X)", "Cancel Launch (O)"))
+    int choice = vita_show_choice4_box("Media Detected", message,
+            "Eject and Launch (X)", "Keep and Launch ([])", "Keep (/\\)", "Cancel Launch (O)");
+    if (choice == 0)
         return 0;
-    if (has_floppy)
-        vita_eject_all_floppies();
-    if (has_hdf)
-        vita_eject_all_hdf();
-    if (has_cd) {
-        cdrom_close_image();
-        cdrom_audio_stop();
+    if (choice == 1) {
+        if (has_floppy)
+            vita_eject_all_floppies();
+        if (has_hdf)
+            vita_eject_all_hdf();
+        if (has_cd) {
+            cdrom_close_image();
+            cdrom_audio_stop();
+        }
+        return 2;
     }
-    return 1;
+    if (choice == 2)
+        return 1;
+    return 3;
 }
 
 static void whdload_ensure_game_dir(const char *game)
@@ -1843,7 +1888,7 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
         { "Amiga 500+ (Enhanced ECS 2.04)", "68000 7MHz | Kickstart 2.04 | 1MB Chip + 1MB Fast RAM", "ECS", "Recommended for late ECS titles and productivity software" },
         { "Amiga 600 (Enhanced ECS 2.05)", "68000 7MHz | Kickstart 2.05 | 2MB Chip + 8MB Fast RAM", "ECS", "Recommended for Amiga 600 games and ECS software" },
         { "Amiga 1200 (Advanced AGA 3.1)", "68020 14MHz | Kickstart 3.1 | 2MB Chip + 4MB Fast RAM", "AGA", "Recommended for AGA games (Alien Breed 3D, Slam Tilt, Gloom)" },
-        { "Amiga CD32 (Console CD Mode)", "68020 14MHz | Kickstart 3.1 CD32 | 2MB Chip RAM + Akiko", "CD32", "Recommended for Amiga CD32 ISO, CUE and CHD disc images" },
+        { "Amiga CD32 (Console CD Mode)", "68020 14MHz | Kickstart 3.1 CD32 | 2MB Chip + 8MB Fast RAM + Akiko", "CD32", "Recommended for Amiga CD32 ISO, CUE and CHD disc images" },
         { "Amiga Custom (Custom ROM)", "68020 14MHz | Custom Kickstart | 2MB Chip + 8MB Fast RAM", "CUST", "Uses kickcustom.rom / custom.rom in ux0:/data/uae4all/kickstarts/" }
     };
 
@@ -3219,7 +3264,7 @@ void vita_view_system(VitaInputState *input, int *selected_item)
                 }
                 break;
             case 10:
-                if (vita_show_confirm_box("About", "Open UAE4All2 HD v1.11 and credits?", "Yes", "No")) {
+                if (vita_show_confirm_box("About", "Open UAE4All2 HD v1.12 and credits?", "Yes", "No")) {
                     vita_show_about_box();
                 }
                 break;
@@ -3245,7 +3290,7 @@ void vita_view_system(VitaInputState *input, int *selected_item)
         "Reboot Amiga Emulation",
         "Take Screenshot",
         "FTP File Transfer",
-        "About UAE4All2 HD v1.11"
+        "About UAE4All2 HD v1.12"
     };
     static const char *system_subtitles[11] = {
         "Save all disk, display, and hardware settings for current game",
@@ -3283,7 +3328,7 @@ void vita_view_system(VitaInputState *input, int *selected_item)
 
 #define VITA_LIBRARY_WHD_MAX    256
 #define VITA_LIBRARY_LABEL_LEN  96
-#define VITA_LIBRARY_FILTERS    6
+#define VITA_LIBRARY_FILTERS    7
 
 typedef struct {
     char label[VITA_LIBRARY_LABEL_LEN];
@@ -3306,7 +3351,7 @@ static char s_lib_whd_names[VITA_LIBRARY_WHD_MAX][128];
 static int s_lib_whd_count = 0;
 
 static const char *s_lib_filter_names[VITA_LIBRARY_FILTERS] = {
-    "ALL", "FAVOURITES", "FLOPPY", "WHDLOAD", "HARD DISK", "CD32"
+    "ALL", "FAVOURITES", "FLOPPY", "WHDLOAD", "HARD DISK", "CD32", "LHA"
 };
 
 #define VITA_LIB_FILTER_ALL        0
@@ -3315,6 +3360,7 @@ static const char *s_lib_filter_names[VITA_LIBRARY_FILTERS] = {
 #define VITA_LIB_FILTER_WHDLOAD    3
 #define VITA_LIB_FILTER_HDF        4
 #define VITA_LIB_FILTER_CD         5
+#define VITA_LIB_FILTER_LHA        6
 
 static void vita_lib_show_scan_message(const char *message)
 {
@@ -3444,6 +3490,7 @@ static int vita_lib_row_matches_filter(int kind, const char *label)
     case VITA_LIB_FILTER_WHDLOAD:    return kind == VITA_LIB_KIND_WHDLOAD || kind == VITA_LIB_KIND_LHA;
     case VITA_LIB_FILTER_HDF:        return kind == VITA_LIB_KIND_HDF;
     case VITA_LIB_FILTER_CD:         return kind == VITA_LIB_KIND_CD;
+    case VITA_LIB_FILTER_LHA:        return kind == VITA_LIB_KIND_LHA;
     default:                         return 1;
     }
 }
@@ -3564,6 +3611,10 @@ static int vita_lib_prepare_row(int row_index)
             cdrom_close_image();
             cdrom_audio_stop();
         }
+
+        vita_eject_all_hdf();
+        mainMenu_bootHD = 0;
+        reset_hdConf();
 
         if (mainMenu_drives < slot + 1)
             mainMenu_drives = slot + 1;
@@ -3696,9 +3747,16 @@ void vita_view_library(VitaInputState *input, int *selected_item)
 
     if (input->pressed & SCE_CTRL_CROSS) {
         int result = vita_lib_prepare_row(*selected_item);
-        if (result < 0)
-            vita_show_message_box("Library", "The selected item could not be prepared.\nCheck the file and try again.", "OK (X)");
-        else if (result > 0) {
+        if (result < 0) {
+            const char *err = vita_whdload_get_last_error();
+            if (err && err[0]) {
+                char msg[512];
+                snprintf(msg, sizeof(msg), "Preparation failed:\n%s", err);
+                vita_show_message_box("Library", msg, "OK (X)");
+            } else {
+                vita_show_message_box("Library", "The selected item could not be prepared.\nCheck the file and try again.", "OK (X)");
+            }
+        } else if (result > 0) {
             if (vita_start_action_restart())
                 return;
         }

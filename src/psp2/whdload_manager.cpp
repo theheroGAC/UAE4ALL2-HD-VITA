@@ -788,7 +788,7 @@ int vita_whdload_install_lha(const char *archive_path, char *installed_path, siz
 
     int native_count = extract_native_lha(archive_path, destination_root);
     if (native_count > 0) {
-        strncpy(installed_path, destination_root, installed_path_size - 1);
+        strncpy(installed_path, folder, installed_path_size - 1);
         installed_path[installed_path_size - 1] = '\0';
         return 1;
     }
@@ -876,15 +876,19 @@ int vita_whdload_install_lha(const char *archive_path, char *installed_path, siz
         return 0;
     }
 
-    strncpy(installed_path, destination_root, installed_path_size - 1);
+    strncpy(installed_path, folder, installed_path_size - 1);
     installed_path[installed_path_size - 1] = '\0';
     return 1;
 }
 
 static void deploy_file_if_missing(const char *src, const char *dst)
 {
-    SceIoStat st;
-    if (sceIoGetstat(dst, &st) >= 0 && st.st_size > 0) return;
+    SceIoStat src_st, dst_st;
+    if (sceIoGetstat(src, &src_st) < 0 || src_st.st_size <= 0)
+        return;
+    if (sceIoGetstat(dst, &dst_st) >= 0 && dst_st.st_size == src_st.st_size)
+        return;
+
     char dst_copy[512];
     strncpy(dst_copy, dst, sizeof(dst_copy) - 1);
     dst_copy[sizeof(dst_copy) - 1] = '\0';
@@ -897,79 +901,185 @@ static void deploy_file_if_missing(const char *src, const char *dst)
     copy_text_file(src, dst);
 }
 
+static void deploy_directory_recursive(const char *src_dir, const char *dst_dir)
+{
+    SceUID dfd = sceIoDopen(src_dir);
+    if (dfd < 0)
+        return;
+
+    ensure_directory(dst_dir);
+
+    SceIoDirent entry;
+    while (sceIoDread(dfd, &entry) > 0) {
+        if (entry.d_name[0] == '.')
+            continue;
+
+        char src_sub[512];
+        char dst_sub[512];
+        snprintf(src_sub, sizeof(src_sub), "%s/%s", src_dir, entry.d_name);
+        snprintf(dst_sub, sizeof(dst_sub), "%s/%s", dst_dir, entry.d_name);
+
+        int is_dir = SCE_S_ISDIR(entry.d_stat.st_mode) || (entry.d_stat.st_attr & 0x0010);
+        if (is_dir) {
+            deploy_directory_recursive(src_sub, dst_sub);
+        } else {
+            deploy_file_if_missing(src_sub, dst_sub);
+        }
+    }
+    sceIoDclose(dfd);
+}
+
 static void deploy_kickstart_file(const char *destination_name, const char *const *source_names)
 {
+    static const char *kick_dirs[] = {
+        "ux0:/data/uae4all/kickstarts",
+        "uma0:/data/uae4all/kickstarts",
+        "ux0:/kickstarts",
+        "uma0:/kickstarts",
+        "app0:/data/whdload_base/Devs/Kickstarts",
+        NULL
+    };
     char destination[512];
     snprintf(destination, sizeof(destination), "%s/Devs/Kickstarts/%s", VITA_WHDLOAD_ROOT, destination_name);
-    for (int i = 0; source_names[i]; i++) {
-        char source[512];
-        snprintf(source, sizeof(source), "ux0:/data/uae4all/kickstarts/%s", source_names[i]);
-        SceIoStat st;
-        if (sceIoGetstat(source, &st) >= 0 && st.st_size > 0) {
-            deploy_file_if_missing(source, destination);
-            return;
+
+    for (int d = 0; kick_dirs[d]; d++) {
+        for (int i = 0; source_names[i]; i++) {
+            char source[512];
+            snprintf(source, sizeof(source), "%s/%s", kick_dirs[d], source_names[i]);
+            SceIoStat st;
+            if (sceIoGetstat(source, &st) >= 0 && st.st_size > 0) {
+                deploy_file_if_missing(source, destination);
+                return;
+            }
         }
+    }
+}
+
+static void deploy_kickstart_extras(void)
+{
+    static const char *dirs[] = {
+        "ux0:/data/uae4all/kickstarts",
+        "uma0:/data/uae4all/kickstarts",
+        NULL
+    };
+    for (int d = 0; dirs[d]; d++) {
+        SceUID dfd = sceIoDopen(dirs[d]);
+        if (dfd < 0) continue;
+        SceIoDirent entry;
+        while (sceIoDread(dfd, &entry) > 0) {
+            if (entry.d_name[0] == '.') continue;
+            const char *ext = strrchr(entry.d_name, '.');
+            if (ext && (!strcasecmp(ext, ".rtb") || !strcasecmp(ext, ".pat") || !strcasecmp(ext, ".key"))) {
+                char src[512];
+                char dst[512];
+                snprintf(src, sizeof(src), "%s/%s", dirs[d], entry.d_name);
+                snprintf(dst, sizeof(dst), "%s/Devs/Kickstarts/%s", VITA_WHDLOAD_ROOT, entry.d_name);
+                deploy_file_if_missing(src, dst);
+            }
+        }
+        sceIoDclose(dfd);
     }
 }
 
 static void deploy_kickstart_aliases(void)
 {
-    static const char *kick12[] = { "kick12.rom", "kick33180.A500", "amiga-os-120.rom", NULL };
-    static const char *kick13[] = { "kick13.rom", "kick34005.A500", "amiga-os-130.rom", NULL };
-    static const char *kick20[] = { "kick20.rom", "kick37175.A500", "amiga-os-204.rom", NULL };
-    static const char *kick31[] = { "kick31.rom", "kick40068.A1200", "amiga-os-310-a1200.rom", NULL };
-    static const char *kick205[] = { "kick37350.A600", "kick205.rom", "amiga-os-205-a600.rom", NULL };
-    static const char *cd32[] = { "kick40060.CD32", "amiga-os-310-cd32.rom", NULL };
+    static const char *kick12[] = { "kick12.rom", "kick1.2.rom", "kick33180.A500", "amiga-os-120.rom", "kick120.rom", NULL };
+    static const char *kick13[] = { "kick13.rom", "kick1.3.rom", "kick34005.A500", "amiga-os-130.rom", "kick130.rom", "kick.rom", NULL };
+    static const char *kick20[] = { "kick20.rom", "kick2.04.rom", "kick37175.A500", "amiga-os-204.rom", NULL };
+    static const char *kick205[] = { "kick37350.A600", "kick205.rom", "kick2.05.rom", "amiga-os-205-a600.rom", NULL };
+    static const char *kick30[] = { "kick39106.A1200", "kick30.rom", "kick3.0.rom", "amiga-os-300-a1200.rom", NULL };
+    static const char *kick31[] = { "kick31.rom", "kick3.1.rom", "kick40068.A1200", "amiga-os-310-a1200.rom", "kick310.rom", NULL };
+    static const char *kick31_a600[] = { "kick40063.A600", "kick31.rom", "amiga-os-310-a600.rom", NULL };
+    static const char *kick31_a4000[] = { "kick40068.A4000", "kick40068.A1200", "kick31.rom", "amiga-os-310-a4000.rom", NULL };
+    static const char *cd32[] = { "kick40060.CD32", "amiga-os-310-cd32.rom", "cd32.rom", NULL };
+    static const char *cd32_ext[] = { "kick40060.CD32.ext", "cd32.ext", NULL };
+    static const char *rom_key[] = { "rom.key", NULL };
+
     static const struct {
         const char *name;
         const char *const *sources;
     } files[] = {
-        { "kick12.rom", kick12 }, { "kick33180.A500", kick12 },
-        { "kick34005.A500", kick13 }, { "kick13.rom", kick13 },
-        { "kick20.rom", kick20 }, { "kick37175.A500", kick20 },
-        { "kick31.rom", kick31 }, { "kick40068.A1200", kick31 },
-        { "kick37350.A600", kick205 }, { "kick205.rom", kick205 },
-        { "kick40060.CD32", cd32 }, { "amiga-os-310-cd32.rom", cd32 },
+        { "kick33180.A500", kick12 },
+        { "kick12.rom", kick12 },
+        { "kick34005.A500", kick13 },
+        { "kick13.rom", kick13 },
+        { "kick37175.A500", kick20 },
+        { "kick20.rom", kick20 },
+        { "kick37350.A600", kick205 },
+        { "kick205.rom", kick205 },
+        { "kick39106.A1200", kick30 },
+        { "kick30.rom", kick30 },
+        { "kick40068.A1200", kick31 },
+        { "kick31.rom", kick31 },
+        { "kick40063.A600", kick31_a600 },
+        { "kick40068.A4000", kick31_a4000 },
+        { "kick40060.CD32", cd32 },
+        { "kick40060.CD32.ext", cd32_ext },
+        { "rom.key", rom_key },
         { NULL, NULL }
     };
     ensure_directory(VITA_WHDLOAD_ROOT "/Devs/Kickstarts");
     for (int i = 0; files[i].name; i++)
         deploy_kickstart_file(files[i].name, files[i].sources);
-    static const char *kick_rtb[] = { "kick34005.A500.RTB", NULL };
-    deploy_kickstart_file("kick34005.A500.RTB", kick_rtb);
 }
 
 static void deploy_whdload_base(void)
 {
     ensure_directory(VITA_WHDLOAD_ROOT);
+    deploy_directory_recursive("app0:/data/whdload_base", VITA_WHDLOAD_ROOT);
     deploy_kickstart_aliases();
-    deploy_file_if_missing("app0:/data/whdload_base/C/WHDLoad", VITA_WHDLOAD_ROOT "/C/WHDLoad");
-    deploy_file_if_missing("app0:/data/whdload_base/C/WHDLoadCD32", VITA_WHDLOAD_ROOT "/C/WHDLoadCD32");
-    deploy_file_if_missing("app0:/data/whdload_base/C/DIC", VITA_WHDLOAD_ROOT "/C/DIC");
-    deploy_file_if_missing("app0:/data/whdload_base/C/Patcher", VITA_WHDLOAD_ROOT "/C/Patcher");
-    deploy_file_if_missing("app0:/data/whdload_base/C/RawDIC", VITA_WHDLOAD_ROOT "/C/RawDIC");
-    deploy_file_if_missing("app0:/data/whdload_base/C/WArc", VITA_WHDLOAD_ROOT "/C/WArc");
-    deploy_file_if_missing("app0:/data/whdload_base/C/WHDLoad.VFS", VITA_WHDLOAD_ROOT "/C/WHDLoad.VFS");
-    deploy_file_if_missing("app0:/data/whdload_base/S/WHDLoad.prefs", VITA_WHDLOAD_ROOT "/S/WHDLoad.prefs");
-    deploy_file_if_missing("app0:/data/whdload_base/S/WHDLoad-Startup", VITA_WHDLOAD_ROOT "/S/WHDLoad-Startup");
-    deploy_file_if_missing("app0:/data/whdload_base/S/WHDLoad-Cleanup", VITA_WHDLOAD_ROOT "/S/WHDLoad-Cleanup");
+    deploy_kickstart_extras();
 }
 
 int vita_whdload_prepare_launch(const char *game_name)
 {
-    if (!game_name || game_name[0] == '\0' || strchr(game_name, '/') || strchr(game_name, '\\') || strchr(game_name, ':'))
+    s_last_error[0] = '\0';
+    if (!game_name || game_name[0] == '\0') {
+        snprintf(s_last_error, sizeof(s_last_error), "Empty game name");
         return 0;
+    }
+
+    char clean_name[128];
+    const char *p = game_name;
+    if (strncasecmp(p, VITA_WHDLOAD_ROOT, strlen(VITA_WHDLOAD_ROOT)) == 0) {
+        p += strlen(VITA_WHDLOAD_ROOT);
+        while (*p == '/' || *p == '\\')
+            p++;
+    } else {
+        const char *s1 = strrchr(p, '/');
+        const char *s2 = strrchr(p, '\\');
+        if (s2 && (!s1 || s2 > s1))
+            s1 = s2;
+        if (s1)
+            p = s1 + 1;
+    }
+
+    strncpy(clean_name, p, sizeof(clean_name) - 1);
+    clean_name[sizeof(clean_name) - 1] = '\0';
+    size_t clen = strlen(clean_name);
+    while (clen > 0 && (clean_name[clen - 1] == '/' || clean_name[clen - 1] == '\\')) {
+        clean_name[--clen] = '\0';
+    }
+
+    if (clean_name[0] == '\0') {
+        snprintf(s_last_error, sizeof(s_last_error), "Invalid game name");
+        return 0;
+    }
 
     deploy_whdload_base();
 
     char game_root[512];
     char slave_relative[384];
-    snprintf(game_root, sizeof(game_root), "%s/%s", VITA_WHDLOAD_ROOT, game_name);
+    snprintf(game_root, sizeof(game_root), "%s/%s", VITA_WHDLOAD_ROOT, clean_name);
     int is_dir = 0;
-    if (!path_exists(game_root, &is_dir) || !is_dir)
+    if (!path_exists(game_root, &is_dir) || !is_dir) {
+        snprintf(s_last_error, sizeof(s_last_error), "Directory not found: %s", clean_name);
         return 0;
-    if (!find_slave_recursive(game_root, "", slave_relative, sizeof(slave_relative), 0))
+    }
+    if (!find_slave_recursive(game_root, "", slave_relative, sizeof(slave_relative), 0)) {
+        snprintf(s_last_error, sizeof(s_last_error), "No .slave file found in %s", clean_name);
         return 0;
+    }
 
     char startup_dir[512];
     char startup_path[512];
@@ -1003,11 +1113,11 @@ int vita_whdload_prepare_launch(const char *game_name)
         size_t dlen = (size_t)(last_slash - slave_relative);
         strncpy(sub_dir, slave_relative, dlen);
         sub_dir[dlen] = '\0';
-        snprintf(amiga_dir, sizeof(amiga_dir), "DH0:%s/%s", game_name, sub_dir);
+        snprintf(amiga_dir, sizeof(amiga_dir), "DH0:%s/%s", clean_name, sub_dir);
         strncpy(slave_file, last_slash + 1, sizeof(slave_file) - 1);
         slave_file[sizeof(slave_file) - 1] = '\0';
     } else {
-        snprintf(amiga_dir, sizeof(amiga_dir), "DH0:%s", game_name);
+        snprintf(amiga_dir, sizeof(amiga_dir), "DH0:%s", clean_name);
         strncpy(slave_file, slave_relative, sizeof(slave_file) - 1);
         slave_file[sizeof(slave_file) - 1] = '\0';
     }

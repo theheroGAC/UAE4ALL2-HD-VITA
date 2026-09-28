@@ -8,7 +8,7 @@
 #define VITA_LIBRARY_FILE        "ux0:/data/uae4all/library.txt"
 #define VITA_LIBRARY_ROOTS_FILE  "ux0:/data/uae4all/library_roots.txt"
 #define VITA_LIBRARY_MAX         2048
-#define VITA_LIBRARY_MAX_ROOTS   8
+#define VITA_LIBRARY_MAX_ROOTS   64
 #define VITA_LIBRARY_PATH_LEN    512
 
 #define VITA_LIB_KIND_UNKNOWN   (-1)
