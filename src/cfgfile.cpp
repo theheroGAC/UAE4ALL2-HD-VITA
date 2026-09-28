@@ -82,13 +82,13 @@ char * make_hard_file_cfg_line (char *dst) {
     hdf_close(myFile);
 
     if (mySize >= 1073741824LL && mySize < 2147483648LL)
-        surfaces = 2;
-    else if (mySize >= 2147483648LL && mySize <= 4294967296LL)
         surfaces = 4;
-    else if (mySize > 4294967296LL && mySize < 8589934592LL)
+    else if (mySize >= 2147483648LL && mySize < 4294967296LL)
         surfaces = 8;
-    else if (mySize >= 8589934592LL)
+    else if (mySize >= 4294967296LL && mySize < 8589934592LL)
         surfaces = 16;
+    else if (mySize >= 8589934592LL)
+        surfaces = 32;
 
     snprintf(buffer, sizeof(buffer), "%d:%d:%d:%d:%s", sectors, surfaces, reserved, blocksize, filepath);
     strncpy(dst, buffer, 255);

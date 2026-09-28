@@ -3397,7 +3397,7 @@ static uae_u32 filesys_dev_storeinfo (void)
     put_long (parmpacket + 20, uip[unit_no].hf.blocksize >> 2); /* longwords per block */
     put_long (parmpacket + 24, 0); /* unused */
     put_long (parmpacket + 28, uip[unit_no].hf.surfaces); /* heads */
-    put_long (parmpacket + 32, 0); /* unused */
+    put_long (parmpacket + 32, 1);
     put_long (parmpacket + 36, uip[unit_no].hf.secspertrack); /* sectors per track */
     put_long (parmpacket + 40, uip[unit_no].hf.reservedblocks); /* reserved blocks */
     put_long (parmpacket + 44, 0); /* unused */
@@ -3409,12 +3409,16 @@ static uae_u32 filesys_dev_storeinfo (void)
     /***************/
     put_long (parmpacket + 60, 50); /* Number of buffers */
     put_long (parmpacket + 64, 0); /* Buffer mem type */
-    put_long (parmpacket + 68, 0x7FFFFFFF); /* largest transfer */
+    put_long (parmpacket + 68, 0x0001FE00);
     put_long (parmpacket + 72, ~1); /* addMask (?) */
-//    put_long (parmpacket + 76, (uae_u32)-1); /* bootPri */
-    /* WinUAE code */
-    put_long (parmpacket + 76, uip[unit_no].hf.bootpri);
-    /***************/
+    int bp = uip[unit_no].hf.bootpri;
+    if (unit_no == 0 && (mainMenu_bootHD == 1 || mainMenu_bootHD == 2)) {
+        if (bp < 10)
+            bp = 10;
+    } else if (mainMenu_bootHD == 0) {
+        bp = -128;
+    }
+    put_long (parmpacket + 76, bp);
     put_long (parmpacket + 80, uip[unit_no].hf.dostype ? uip[unit_no].hf.dostype : 0x444f5300); /* DosType */
     put_long (parmpacket + 84, 0); /* pad */
     

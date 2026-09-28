@@ -775,6 +775,17 @@ void gui_handle_events (void)
 
 		buttonSelect[i] = SDL_JoystickGetButton(currentJoy, PAD_SELECT);
 		buttonStart[i] = SDL_JoystickGetButton(currentJoy, PAD_START);
+#ifdef __PSP2__
+		if (i == 0) {
+			SceCtrlData vita_pad;
+			if (sceCtrlPeekBufferPositive(0, &vita_pad, 1) > 0) {
+				if (vita_pad.buttons & SCE_CTRL_SELECT)
+					buttonSelect[0] = 1;
+				if (vita_pad.buttons & SCE_CTRL_START)
+					buttonStart[0] = 1;
+			}
+		}
+#endif
 #ifdef __SWITCH__
 		triggerL2[i] = SDL_JoystickGetButton(currentJoy, PAD_L2);
 		triggerR2[i] = SDL_JoystickGetButton(currentJoy, PAD_R2);

@@ -108,7 +108,7 @@ int rdb_parse(const char *path, RdbPartition *parts, int max_parts)
         low_cyl = rdb_get_u32(blk, PART_OFF_ENV + ENV_OFF_LOWCYL);
         high_cyl = rdb_get_u32(blk, PART_OFF_ENV + ENV_OFF_HIGHCYL);
         bootpri = (int)rdb_get_u32(blk, PART_OFF_ENV + ENV_OFF_BOOTPRI);
-        dostype = (env_size >= 17) ? rdb_get_u32(blk, PART_OFF_ENV + ENV_OFF_DOSTYPE) : 0;
+        dostype = (env_size >= 16) ? rdb_get_u32(blk, PART_OFF_ENV + ENV_OFF_DOSTYPE) : 0;
 
         if (secs_per_blk == 0)
             secs_per_blk = 1;

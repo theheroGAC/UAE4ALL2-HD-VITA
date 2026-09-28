@@ -335,10 +335,27 @@ static int drive_insert (drive *drv, int dnum, const char *fname)
             drv->ddhd = 1;
             drv->num_secs = 11;
             drv->num_tracks = vita_ipf_get_track_count(drv->ipf_image);
+            if (drv->num_tracks > MAX_TRACKS)
+                drv->num_tracks = MAX_TRACKS;
+            for (int i = 0; i < drv->num_tracks; i++) {
+                trackid *tid = &drv->trackdata[i];
+                tid->type = TRACK_RAW;
+                tid->len = 0;
+                tid->bitlen = 0;
+                tid->offs = 0;
+                tid->sync = 0;
+                tid->track = i;
+            }
             drv->hard_num_cyls = drv->type == DRV_525_SD ? 40 : 80;
             drv->filetype = ADF_NORMAL;
             drive_settype_id (drv);
+            drv->cyl = 0;
+            drv->dskchange = 0;
+            drv->dskready = 0;
+            drv->steplimit = 0;
+            drv->mfmpos = 0;
             drv->buffered_side = 2;
+            drv->buffered_cyl = -1;
             newly_inserted_countdown = 100;
             drive_fill_bigbuf (drv);
             return 1;
@@ -529,6 +546,13 @@ static void reset_drive (int i)
     drive *drv = &floppy[i];
     drive_image_free (drv);
     drv->motoroff = 1;
+    drv->cyl = 0;
+    drv->dskchange = 0;
+    drv->dskready = 0;
+    drv->steplimit = 0;
+    drv->mfmpos = 0;
+    drv->drive_id_scnt = 0;
+    drv->idbit = 0;
     disabled &= ~(1 << i);
     if (i>=mainMenu_drives)
 	disabled |= 1 << i;
@@ -685,7 +709,7 @@ static void decode_amigados (drive *drv)
 static void drive_fill_bigbuf (drive * drv)
 {
     int tr = drv->cyl * 2 + side;
-    trackid *ti = drv->trackdata + tr;
+    trackid *ti = (tr < MAX_TRACKS) ? drv->trackdata + tr : drv->trackdata;
     {
         static int ffill_log_count = 0;
         if (ffill_log_count < 24) {
@@ -716,31 +740,21 @@ static void drive_fill_bigbuf (drive * drv)
             memset (drv->bigmfmbuf, 0xaa, FLOPPY_WRITE_LEN * 2);
         } else {
             int words = (bytes + 1) / 2;
-            int sync_words = 0;
-            int swapped_sync_words = 0;
             for (int i = 0; i < words; i++) {
                 unsigned char *p = raw + i * 2;
                 unsigned char low = (i * 2 + 1 < bytes) ? p[1] : 0;
                 drv->bigmfmbuf[i] = (uae_u16)(p[0] * 256 + low);
-                if (drv->bigmfmbuf[i] == 0x4489)
-                    sync_words++;
-                else if (drv->bigmfmbuf[i] == 0x8944)
-                    swapped_sync_words++;
-            }
-            if (sync_words == 0 && swapped_sync_words > 0) {
-                for (int i = 0; i < words; i++)
-                    drv->bigmfmbuf[i] = (uae_u16)((drv->bigmfmbuf[i] >> 8) | (drv->bigmfmbuf[i] << 8));
             }
             drv->tracklen = track_bits > 0 ? track_bits : bytes * 8;
-            /* Clamp tracklen to what bigmfmbuf can actually hold */
             int max_bits = (int)sizeof(drv->bigmfmbuf) * 8;
             if (drv->tracklen > max_bits)
                 drv->tracklen = max_bits;
             if (drv->tracklen > bytes * 8)
                 drv->tracklen = bytes * 8;
-            drv->trackspeed = get_floppy_speed() * drv->tracklen / (2 * 8 * FLOPPY_WRITE_LEN);
-            /* Prevent division-related hangs: ensure trackspeed is never zero */
-            if (drv->trackspeed <= 0)
+            if (drv->tracklen <= 0)
+                drv->tracklen = FLOPPY_WRITE_LEN * 2 * 8;
+            drv->trackspeed = NORMAL_FLOPPY_SPEED * drv->tracklen / (2 * 8 * FLOPPY_WRITE_LEN);
+            if (drv->trackspeed < 50)
                 drv->trackspeed = floppy_speed;
         }
         drv->buffered_side = side;
@@ -777,12 +791,16 @@ static void drive_fill_bigbuf (drive * drv)
     }
     drv->buffered_side = side;
     drv->buffered_cyl = drv->cyl;
+    if (drv->tracklen <= 0)
+        drv->tracklen = FLOPPY_WRITE_LEN * drv->ddhd * 2 * 8;
     if (newly_inserted_countdown) {
         drv->trackspeed = NORMAL_FLOPPY_SPEED * drv->tracklen / (2 * 8 * FLOPPY_WRITE_LEN);
         newly_inserted_countdown--;
     } else {
         drv->trackspeed = get_floppy_speed() * drv->tracklen / (2 * 8 * FLOPPY_WRITE_LEN);
     }
+    if (drv->trackspeed < 50)
+        drv->trackspeed = NORMAL_FLOPPY_SPEED;
 }
 
 /* Update ADF_EXT2 track header */
@@ -1233,9 +1251,11 @@ static int disk_hpos;
 static void disk_doupdate_write (drive * drv)
 {
     int hpos = disk_hpos;
+    int trklen = drv->tracklen > 0 ? drv->tracklen : (FLOPPY_WRITE_LEN * 2 * 8);
+    int trkspeed = drv->trackspeed >= 50 ? drv->trackspeed : NORMAL_FLOPPY_SPEED;
     while (hpos < (maxhpos << 8)) {
 	drv->mfmpos++;
-	drv->mfmpos %= drv->tracklen;
+	drv->mfmpos %= trklen;
 	if (!drv->mfmpos) {
 	    disk_sync[hpos >> 8] |= DISK_INDEXSYNC;
 	    disk_events (0);
@@ -1253,7 +1273,7 @@ static void disk_doupdate_write (drive * drv)
 		}
 	    }
 	}
-        hpos += drv->trackspeed;
+        hpos += trkspeed;
     }
     disk_hpos = hpos - (maxhpos << 8);
 }
@@ -1279,6 +1299,8 @@ static void disk_doupdate_read (drive * drv)
     int j = 0, k = 1, l = 0;
     uae_u16 synccheck;
     static int dskbytr_last = 0, wordsync_last = -1;
+    int trklen = drv->tracklen > 0 ? drv->tracklen : (FLOPPY_WRITE_LEN * 2 * 8);
+    int trkspeed = drv->trackspeed >= 50 ? drv->trackspeed : NORMAL_FLOPPY_SPEED;
     {
         static int dread_log_count = 0;
         if (dread_log_count < 2) {
@@ -1300,7 +1322,7 @@ static void disk_doupdate_read (drive * drv)
 	else
 	    word <<= 1;
 	drv->mfmpos++;
-	drv->mfmpos %= drv->tracklen;
+	drv->mfmpos %= trklen;
 	if (!drv->mfmpos) {
 	    disk_sync[hpos >> 8] |= DISK_INDEXSYNC;
 	    is_sync = 1;
@@ -1332,7 +1354,7 @@ static void disk_doupdate_read (drive * drv)
 	}
 	bitoffset++;
 	if (bitoffset == 32) bitoffset = 16;
-	hpos += drv->trackspeed;
+	hpos += trkspeed;
     }
     dma_tab[j] = 0xffffffff;
     dskbytr_cycle[k] = 255;
@@ -1455,12 +1477,17 @@ void DISK_update (void)
 	if (drv->motoroff)
 	    continue;
 	if (selected & (1 << dr)) {
-	    drv->mfmpos += (maxhpos << 8) / drv->trackspeed;
-	    drv->mfmpos %= drv->tracklen;
+	    int trklen = drv->tracklen > 0 ? drv->tracklen : (FLOPPY_WRITE_LEN * 2 * 8);
+	    int trkspeed = drv->trackspeed >= 50 ? drv->trackspeed : NORMAL_FLOPPY_SPEED;
+	    drv->mfmpos += (maxhpos << 8) / trkspeed;
+	    drv->mfmpos %= trklen;
 	    continue;
 	}
 	drive_fill_bigbuf (drv);
-	drv->mfmpos %= drv->tracklen;
+	{
+	    int trklen = drv->tracklen > 0 ? drv->tracklen : (FLOPPY_WRITE_LEN * 2 * 8);
+	    drv->mfmpos %= trklen;
+	}
 	if (dskdmaen > 1)
 	    disk_data_used = 0;
 
@@ -1534,25 +1561,25 @@ void DSKLEN (uae_u16 v, int hpos)
 		int i;
 
 		drive_fill_bigbuf (drv);
+		int trklen = drv->tracklen > 0 ? drv->tracklen : (FLOPPY_WRITE_LEN * 2 * 8);
 		if (adkcon & 0x400) {
-		    for (i = 0; i < drv->tracklen; i += 16) {
+		    for (i = 0; i < trklen; i += 16) {
 			pos += 16;
-			pos %= drv->tracklen;
+			pos %= trklen;
 			if (drv->bigmfmbuf[pos >> 4] == dsksync) {
-			    /* must skip first disk sync marker */
 			    pos += 16;
-			    pos %= drv->tracklen;
+			    pos %= trklen;
 			    break;
 			}
 		    }
-		    if (i >= drv->tracklen)
+		    if (i >= trklen)
 			return;
 		}
 		while (dsklength-- > 0) {
 		    put_word (dskpt, drv->bigmfmbuf[pos >> 4]);
 		    dskpt += 2;
 		    pos += 16;
-		    pos %= drv->tracklen;
+		    pos %= trklen;
 		}
 		INTREQ (0x9000);
 		linecounter = 2;
@@ -1622,6 +1649,17 @@ void DISK_reset (void)
     if (savestate_state)
 	    return;
 
+    selected = 15;
+    side = 0;
+    direction = 0;
+    writing = 0;
+    step = 0;
+    dsklength = 0;
+    dsksync = 0;
+    dskpt = 0;
+    dma_enable = 0;
+    bitoffset = 0;
+    word = 0;
     disk_hpos = 0;
     disk_data_used = 0;
     dskdmaen = 0;
