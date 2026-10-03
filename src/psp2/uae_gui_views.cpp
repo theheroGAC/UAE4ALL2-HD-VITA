@@ -178,6 +178,8 @@ static const CustomActionInfo s_custom_actions[] = {
     { -26, "Speed Up Mouse (Hold)" },
     { -27, "Quick Save State" },
     { -28, "Quick Load State" },
+    { -30, "Turbo Mode (Toggle)" },
+    { -31, "Turbo Mode (Hold)" },
     { -9, "Joy 2 UP" },
     { -10, "Joy 2 DOWN" },
     { -11, "Joy 2 LEFT" },
@@ -784,7 +786,7 @@ static void hdf_create_blank_into_slot(int slot)
 
     char msg[320];
     snprintf(msg, sizeof(msg),
-        "Blank %d MB HDF created and mounted in slot %d.\nFormat it from Workbench (e.g. via HD Toolbox) before use.",
+        "Blank %d MB HDF created and mounted in slot %d.\nFormat from Workbench (Icons -> Format Disk) or partition with HDToolBox.",
         size_mb, slot + 1);
     vita_show_message_box("Blank HDF Created", msg, "OK (X)");
 }
@@ -2324,7 +2326,7 @@ void vita_view_display(VitaInputState *input, int *selected_item)
 
     const char *item_titles[13] = {
         "Game Display Mode",
-        "Hardware Vita Shader",
+        "Display Shader / Filter",
         "Screen Refresh & Region",
         "Status Bar (Floppy LED/FPS)",
         "Horizontal Resolution",
@@ -2404,9 +2406,9 @@ void vita_view_controls(VitaInputState *input, int *selected_item)
             mainMenu_custom_stickdown[c] = -6;
             mainMenu_custom_stickleft[c] = -7;
             mainMenu_custom_stickright[c] = -8;
-            mainMenu_custom_A[c] = -3;
+            mainMenu_custom_X[c] = -3;
             mainMenu_custom_B[c] = -4;
-            mainMenu_custom_X[c] = 23;
+            mainMenu_custom_A[c] = 23;
             mainMenu_custom_Y[c] = 27;
             mainMenu_custom_L[c] = 0;
             mainMenu_custom_R[c] = 0;
@@ -2472,7 +2474,7 @@ void vita_view_controls(VitaInputState *input, int *selected_item)
                     remap_custom_controls();
                     break;
                 case 11:
-                    mainMenu_custom_A[c] = vita_cycle_custom_action(mainMenu_custom_A[c], dir);
+                    mainMenu_custom_X[c] = vita_cycle_custom_action(mainMenu_custom_X[c], dir);
                     mapback_custom_controls();
                     remap_custom_controls();
                     break;
@@ -2482,7 +2484,7 @@ void vita_view_controls(VitaInputState *input, int *selected_item)
                     remap_custom_controls();
                     break;
                 case 13:
-                    mainMenu_custom_X[c] = vita_cycle_custom_action(mainMenu_custom_X[c], dir);
+                    mainMenu_custom_A[c] = vita_cycle_custom_action(mainMenu_custom_A[c], dir);
                     mapback_custom_controls();
                     remap_custom_controls();
                     break;
@@ -2568,16 +2570,16 @@ void vita_view_controls(VitaInputState *input, int *selected_item)
                     vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map Left Stick RIGHT", vita_get_custom_action_name(mainMenu_custom_stickright[c]), focused);
                     break;
                 case 11:
-                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map CROSS (Fire 1 / A)", vita_get_custom_action_name(mainMenu_custom_A[c]), focused);
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map CROSS (Fire 1)", vita_get_custom_action_name(mainMenu_custom_X[c]), focused);
                     break;
                 case 12:
-                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map CIRCLE (Fire 2 / B)", vita_get_custom_action_name(mainMenu_custom_B[c]), focused);
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map CIRCLE (Fire 2)", vita_get_custom_action_name(mainMenu_custom_B[c]), focused);
                     break;
                 case 13:
-                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map SQUARE (Space / X)", vita_get_custom_action_name(mainMenu_custom_X[c]), focused);
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map SQUARE (Space)", vita_get_custom_action_name(mainMenu_custom_A[c]), focused);
                     break;
                 case 14:
-                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map TRIANGLE (VKBD / Y)", vita_get_custom_action_name(mainMenu_custom_Y[c]), focused);
+                    vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map TRIANGLE (VKBD)", vita_get_custom_action_name(mainMenu_custom_Y[c]), focused);
                     break;
                 case 15:
                     vita_draw_selector_item(m_card_x, y, m_card_w, m_item_h, "Map L Trigger", vita_get_custom_action_name(mainMenu_custom_L[c]), focused);
@@ -2767,7 +2769,7 @@ void vita_view_controls(VitaInputState *input, int *selected_item)
                 vita_draw_selector_item(card_x, y, card_w, item_h, "Pinball Flippers (L1/R1)", pinball_names[mainMenu_pinballMode % 3], focused);
                 break;
             case 13:
-                vita_draw_slider_item(card_x, y, card_w, item_h, "Floppy / HDF Sound Volume", mainMenu_diskSoundVolume, 0, 100, "%", focused);
+                vita_draw_slider_item(card_x, y, card_w, item_h, "Floppy Sound Volume", mainMenu_diskSoundVolume, 0, 100, "%", focused);
                 break;
             case 14:
                 vita_draw_slider_item(card_x, y, card_w, item_h, "Analog Stick Dead Zone", mainMenu_deadZone, 0, 8000, "", focused);
@@ -3264,7 +3266,7 @@ void vita_view_system(VitaInputState *input, int *selected_item)
                 }
                 break;
             case 10:
-                if (vita_show_confirm_box("About", "Open UAE4All2 HD v1.12 and credits?", "Yes", "No")) {
+                if (vita_show_confirm_box("About", "Open UAE4All2 HD v1.13 and credits?", "Yes", "No")) {
                     vita_show_about_box();
                 }
                 break;
@@ -3290,7 +3292,7 @@ void vita_view_system(VitaInputState *input, int *selected_item)
         "Reboot Amiga Emulation",
         "Take Screenshot",
         "FTP File Transfer",
-        "About UAE4All2 HD v1.12"
+        "About UAE4All2 HD v1.13"
     };
     static const char *system_subtitles[11] = {
         "Save all disk, display, and hardware settings for current game",

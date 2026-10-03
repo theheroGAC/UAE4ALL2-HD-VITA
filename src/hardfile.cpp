@@ -147,7 +147,7 @@ static uae_u32 hardfile_beginio (void)
 			break;
 			
 		case 18:
-			put_long (tmp1 + 32, 1);
+			put_long (tmp1 + 32, get_hardfile_readonly (unit) ? 1 : 0);
 			break;
 			
 		case 19:
@@ -247,6 +247,22 @@ static uae_u32 hardfile_beginio (void)
 				retval = 0;
 				break;
 			}
+			if (opcode == 0x03) {
+				uae_u32 slen = scsi_len > 18 ? 18 : scsi_len;
+				unsigned char sense[18];
+				memset (sense, 0, sizeof(sense));
+				sense[0] = 0x70;
+				sense[7] = 10;
+				for (uae_u32 i = 0; i < slen; i++)
+					put_byte (scsi_data + i, sense[i]);
+				put_long (scsicmd + 8, slen);
+				put_word (scsicmd + 18, scsi_cmdlen);
+				put_byte (scsicmd + 21, 0);
+				put_byte (tmp1 + 31, 0);
+				put_long (tmp1 + 32, 0);
+				retval = 0;
+				break;
+			}
 			if (opcode == 0x12) {
 				uae_u32 slen = scsi_len > 36 ? 36 : scsi_len;
 				unsigned char inq[36];
@@ -262,6 +278,24 @@ static uae_u32 hardfile_beginio (void)
 				for (uae_u32 i = 0; i < slen; i++)
 					put_byte (scsi_data + i, inq[i]);
 				put_long (scsicmd + 8, slen);
+				put_word (scsicmd + 18, scsi_cmdlen);
+				put_byte (scsicmd + 21, 0);
+				put_byte (tmp1 + 31, 0);
+				put_long (tmp1 + 32, 0);
+				retval = 0;
+				break;
+			}
+			if (opcode == 0x15 || opcode == 0x55) {
+				put_long (scsicmd + 8, scsi_len);
+				put_word (scsicmd + 18, scsi_cmdlen);
+				put_byte (scsicmd + 21, 0);
+				put_byte (tmp1 + 31, 0);
+				put_long (tmp1 + 32, 0);
+				retval = 0;
+				break;
+			}
+			if (opcode == 0x1B) {
+				put_long (scsicmd + 8, 0);
 				put_word (scsicmd + 18, scsi_cmdlen);
 				put_byte (scsicmd + 21, 0);
 				put_byte (tmp1 + 31, 0);
@@ -335,6 +369,13 @@ static uae_u32 hardfile_beginio (void)
 				break;
 			}
 			if (opcode == 0x0A || opcode == 0x2A) {
+				if (get_hardfile_readonly (unit)) {
+					put_byte (scsicmd + 21, 2);
+					put_byte (tmp1 + 31, (uae_u8)-3);
+					put_long (tmp1 + 32, 0);
+					retval = 0;
+					break;
+				}
 				uae_u32 lba = 0;
 				uae_u32 count = 0;
 				if (opcode == 0x0A) {
@@ -382,20 +423,99 @@ static uae_u32 hardfile_beginio (void)
 			}
 			if (opcode == 0x1A || opcode == 0x5A) {
 				uae_u8 page = get_byte (scsi_cmd + 2) & 0x3F;
-				if (page == 0x04 && scsi_len >= 24) {
-					put_byte (scsi_data + 0, 23);
-					put_byte (scsi_data + 1, 0);
-					put_byte (scsi_data + 2, 0);
-					put_byte (scsi_data + 3, 0);
-					put_byte (scsi_data + 4, 4);
-					put_byte (scsi_data + 5, 18);
-					put_byte (scsi_data + 6, (uae_u8)((hfd->nrcyls >> 16) & 0xFF));
-					put_byte (scsi_data + 7, (uae_u8)((hfd->nrcyls >> 8) & 0xFF));
-					put_byte (scsi_data + 8, (uae_u8)(hfd->nrcyls & 0xFF));
-					put_byte (scsi_data + 9, (uae_u8)hfd->surfaces);
-					for (int i = 10; i < 24; i++)
-						put_byte (scsi_data + i, 0);
-					put_long (scsicmd + 8, 24);
+				unsigned char mdata[64];
+				memset (mdata, 0, sizeof(mdata));
+				int mlen = 0;
+				int is_10 = (opcode == 0x5A);
+				int ro = get_hardfile_readonly (unit);
+
+				if (page == 0x04 || page == 0x3F) {
+					if (!is_10) {
+						mdata[0] = 23;
+						mdata[1] = 0;
+						mdata[2] = ro ? 0x80 : 0x00;
+						mdata[3] = 0;
+						mdata[4] = 4;
+						mdata[5] = 18;
+						mdata[6] = (uae_u8)((hfd->nrcyls >> 16) & 0xFF);
+						mdata[7] = (uae_u8)((hfd->nrcyls >> 8) & 0xFF);
+						mdata[8] = (uae_u8)(hfd->nrcyls & 0xFF);
+						mdata[9] = (uae_u8)hfd->surfaces;
+						mlen = 24;
+					} else {
+						mdata[0] = 0;
+						mdata[1] = 26;
+						mdata[2] = 0;
+						mdata[3] = ro ? 0x80 : 0x00;
+						mdata[4] = 0;
+						mdata[5] = 0;
+						mdata[6] = 0;
+						mdata[7] = 0;
+						mdata[8] = 4;
+						mdata[9] = 18;
+						mdata[10] = (uae_u8)((hfd->nrcyls >> 16) & 0xFF);
+						mdata[11] = (uae_u8)((hfd->nrcyls >> 8) & 0xFF);
+						mdata[12] = (uae_u8)(hfd->nrcyls & 0xFF);
+						mdata[13] = (uae_u8)hfd->surfaces;
+						mlen = 28;
+					}
+				} else if (page == 0x03) {
+					if (!is_10) {
+						mdata[0] = 27;
+						mdata[1] = 0;
+						mdata[2] = ro ? 0x80 : 0x00;
+						mdata[3] = 0;
+						mdata[4] = 3;
+						mdata[5] = 22;
+						mdata[14] = (uae_u8)((hfd->secspertrack >> 8) & 0xFF);
+						mdata[15] = (uae_u8)(hfd->secspertrack & 0xFF);
+						mdata[16] = (uae_u8)((hfd->blocksize >> 8) & 0xFF);
+						mdata[17] = (uae_u8)(hfd->blocksize & 0xFF);
+						mdata[19] = 1;
+						mlen = 28;
+					} else {
+						mdata[0] = 0;
+						mdata[1] = 30;
+						mdata[2] = 0;
+						mdata[3] = ro ? 0x80 : 0x00;
+						mdata[4] = 0;
+						mdata[5] = 0;
+						mdata[6] = 0;
+						mdata[7] = 0;
+						mdata[8] = 3;
+						mdata[9] = 22;
+						mdata[18] = (uae_u8)((hfd->secspertrack >> 8) & 0xFF);
+						mdata[19] = (uae_u8)(hfd->secspertrack & 0xFF);
+						mdata[20] = (uae_u8)((hfd->blocksize >> 8) & 0xFF);
+						mdata[21] = (uae_u8)(hfd->blocksize & 0xFF);
+						mdata[23] = 1;
+						mlen = 32;
+					}
+				} else if (page == 0x00) {
+					if (!is_10) {
+						mdata[0] = 3;
+						mdata[1] = 0;
+						mdata[2] = ro ? 0x80 : 0x00;
+						mdata[3] = 0;
+						mlen = 4;
+					} else {
+						mdata[0] = 0;
+						mdata[1] = 6;
+						mdata[2] = 0;
+						mdata[3] = ro ? 0x80 : 0x00;
+						mdata[4] = 0;
+						mdata[5] = 0;
+						mdata[6] = 0;
+						mdata[7] = 0;
+						mlen = 8;
+					}
+				}
+
+				if (mlen > 0) {
+					uae_u32 to_copy = (uae_u32)mlen > scsi_len ? scsi_len : (uae_u32)mlen;
+					for (uae_u32 i = 0; i < to_copy; i++)
+						put_byte (scsi_data + i, mdata[i]);
+					put_long (scsicmd + 8, to_copy);
 					put_word (scsicmd + 18, scsi_cmdlen);
 					put_byte (scsicmd + 21, 0);
 					put_byte (tmp1 + 31, 0);
@@ -403,6 +523,7 @@ static uae_u32 hardfile_beginio (void)
 					retval = 0;
 					break;
 				}
+
 				put_long (scsicmd + 8, 0);
 				put_word (scsicmd + 18, scsi_cmdlen);
 				put_byte (scsicmd + 21, 2);
@@ -414,6 +535,19 @@ static uae_u32 hardfile_beginio (void)
 			put_long (scsicmd + 8, 0);
 			put_word (scsicmd + 18, scsi_cmdlen);
 			put_byte (scsicmd + 21, 2);
+			uaecptr sense_ptr = get_long (scsicmd + 22);
+			uae_u16 sense_len = get_word (scsicmd + 26);
+			if (sense_ptr && sense_len >= 18) {
+				unsigned char sbuf[18];
+				memset (sbuf, 0, sizeof(sbuf));
+				sbuf[0] = 0x70;
+				sbuf[2] = 0x05;
+				sbuf[7] = 10;
+				sbuf[12] = 0x20;
+				for (int i = 0; i < 18; i++)
+					put_byte (sense_ptr + i, sbuf[i]);
+				put_word (scsicmd + 28, 18);
+			}
 			put_byte (tmp1 + 31, 0);
 			put_long (tmp1 + 32, 0);
 			retval = 0;

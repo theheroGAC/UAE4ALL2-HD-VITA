@@ -468,7 +468,8 @@ static void drive_step (drive * drv)
      * (stupid trackloaders with CPU delay loops)
      */
     drv->steplimit = 2;
-    disk_sound_floppy_step();
+    if (!drive_empty (drv))
+        disk_sound_floppy_step();
     if (!drive_empty (drv))
 	drv->dskchange = 0;
     if (direction) {
@@ -511,7 +512,8 @@ static void drive_motor (drive * drv, int off)
        Higher values are dangerous, e.g. a value of 8 breaks the RSI
        demo.  */
     if (drv->motoroff && !off) {
-        disk_sound_floppy_motor();
+        if (!drive_empty (drv))
+            disk_sound_floppy_motor();
         {
             static int motor_log_count = 0;
             if (motor_log_count < 2) {

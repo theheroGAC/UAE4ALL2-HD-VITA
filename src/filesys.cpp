@@ -504,10 +504,40 @@ void free_mountinfo (struct uaedev_mount_info *mip)
 
 struct hardfiledata *get_hardfile_data (int nr)
 {
+    if (!current_mountinfo)
+        return 0;
     UnitInfo *uip = current_mountinfo->ui;
-    if (nr < 0 || nr >= current_mountinfo->num_units || uip[nr].volname != 0)
-	return 0;
-    return &uip[nr].hf;
+    if (nr >= 0 && nr < current_mountinfo->num_units && uip[nr].volname == 0 && hdf_is_open (uip[nr].hf.fd))
+        return &uip[nr].hf;
+
+    int hf_idx = 0;
+    for (int i = 0; i < current_mountinfo->num_units; i++) {
+        if (uip[i].volname == 0 && hdf_is_open (uip[i].hf.fd)) {
+            if (hf_idx == nr)
+                return &uip[i].hf;
+            hf_idx++;
+        }
+    }
+    return 0;
+}
+
+int get_hardfile_readonly (int nr)
+{
+    if (!current_mountinfo)
+        return 0;
+    UnitInfo *uip = current_mountinfo->ui;
+    if (nr >= 0 && nr < current_mountinfo->num_units && uip[nr].volname == 0)
+        return uip[nr].readonly;
+
+    int hf_idx = 0;
+    for (int i = 0; i < current_mountinfo->num_units; i++) {
+        if (uip[i].volname == 0) {
+            if (hf_idx == nr)
+                return uip[i].readonly;
+            hf_idx++;
+        }
+    }
+    return 0;
 }
 
 /* minimal AmigaDOS definitions */

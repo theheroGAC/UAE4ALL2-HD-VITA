@@ -163,11 +163,7 @@ int visibleAreaWidth = 320;
 int saveMenu_n_savestate = 0;
 
 #if defined(__PSP2__) || defined(__SWITCH__)
-#if defined(__SWITCH__)
 int mainMenu_shader = 1;
-#else
-int mainMenu_shader = 5;
-#endif
 int mainMenu_leftStickMouse = 0;
 int mainMenu_touchControls = 1;
 int mainMenu_deadZone = 1000;
@@ -385,10 +381,17 @@ void SetDefaultMenuSettings(int general)
 	mainMenu_customPreset_stickdown[0][0] = -6; // ply1 joy down
 	mainMenu_customPreset_stickleft[0][0] = -7; // ply1 joy left
 	mainMenu_customPreset_stickright[0][0] = -8; // ply1 joy right
+#ifdef __PSP2__
+	mainMenu_customPreset_X[0][0] = -3;
+	mainMenu_customPreset_B[0][0] = -4;
+	mainMenu_customPreset_A[0][0] = 23;
+	mainMenu_customPreset_Y[0][0] = 27;
+#else
 	mainMenu_customPreset_X[0][0] = -5; // ply1 joy up (jump)
 	mainMenu_customPreset_B[0][0] = 23; // space
 	mainMenu_customPreset_A[0][0] = -3; // ply1 fire 1
 	mainMenu_customPreset_Y[0][0] = -4; // ply1 fire 2
+#endif
 	mainMenu_customPreset_L[0][0] = -2; // right mouse
 	mainMenu_customPreset_R[0][0] = -1; // left mouse
 #ifdef __SWITCH__
@@ -571,11 +574,7 @@ void SetDefaultMenuSettings(int general)
     mainMenu_autofireMode = 0;
 
 #if defined(__PSP2__) || defined(__SWITCH__)
-#ifdef __SWITCH__
     mainMenu_shader = 1;
-#else
-    mainMenu_shader = 5;
-#endif
     mainMenu_leftStickMouse = 0;
     mainMenu_touchControls = 1;
     mainMenu_deadZone = 1000;
@@ -1807,7 +1806,9 @@ void loadconfig(int general)
 #if defined(__PSP2__) || defined(__SWITCH__)
         fscanf(f,"shader=%d\n",&mainMenu_shader);
 #if defined(__SWITCH__)
-        if (mainMenu_shader > 3) mainMenu_shader = 1;
+        if (mainMenu_shader > 3 || mainMenu_shader < 0) mainMenu_shader = 1;
+#elif defined(__PSP2__)
+        if (mainMenu_shader > 1 || mainMenu_shader < 0) mainMenu_shader = 1;
 #endif
         fscanf(f,"leftstickmouse=%d\n",&mainMenu_leftStickMouse);
         fscanf(f,"touchcontrols=%d\n",&mainMenu_touchControls);

@@ -8,17 +8,17 @@ option(BUILD_DISPLAY_TESTS "Build automatic display geometry tests" OFF)
 option(BUILD_HDF_TESTS "Build HDF backend tests" OFF)
 option(BUILD_LIBRARY_TESTS "Build game library index tests" OFF)
 
-if(vita OR DEFINED ENV{VITASDK})
-    set(BUILD_PSP2 ON)
+set(BUILD_PSP2 ON)
+if (NOT DEFINED ENV{VITASDK})
+    set(ENV{VITASDK} "C:/msys64/usr/local/vitasdk")
+endif()
+if (NOT DEFINED VITASDK)
+    set(VITASDK "C:/msys64/usr/local/vitasdk")
 endif()
 
 if(BUILD_PSP2)
 if (NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-    if (DEFINED ENV{VITASDK})
-        set(CMAKE_TOOLCHAIN_FILE "$ENV{VITASDK}/share/vita.toolchain.cmake" CACHE PATH "toolchain file")
-    else ()
-        message(FATAL_ERROR "Please define VITASDK to point to your SDK path!")
-    endif ()
+    set(CMAKE_TOOLCHAIN_FILE "C:/msys64/usr/local/vitasdk/share/vita.toolchain.cmake" CACHE PATH "toolchain file")
 endif ()
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(BUILD_DEBUG true CACHE BOOL "Build with psp2shell support")
@@ -175,7 +175,6 @@ if(BUILD_PSP2)
     src/psp2/library_manager.cpp
     src/psp2/cover_downloader.cpp
     src/psp2/ftp_server.cpp
-    src/psp2/psp2_shader.cpp
     src/psp2/psp2-dirent.c
     src/psp2/psp2_touch.c
     src/psp2/psp2_kbdvita.c
@@ -241,7 +240,7 @@ if(BUILD_PSP2)
   add_custom_target(${PROJECT_NAME}.vpk
           DEPENDS ${PROJECT_NAME}.self-self
           COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Generating param.sfo"
-          COMMAND ${VITASDK}/bin/vita-mksfoex -d ATTRIBUTE2=12 -s TITLE_ID=${TITLEID} -s APP_VER=01.12 "UAE4All2 HD" param.sfo
+          COMMAND ${VITASDK}/bin/vita-mksfoex -d ATTRIBUTE2=12 -s TITLE_ID=${TITLEID} -s APP_VER=01.13 "UAE4All2 HD" param.sfo
           COMMAND ${CMAKE_COMMAND} -E echo "[VPK] Packaging uae4all2hd.vpk"
           COMMAND ${VITASDK}/bin/vita-pack-vpk -s param.sfo -b ${PROJECT_NAME}.self -a ${CMAKE_SOURCE_DIR}/psp2data/data=data -a ${CMAKE_SOURCE_DIR}/psp2data/sce_sys=sce_sys uae4all2hd.vpk
   )

@@ -191,7 +191,7 @@ int buttonX[MAX_NUM_CONTROLLERS]={}; // Vita Cross, GP2X_BUTTON_X
 int buttonY[MAX_NUM_CONTROLLERS]={}; // Vita Triangle, GP2X_BUTTON_Y
 int triggerL[MAX_NUM_CONTROLLERS]={};
 int triggerR[MAX_NUM_CONTROLLERS]={};
-#ifdef __SWITCH__
+#if defined(__SWITCH__) || defined(__PSP2__)
 int triggerL2[MAX_NUM_CONTROLLERS]={};
 int triggerR2[MAX_NUM_CONTROLLERS]={};
 int triggerL3[MAX_NUM_CONTROLLERS]={};
@@ -199,6 +199,9 @@ int triggerR3[MAX_NUM_CONTROLLERS]={};
 #endif
 int buttonSelect[MAX_NUM_CONTROLLERS]={};
 int buttonStart[MAX_NUM_CONTROLLERS]={};
+int vita_fast_forward = 0;
+int vita_turbo_toggle = 0;
+static int vita_turbo_hold = 0;
 
 extern int mainMenu_case;
 #ifdef WITH_TESTMODE
@@ -422,9 +425,12 @@ static void goMenu(void)
 		return;
 	}
 	if (buttonStart[0]) {
-		vkbd_mode = !vkbd_mode;
+		vita_turbo_toggle = !vita_turbo_toggle;
+		vita_fast_forward = vita_turbo_toggle;
 		buttonSelect[0] = 0;
 		buttonStart[0] = 0;
+		if (vkbd_mode) vkbd_mode = 0;
+		gui_set_message(vita_turbo_toggle ? ">> TURBO >>" : "TURBO OFF", 60);
 		return;
 	}
 	if (vkbd_mode) {
@@ -776,13 +782,43 @@ void gui_handle_events (void)
 		buttonSelect[i] = SDL_JoystickGetButton(currentJoy, PAD_SELECT);
 		buttonStart[i] = SDL_JoystickGetButton(currentJoy, PAD_START);
 #ifdef __PSP2__
-		if (i == 0) {
+		if (i >= 0 && i < 4) {
 			SceCtrlData vita_pad;
-			if (sceCtrlPeekBufferPositive(0, &vita_pad, 1) > 0) {
-				if (vita_pad.buttons & SCE_CTRL_SELECT)
-					buttonSelect[0] = 1;
-				if (vita_pad.buttons & SCE_CTRL_START)
-					buttonStart[0] = 1;
+			if (sceCtrlPeekBufferPositive(i, &vita_pad, 1) > 0) {
+				dpadUp[i] = (vita_pad.buttons & SCE_CTRL_UP) ? 1 : 0;
+				dpadDown[i] = (vita_pad.buttons & SCE_CTRL_DOWN) ? 1 : 0;
+				dpadLeft[i] = (vita_pad.buttons & SCE_CTRL_LEFT) ? 1 : 0;
+				dpadRight[i] = (vita_pad.buttons & SCE_CTRL_RIGHT) ? 1 : 0;
+				buttonA[i] = (vita_pad.buttons & SCE_CTRL_SQUARE) ? 1 : 0;
+				buttonB[i] = (vita_pad.buttons & SCE_CTRL_CIRCLE) ? 1 : 0;
+				buttonX[i] = (vita_pad.buttons & SCE_CTRL_CROSS) ? 1 : 0;
+				buttonY[i] = (vita_pad.buttons & SCE_CTRL_TRIANGLE) ? 1 : 0;
+				triggerL[i] = (vita_pad.buttons & SCE_CTRL_LTRIGGER) ? 1 : 0;
+				triggerR[i] = (vita_pad.buttons & SCE_CTRL_RTRIGGER) ? 1 : 0;
+				buttonSelect[i] = (vita_pad.buttons & SCE_CTRL_SELECT) ? 1 : 0;
+				buttonStart[i] = (vita_pad.buttons & SCE_CTRL_START) ? 1 : 0;
+			}
+			if (i == 0) {
+				static int just_turbo_combo = 0;
+				if (triggerR[0] && buttonA[0]) {
+					if (!just_turbo_combo) {
+						just_turbo_combo = 1;
+						vita_turbo_toggle = !vita_turbo_toggle;
+						vita_fast_forward = vita_turbo_toggle;
+						gui_set_message(vita_turbo_toggle ? ">> TURBO >>" : "TURBO OFF", 60);
+					}
+					buttonA[0] = 0;
+					triggerR[0] = 0;
+					buttonstate[0] = 0;
+				} else if (just_turbo_combo) {
+					if (!triggerR[0] && !buttonA[0]) {
+						just_turbo_combo = 0;
+					} else {
+						buttonA[0] = 0;
+						triggerR[0] = 0;
+						buttonstate[0] = 0;
+					}
+				}
 			}
 		}
 #endif
@@ -964,9 +1000,71 @@ void gui_handle_events (void)
 		}
 	}
 
+#if defined(__PSP2__)
+	static int select_hold_frames = 0;
 	if(buttonSelect[0])
 	{
-		//re-center the Joysticks when the user opens the menu
+		if (buttonStart[0])
+		{
+			vita_turbo_toggle = !vita_turbo_toggle;
+			vita_fast_forward = vita_turbo_toggle;
+			buttonSelect[0] = 0;
+			buttonStart[0] = 0;
+			select_hold_frames = 0;
+			if (vkbd_mode) vkbd_mode = 0;
+			gui_set_message(vita_turbo_toggle ? ">> TURBO >>" : "TURBO OFF", 60);
+		}
+		else
+		{
+			select_hold_frames++;
+			if (select_hold_frames >= 3)
+			{
+				select_hold_frames = 0;
+				for (int i=0; i<nr_joysticks; i++)
+				{
+					switch (i)
+					{	
+						case 0:
+							currentJoy = uae4all_joy0;
+							break;
+						case 1:
+							currentJoy = uae4all_joy1;
+							break;
+						case 2:
+							currentJoy = uae4all_joy2;
+							break;
+						case 3:
+							currentJoy = uae4all_joy3;
+							break;
+						case 4:
+							currentJoy = uae4all_joy4;
+							break;
+						case 5:
+							currentJoy = uae4all_joy5;
+							break;
+						case 6:
+							currentJoy = uae4all_joy6;
+							break;
+						case 7:
+							currentJoy = uae4all_joy7;
+							break;
+					}
+					lAnalogXCenter[i]=SDL_JoystickGetAxis(currentJoy, 0);
+					lAnalogYCenter[i]=SDL_JoystickGetAxis(currentJoy, 1);
+					rAnalogXCenter[i]=SDL_JoystickGetAxis(currentJoy, 2);
+					rAnalogYCenter[i]=SDL_JoystickGetAxis(currentJoy, 3);
+				}
+				goMenu();
+			}
+		}
+	}
+	else
+	{
+		select_hold_frames = 0;
+	}
+#else
+	if(buttonSelect[0])
+	{
 		for (int i=0; i<nr_joysticks; i++)
 		{
 			switch (i)
@@ -1003,6 +1101,7 @@ void gui_handle_events (void)
 		}
 		goMenu();
 	}
+#endif
 
 #else
 	dpadUp[0] = keystate[SDLK_UP];
@@ -1646,6 +1745,18 @@ if(!vkbd_mode)
 							else if (*mainMenu_custom == -27) quickSave=1;
 							else if (*mainMenu_custom == -28) quickLoad=1;
 							else if (*mainMenu_custom == -29) vkbd_mode = !vkbd_mode;
+							else if (*mainMenu_custom == -30)
+							{
+								vita_turbo_toggle = !vita_turbo_toggle;
+								vita_fast_forward = vita_turbo_toggle;
+								gui_set_message(vita_turbo_toggle ? ">> TURBO >>" : "TURBO OFF", 60);
+							}
+							else if (*mainMenu_custom == -31)
+							{
+								vita_turbo_hold = 1;
+								vita_fast_forward = 1;
+								gui_set_message(">> TURBO >>", 40);
+							}
 							else if (*mainMenu_custom > 0)
 							{
 								getMapping(*mainMenu_custom);
@@ -1659,6 +1770,12 @@ if(!vkbd_mode)
 					{
 						if (*mainMenu_custom == -1) buttonstate[0]=0;
 						else if (*mainMenu_custom == -2) buttonstate[2]=0;
+						else if (*mainMenu_custom == -31)
+						{
+							vita_turbo_hold = 0;
+							vita_fast_forward = vita_turbo_toggle;
+							if (!vita_fast_forward) gui_set_message("TURBO OFF", 30);
+						}
 						else if (*mainMenu_custom > 0)
 						{		
 							getMapping(*mainMenu_custom);
@@ -2227,7 +2344,14 @@ if(!vkbd_mode)
 			justPressedL[0]=0;
 		}
 	}
-#endif // __PSP2__
+#endif
+#if defined(__PSP2__)
+	{
+		int hold_r2 = triggerR2[0];
+		vita_fast_forward = hold_r2 || vita_turbo_toggle || vita_turbo_hold;
+		if (hold_r2 && !mainMenu_customControls) triggerR2[0] = 0;
+	}
+#endif
 
 	static int justPressedStart[MAX_NUM_CONTROLLERS] = {};
 #if defined(__PSP2__) || defined(__SWITCH__)

@@ -61,13 +61,16 @@ int rdb_parse(const char *path, RdbPartition *parts, int max_parts)
     if (!hdf_is_open(fd))
         return -1;
 
-    if (!rdb_read_block(fd, 0, blk) ||
-        blk[0] != 'R' || blk[1] != 'D' || blk[2] != 'S' || blk[3] != 'K') {
-        hdf_close(fd);
-        return 0;
+    int found_rdb = 0;
+    for (int b = 0; b < 16; b++) {
+        if (rdb_read_block(fd, b, blk) &&
+            blk[0] == 'R' && blk[1] == 'D' && blk[2] == 'S' && blk[3] == 'K' &&
+            rdb_get_u32(blk, RDB_OFF_BLOCK_BYTES) == RDB_BLOCK_SIZE) {
+            found_rdb = 1;
+            break;
+        }
     }
-
-    if (rdb_get_u32(blk, RDB_OFF_BLOCK_BYTES) != RDB_BLOCK_SIZE) {
+    if (!found_rdb) {
         hdf_close(fd);
         return 0;
     }

@@ -4,10 +4,20 @@
 #endif
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <stdio.h>
 
 extern int mainMenu_drives;
 extern int kickstart;
+extern int mainMenu_bootHD;
+extern char mainMenu_whdload_game[128];
+extern int cdrom_is_inserted;
+extern char current_cd_image[256];
+extern char prefs_df[4][256];
+extern char uae4all_image_file0[256];
+extern char uae4all_image_file1[256];
+extern char uae4all_image_file2[256];
+extern char uae4all_image_file3[256];
 
 static volatile int disk_sound_volume = 35;
 static volatile int pending_floppy_step;
@@ -163,38 +173,74 @@ static void add_pending(volatile int *counter)
     if (*counter < 8) (*counter)++;
 }
 
+static int is_floppy_ext(const char *path)
+{
+    const char *ext;
+    if (!path || !path[0]) return 0;
+    ext = strrchr(path, '.');
+    if (!ext) return 0;
+    if (strcasecmp(ext, ".adf") == 0 ||
+        strcasecmp(ext, ".adz") == 0 ||
+        strcasecmp(ext, ".ipf") == 0 ||
+        strcasecmp(ext, ".zip") == 0 ||
+        strcasecmp(ext, ".dms") == 0 ||
+        strcasecmp(ext, ".fdi") == 0 ||
+        strcasecmp(ext, ".rp9") == 0 ||
+        strcasecmp(ext, ".gz") == 0 ||
+        strcasecmp(ext, ".bz2") == 0 ||
+        strcasecmp(ext, ".7z") == 0) {
+        return 1;
+    }
+    return 0;
+}
+
+static int floppy_sound_allowed(void)
+{
+    int i;
+    if (mainMenu_drives <= 0 || kickstart == 6) return 0;
+    if (mainMenu_bootHD != 0) return 0;
+    if (mainMenu_whdload_game[0] != '\0') return 0;
+    if (cdrom_is_inserted || current_cd_image[0] != '\0') return 0;
+    for (i = 0; i < 4; i++) {
+        if (is_floppy_ext(prefs_df[i])) return 1;
+    }
+    if (is_floppy_ext(uae4all_image_file0)) return 1;
+    if (is_floppy_ext(uae4all_image_file1)) return 1;
+    if (is_floppy_ext(uae4all_image_file2)) return 1;
+    if (is_floppy_ext(uae4all_image_file3)) return 1;
+    return 0;
+}
+
 void disk_sound_floppy_step(void)
 {
-    if (mainMenu_drives <= 0 || kickstart == 6) return;
+    if (!floppy_sound_allowed()) return;
     add_pending(&pending_floppy_step);
 }
 
 void disk_sound_floppy_motor(void)
 {
-    if (mainMenu_drives <= 0 || kickstart == 6) return;
+    if (!floppy_sound_allowed()) return;
     add_pending(&pending_floppy_motor);
 }
 
 void disk_sound_floppy_read(void)
 {
-    if (mainMenu_drives <= 0 || kickstart == 6) return;
+    if (!floppy_sound_allowed()) return;
     add_pending(&pending_floppy_read);
 }
 
 void disk_sound_floppy_write(void)
 {
-    if (mainMenu_drives <= 0 || kickstart == 6) return;
+    if (!floppy_sound_allowed()) return;
     add_pending(&pending_floppy_write);
 }
 
 void disk_sound_hard_read(void)
 {
-    add_pending(&pending_hard_read);
 }
 
 void disk_sound_hard_write(void)
 {
-    add_pending(&pending_hard_write);
 }
 
 static void set_sample(int event, int output_rate)

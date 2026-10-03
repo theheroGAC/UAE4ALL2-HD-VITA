@@ -156,13 +156,16 @@ int hdf_analyze(const char *path, HdfInfo *info)
     info->size = size;
     info->total_blocks = size / HDF_DEFAULT_BLOCKSIZE;
 
-    if (!hdf_read_block(f, 0, HDF_DEFAULT_BLOCKSIZE, hdr)) {
-        hdf_close(f);
-        hdf_set_error(info->error, sizeof(info->error), "Read error while inspecting HDF");
-        return 0;
+    int found_rdb = 0;
+    for (int b = 0; b < 16; b++) {
+        if (hdf_read_block(f, b, HDF_DEFAULT_BLOCKSIZE, hdr) &&
+            hdr[0] == 'R' && hdr[1] == 'D' && hdr[2] == 'S' && hdr[3] == 'K') {
+            found_rdb = 1;
+            break;
+        }
     }
 
-    if (hdr[0] == 'R' && hdr[1] == 'D' && hdr[2] == 'S' && hdr[3] == 'K') {
+    if (found_rdb) {
         info->is_rdb = 1;
         snprintf(info->filesystem, sizeof(info->filesystem), "RDB");
         info->dostype = 0;

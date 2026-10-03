@@ -1,4 +1,4 @@
-# UAE4ALL2 HD — PlayStation Vita 1.12
+# UAE4ALL2 HD — PlayStation Vita 1.13
 
 A cleaned PlayStation Vita build of UAE4ALL2 HD, an Amiga emulator based on the UAE4ALL2 project.
 
@@ -42,7 +42,7 @@ uae4all2hd.vpk
 - One-press game launch from the Library for ADF/IPF, HDF, WHDLoad, LHA and CD32 images, plus TRIANGLE favourites shared with the WHDLoad tab
 - Custom library folders through `ux0:/data/uae4all/library_roots.txt` (up to 8 roots, one per line)
 - Animated Boing Ball startup splash with real initialization stages and progress bar
-- About screen with version 1.12 and automatic scrolling credits
+- About screen with version 1.13 and automatic scrolling credits
 - Dedicated LHA filter in the Game Library tab with automatic extraction and launch
 - Enhanced IPF floppy compatibility with variable-density decoding and weak bit handling (CapsLib)
 - In-game menu seamless RESUME: changing display, control or audio settings resumes without restarting

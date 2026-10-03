@@ -174,29 +174,45 @@ void flush_block ()
 			vita_screenshot_request = 0;
 		}
 #endif
-		unsigned long start = read_processor_time();
-		if(start < next_synctime && next_synctime - start > time_per_frame - 1000)
 #if defined(__PSP2__)
-			SDL_Delay(((next_synctime - start) - 1000) / 1000);
+		extern int vita_fast_forward;
+		static int s_vita_ff_cnt = 0;
+		s_vita_ff_cnt++;
+		if (vita_fast_forward) {
+			if (s_vita_ff_cnt % 5 == 0) {
+				vita_apply_auto_display_scaling();
+				OSD_Render(prSDLScreen);
+				SDL_Flip(prSDLScreen);
+			}
+			last_synctime = read_processor_time();
+			next_synctime = last_synctime + time_per_frame;
+		} else
+#endif
+		{
+			unsigned long start = read_processor_time();
+			if(start < next_synctime && next_synctime - start > time_per_frame - 1000)
+#if defined(__PSP2__)
+				SDL_Delay(((next_synctime - start) - 1000) / 1000);
 #else
-			usleep((next_synctime - start) - 1000);
+				usleep((next_synctime - start) - 1000);
 #endif
 #if defined(__PSP2__)
-		vita_apply_auto_display_scaling();
+			vita_apply_auto_display_scaling();
 #endif
-		OSD_Render(prSDLScreen);
-		SDL_Flip(prSDLScreen);
-		last_synctime = read_processor_time();
+			OSD_Render(prSDLScreen);
+			SDL_Flip(prSDLScreen);
+			last_synctime = read_processor_time();
 
-		if(last_synctime - next_synctime > time_per_frame - 1000)
-			adjust_idletime(0);
-		else
-			adjust_idletime(next_synctime - start);
+			if(last_synctime - next_synctime > time_per_frame - 1000)
+				adjust_idletime(0);
+			else
+				adjust_idletime(next_synctime - start);
 
-		if(last_synctime - next_synctime > time_per_frame - 5000)
-			next_synctime = last_synctime + time_per_frame * (1 + prefs_gfx_framerate);
-		else
-			next_synctime = next_synctime + time_per_frame * (1 + prefs_gfx_framerate);
+			if(last_synctime - next_synctime > time_per_frame - 5000)
+				next_synctime = last_synctime + time_per_frame * (1 + prefs_gfx_framerate);
+			else
+				next_synctime = next_synctime + time_per_frame * (1 + prefs_gfx_framerate);
+		}
 	}
 #if defined(__SWITCH__)
 	SDL_LockSurface (prSDLScreen);

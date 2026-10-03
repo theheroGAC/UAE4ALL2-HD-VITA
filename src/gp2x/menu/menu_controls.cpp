@@ -28,7 +28,7 @@
 #endif
 
 #define MAX_CUSTOM_ID 96
-#define MIN_CUSTOM_ID -29
+#define MIN_CUSTOM_ID -31
 
 const char *text_str_controls_separator="---------------------------------------";
 const char *text_str_controls_title=    "Custom Controls";
@@ -77,6 +77,8 @@ static void getMapping(int customId)
 {
 	switch(customId)
 	{
+		case -31: strcpy(mapping, "Turbo Mode (Hold)"); break;
+		case -30: strcpy(mapping, "Turbo Mode (Toggle)"); break;
 		case -29: strcpy(mapping, "Virtual Keyboard"); break;
 		case -28: strcpy(mapping, "Quick Load"); break;
 		case -27: strcpy(mapping, "Quick Save"); break;

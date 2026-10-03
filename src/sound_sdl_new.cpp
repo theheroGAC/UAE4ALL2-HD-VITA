@@ -239,6 +239,14 @@ void finish_sound_buffer (void)
 	sndbufpt = render_sndbuff = sndbuffer[0];
 #else
 
+#if defined(__PSP2__) || defined(__SWITCH__)
+	extern int vita_fast_forward;
+	if (vita_fast_forward) {
+		wrcnt++;
+		sndbufpt = render_sndbuff = sndbuffer[wrcnt%SOUND_BUFFERS_COUNT];
+		return;
+	}
+#endif
 #ifdef SOUND_USE_SEMAPHORES
 	uae_sem_post(&sound_sem);
 	uae_sem_wait(&callback_sem);

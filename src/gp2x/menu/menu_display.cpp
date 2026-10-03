@@ -81,17 +81,8 @@ enum {
 #if defined(__PSP2__)
 enum {
 	SHADER_NONE = 0,
-	SHADER_LCD3X,
-	SHADER_AAA,
-	SHADER_SCALE2X,
-	SHADER_SHARP_BILINEAR,
-	SHADER_SHARP_BILINEAR_SIMPLE,
-	SHADER_FXAA,
-	SHADER_CRT_EASYMODE,
-	SHADER_BICUBIC,
-	SHADER_XBR_2X,
-	SHADER_GTU,
-	NUM_SHADERS, //NUM_SHADERS - 1 is the max allowed number in mainMenu_shader
+	SHADER_BILINEAR,
+	NUM_SHADERS,
 };
 #endif
 
@@ -297,39 +288,12 @@ static void draw_displayMenu(int c)
 		case SHADER_POINT:
 			snprintf((char*)value, 25, "POINT");
 			break;
-#else
+#elif defined(__PSP2__)
 		case SHADER_NONE:
-			snprintf((char*)value, 25, "NONE (perfect 2x)");
+			snprintf((char*)value, 25, "Point (Crisp)");
 			break;
-		case SHADER_LCD3X:
-			snprintf((char*)value, 25, "LCD3X");
-			break;
-		case SHADER_SCALE2X:
-			snprintf((char*)value, 25, "SCALE2X");
-			break;
-		case SHADER_AAA:
-			snprintf((char*)value, 25, "AAA");
-			break;
-		case SHADER_SHARP_BILINEAR:
-			snprintf((char*)value, 25, "SHARP_BILINEAR");
-			break;
-		case SHADER_SHARP_BILINEAR_SIMPLE:
-			snprintf((char*)value, 25, "SHARP_BILINEAR_SIMPLE");
-			break;
-		case SHADER_FXAA:
-			snprintf((char*)value, 25, "FXAA");
-			break;
-		case SHADER_CRT_EASYMODE:
-			snprintf((char*)value, 25, "CRT EASYMODE");
-			break;
-		case SHADER_BICUBIC:
-			snprintf((char*)value, 25, "BICUBIC");
-			break;
-		case SHADER_XBR_2X:
-			snprintf((char*)value, 25, "XBR 2X");
-			break;
-		case SHADER_GTU:
-			snprintf((char*)value, 25, "GTU CRT");
+		case SHADER_BILINEAR:
+			snprintf((char*)value, 25, "Bilinear (Smooth)");
 			break;
 #endif
 		default:

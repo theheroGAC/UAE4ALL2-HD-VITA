@@ -31,3 +31,4 @@ int truncate (const char *name, long int len);
 struct uaedev_mount_info;
 
 extern struct hardfiledata *get_hardfile_data (int nr);
+extern int get_hardfile_readonly (int nr);
