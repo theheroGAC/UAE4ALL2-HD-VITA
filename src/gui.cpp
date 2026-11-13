@@ -152,6 +152,8 @@ int rAnalogYCenter[MAX_NUM_CONTROLLERS]={};
 int haveJoysticksBeenCentered=0;
 extern int mainMenu_leftStickMouse;
 extern int mainMenu_pinballMode;
+extern int mainMenu_cd32Remap;
+extern int mainMenu_cd32Map[7];
 #endif
 
 #ifdef USE_UAE4ALL_VKBD
@@ -797,6 +799,38 @@ void gui_handle_events (void)
 				triggerR[i] = (vita_pad.buttons & SCE_CTRL_RTRIGGER) ? 1 : 0;
 				buttonSelect[i] = (vita_pad.buttons & SCE_CTRL_SELECT) ? 1 : 0;
 				buttonStart[i] = (vita_pad.buttons & SCE_CTRL_START) ? 1 : 0;
+				if (mainMenu_cd32Remap && (kickstart == 6 || cdrom_is_inserted != 0)) {
+					int phys[8];
+					phys[0] = (vita_pad.buttons & SCE_CTRL_SQUARE) ? 1 : 0;
+					phys[1] = (vita_pad.buttons & SCE_CTRL_CIRCLE) ? 1 : 0;
+					phys[2] = (vita_pad.buttons & SCE_CTRL_CROSS) ? 1 : 0;
+					phys[3] = (vita_pad.buttons & SCE_CTRL_TRIANGLE) ? 1 : 0;
+					phys[4] = (vita_pad.buttons & SCE_CTRL_LTRIGGER) ? 1 : 0;
+					phys[5] = (vita_pad.buttons & SCE_CTRL_RTRIGGER) ? 1 : 0;
+					phys[6] = (vita_pad.buttons & SCE_CTRL_SELECT) ? 1 : 0;
+					phys[7] = (vita_pad.buttons & SCE_CTRL_START) ? 1 : 0;
+					int m0 = mainMenu_cd32Map[0];
+					int m1 = mainMenu_cd32Map[1];
+					int m2 = mainMenu_cd32Map[2];
+					int m3 = mainMenu_cd32Map[3];
+					int m4 = mainMenu_cd32Map[4];
+					int m5 = mainMenu_cd32Map[5];
+					int m6 = mainMenu_cd32Map[6];
+					if (m0 < 0 || m0 > 7) m0 = 1;
+					if (m1 < 0 || m1 > 7) m1 = 2;
+					if (m2 < 0 || m2 > 7) m2 = 0;
+					if (m3 < 0 || m3 > 7) m3 = 3;
+					if (m4 < 0 || m4 > 7) m4 = 5;
+					if (m5 < 0 || m5 > 7) m5 = 4;
+					if (m6 < 0 || m6 > 7) m6 = 7;
+					buttonB[i] = phys[m0];
+					buttonX[i] = phys[m1];
+					buttonA[i] = phys[m2];
+					buttonY[i] = phys[m3];
+					triggerR[i] = phys[m4];
+					triggerL[i] = phys[m5];
+					buttonStart[i] = phys[m6];
+				}
 			}
 			if (i == 0) {
 				static int just_turbo_combo = 0;

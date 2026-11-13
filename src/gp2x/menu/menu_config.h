@@ -101,6 +101,7 @@ extern int visibleAreaWidth;
 extern int saveMenu_n_savestate;
 
 extern int mainMenu_autosave;
+extern int mainMenu_libraryAutoScan;
 extern int mainMenu_button1;
 extern int mainMenu_button2;
 extern int mainMenu_autofireButton1;
@@ -175,6 +176,8 @@ extern int mainMenu_customPreset_X[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
 extern int mainMenu_customPreset_Y[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
 extern int mainMenu_customPreset_L[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
 extern int mainMenu_customPreset_R[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
+extern int mainMenu_cd32Remap;
+extern int mainMenu_cd32Map[7];
 #ifdef __SWITCH__
 extern int mainMenu_customPreset_L2[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];
 extern int mainMenu_customPreset_R2[MAX_NUM_CUSTOM_PRESETS][MAX_NUM_CONTROLLERS];

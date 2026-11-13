@@ -174,6 +174,8 @@ char mainMenu_whdload_game[128] = "";
 char mainMenu_whdload_args[256] = "";
 int mainMenu_floppyWriteProtect[4] = { 0, 0, 0, 0 };
 int mainMenu_cycleExact = 0;
+int mainMenu_cd32Remap = 0;
+int mainMenu_cd32Map[7] = { 1, 2, 0, 3, 5, 4, 7 };
 #endif
 #ifdef __SWITCH__
 int mainMenu_swapAB = DEFAULT_SWAPAB;
@@ -182,6 +184,7 @@ int mainMenu_singleJoycons = DEFAULT_SINGLEJOYCONS;
 
 // The following params in use, but can't be changed with gui
 int mainMenu_autosave = DEFAULT_AUTOSAVE;
+int mainMenu_libraryAutoScan = 1;
 int mainMenu_button1 = GP2X_BUTTON_X;
 int mainMenu_button2 = GP2X_BUTTON_A;
 int mainMenu_autofireButton1 = GP2X_BUTTON_B;
@@ -582,6 +585,14 @@ void SetDefaultMenuSettings(int general)
     mainMenu_midiSynth = 0;
     mainMenu_pinballMode = 0;
     mainMenu_whdload_game[0] = '\0';
+    mainMenu_cd32Remap = 0;
+    mainMenu_cd32Map[0] = 1;
+    mainMenu_cd32Map[1] = 2;
+    mainMenu_cd32Map[2] = 0;
+    mainMenu_cd32Map[3] = 3;
+    mainMenu_cd32Map[4] = 5;
+    mainMenu_cd32Map[5] = 4;
+    mainMenu_cd32Map[6] = 7;
 #endif
 #ifdef __SWITCH__
     mainMenu_swapAB = DEFAULT_SWAPAB;
@@ -590,6 +601,7 @@ void SetDefaultMenuSettings(int general)
     // The following params can't be changed in gui
     skipintro = DEFAULT_SKIPINTRO;
     mainMenu_autosave = DEFAULT_AUTOSAVE;
+    mainMenu_libraryAutoScan = 1;
     mainMenu_button1 = GP2X_BUTTON_X;
     mainMenu_button2 = GP2X_BUTTON_A;
     mainMenu_autofireButton1 = GP2X_BUTTON_B;
@@ -1397,6 +1409,8 @@ int saveconfig(int general)
     fputs(buffer,f);
     snprintf((char*)buffer, 255, "autosave=%d\n",mainMenu_autosave);
     fputs(buffer,f);
+    snprintf((char*)buffer, 255, "libraryautoscan=%d\n",mainMenu_libraryAutoScan);
+    fputs(buffer,f);
     snprintf((char*)buffer, 255, "gp2xclock=%d\n",gp2xClockSpeed);
     fputs(buffer,f);
     snprintf((char*)buffer, 255, "joyconf=%d\n",mainMenu_joyConf + (mainMenu_joyPort << 4));
@@ -1853,6 +1867,7 @@ void loadconfig(int general)
         sound_rate = DEFAULT_SOUND_FREQ;
 #endif
         fscanf(f,"autosave=%d\n",&mainMenu_autosave);
+        fscanf(f,"libraryautoscan=%d\n",&mainMenu_libraryAutoScan);
         fscanf(f,"gp2xclock=%d\n", &gp2xClockSpeed);
         int joybuffer = 0;
         fscanf(f,"joyconf=%d\n",&joybuffer);

@@ -87,6 +87,9 @@ extern int mainMenu_mouseEmulation;
 extern int mainMenu_deadZone;
 extern int mainMenu_scanlines;
 extern int mainMenu_autosave;
+extern int mainMenu_libraryAutoScan;
+extern int mainMenu_cd32Remap;
+extern int mainMenu_cd32Map[7];
 extern char mainMenu_whdload_args[256];
 extern void disk_set_write_protect(int num, int enabled);
 extern int disk_get_write_protect(int num);
@@ -316,6 +319,21 @@ static int vita_cycle_custom_action(int current_id, int direction)
     }
     current_idx = (current_idx + direction + s_num_custom_actions) % s_num_custom_actions;
     return s_custom_actions[current_idx].id;
+}
+static const char *vita_cd32_source_name(int src)
+{
+    if (src == 0) return "SQUARE";
+    if (src == 1) return "CIRCLE";
+    if (src == 2) return "CROSS";
+    if (src == 3) return "TRIANGLE";
+    if (src == 4) return "L";
+    if (src == 5) return "R";
+    if (src == 6) return "SELECT";
+    return "START";
+}
+static int vita_cd32_cycle_source(int cur, int dir)
+{
+    return (cur + dir + 8) % 8;
 }
 
 static bool vita_copy_file(const char *src_path, const char *dst_path)
@@ -1926,9 +1944,102 @@ void vita_view_presets(VitaInputState *input, int *selected_item)
     vita_draw_list_page_indicator(*selected_item, total_items, visible_items);
 }
 
+static void vita_get_game_label(char *destination, size_t destination_size);
+static void vita_remap_build_path(char *out, size_t out_size)
+{
+    char label[128];
+    vita_get_game_label(label, sizeof(label));
+    for (size_t i = 0; label[i] != 0; i++) {
+        char c = label[i];
+        if (c == 47 || c == 92 || c == 58 || c == 42 || c == 63 || c == 34 || c == 60 || c == 62 || c == 124) label[i] = 95;
+    }
+    if (label[0] == 0) {
+        out[0] = 0;
+        return;
+    }
+    snprintf(out, out_size, "ux0:/data/uae4all/conf/remap_%s.cfg", label);
+}
+static int vita_remap_exists(void)
+{
+    char path[300];
+    vita_remap_build_path(path, sizeof(path));
+    if (path[0] == 0) return 0;
+    FILE *f = fopen(path, "rb");
+    if (!f) return 0;
+    fclose(f);
+    return 1;
+}
+static int vita_remap_save_game(void)
+{
+    char path[300];
+    vita_remap_build_path(path, sizeof(path));
+    if (path[0] == 0) return 0;
+    FILE *f = fopen(path, "wb");
+    if (!f) return 0;
+    fprintf(f, "vita_remap=1\n");
+    fprintf(f, "custom=%d set=%d joyport=%d\n", mainMenu_customControls, mainMenu_custom_controlSet, mainMenu_joyPort);
+    fprintf(f, "cd32=%d %d %d %d %d %d %d %d\n", mainMenu_cd32Remap, mainMenu_cd32Map[0], mainMenu_cd32Map[1], mainMenu_cd32Map[2], mainMenu_cd32Map[3], mainMenu_cd32Map[4], mainMenu_cd32Map[5], mainMenu_cd32Map[6]);
+    for (int c = 0; c < 4; c++) {
+        fprintf(f, "pad%d=%d %d %d %d %d %d %d %d %d %d %d %d %d %d\n", c,
+            mainMenu_custom_up[c], mainMenu_custom_down[c], mainMenu_custom_left[c], mainMenu_custom_right[c],
+            mainMenu_custom_stickup[c], mainMenu_custom_stickdown[c], mainMenu_custom_stickleft[c], mainMenu_custom_stickright[c],
+            mainMenu_custom_X[c], mainMenu_custom_B[c], mainMenu_custom_A[c], mainMenu_custom_Y[c],
+            mainMenu_custom_L[c], mainMenu_custom_R[c]);
+    }
+    fclose(f);
+    return 1;
+}
+static int vita_remap_load_game(void)
+{
+    char path[300];
+    vita_remap_build_path(path, sizeof(path));
+    if (path[0] == 0) return 0;
+    FILE *f = fopen(path, "rb");
+    if (!f) return 0;
+    int tag = 0;
+    char line[256];
+    if (!fgets(line, sizeof(line), f)) { fclose(f); return 0; }
+    if (fscanf(f, "custom=%d set=%d joyport=%d\n", &mainMenu_customControls, &mainMenu_custom_controlSet, &mainMenu_joyPort) != 3) { fclose(f); return 0; }
+    for (int c = 0; c < 4; c++) {
+        int vals[14];
+        if (fscanf(f, "pad%d=%d %d %d %d %d %d %d %d %d %d %d %d %d %d\n", &tag,
+            &vals[0], &vals[1], &vals[2], &vals[3], &vals[4], &vals[5], &vals[6], &vals[7],
+            &vals[8], &vals[9], &vals[10], &vals[11], &vals[12], &vals[13]) != 15) { fclose(f); return 0; }
+        mainMenu_custom_up[c] = vals[0];
+        mainMenu_custom_down[c] = vals[1];
+        mainMenu_custom_left[c] = vals[2];
+        mainMenu_custom_right[c] = vals[3];
+        mainMenu_custom_stickup[c] = vals[4];
+        mainMenu_custom_stickdown[c] = vals[5];
+        mainMenu_custom_stickleft[c] = vals[6];
+        mainMenu_custom_stickright[c] = vals[7];
+        mainMenu_custom_X[c] = vals[8];
+        mainMenu_custom_B[c] = vals[9];
+        mainMenu_custom_A[c] = vals[10];
+        mainMenu_custom_Y[c] = vals[11];
+        mainMenu_custom_L[c] = vals[12];
+        mainMenu_custom_R[c] = vals[13];
+    }
+    if (fscanf(f, "cd32=%d %d %d %d %d %d %d %d\n", &mainMenu_cd32Remap, &mainMenu_cd32Map[0], &mainMenu_cd32Map[1], &mainMenu_cd32Map[2], &mainMenu_cd32Map[3], &mainMenu_cd32Map[4], &mainMenu_cd32Map[5], &mainMenu_cd32Map[6]) != 8) {
+        mainMenu_cd32Remap = 0;
+        mainMenu_cd32Map[0] = 1;
+        mainMenu_cd32Map[1] = 2;
+        mainMenu_cd32Map[2] = 0;
+        mainMenu_cd32Map[3] = 3;
+        mainMenu_cd32Map[4] = 5;
+        mainMenu_cd32Map[5] = 4;
+        mainMenu_cd32Map[6] = 7;
+    }
+    fclose(f);
+    if (mainMenu_custom_controlSet < 0) mainMenu_custom_controlSet = 0;
+    if (mainMenu_custom_controlSet > 5) mainMenu_custom_controlSet = 0;
+    mapback_custom_controls();
+    remap_custom_controls();
+    return 1;
+}
 void vita_view_hardware(VitaInputState *input, int *selected_item)
 {
-    const int total_items = 15;
+    const int total_items = 14;
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
 
@@ -1939,41 +2050,6 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
     if (input->pressed & SCE_CTRL_DOWN) {
         (*selected_item)++;
         if (*selected_item >= total_items) *selected_item = 0;
-    }
-
-    if (input->pressed & SCE_CTRL_CROSS && *selected_item == 13) {
-        char new_file[512];
-        new_file[0] = '\0';
-        int res = vita_gui_run_browser(new_file, currentDir, 8);
-        input->pressed = 0;
-        if (res == 1) {
-            if (cdrom_open_image(new_file)) {
-                ApplyCd32Profile();
-                mainMenu_whdload_game[0] = '\0';
-                vita_eject_all_floppies();
-                int ks_loaded = vita_set_kickstart(kickstart, 0);
-                bReloadKickstart = 1;
-                if (!ks_loaded)
-                    vita_show_message_box("Kickstart CD32 Missing", "CD inserted, but CD32 ROMs are missing in ux0:/data/uae4all/kickstarts/!\nRequired: kick40060.CD32 and kick40060.CD32.ext (or 1MB combined ROM).", "OK (X)");
-                else if (cdrom_get_disc_count() > 1)
-                    vita_show_message_box("CD32 Playlist", "M3U playlist inserted and CD32 profile applied.\nUse LEFT / RIGHT on this item to change disc while the game runs.", "OK (X)");
-                else
-                    vita_show_message_box("CD32 Image", "CD image inserted and CD32 profile applied.", "OK (X)");
-            } else
-                vita_show_message_box("CD32 Image Error", "The selected image could not be opened.", "OK (X)");
-        }
-    }
-    if (input->pressed & SCE_CTRL_TRIANGLE && *selected_item == 13) {
-        cdrom_close_image();
-        vita_show_message_box("CD32 Image", "CD image ejected.", "OK (X)");
-    }
-
-    if (*selected_item == 13 && cdrom_get_disc_count() > 1) {
-        int disc_step = 0;
-        if (input->pressed & SCE_CTRL_RIGHT) disc_step = 1;
-        if (input->pressed & SCE_CTRL_LEFT) disc_step = -1;
-        if (disc_step != 0)
-            cdrom_select_disc(cdrom_get_current_disc() + disc_step);
     }
 
     int dir = 0;
@@ -2062,7 +2138,7 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
                 mainMenu_soundStereoSep = (mainMenu_soundStereoSep + dir + 4) % 4;
                 getChanges();
                 break;
-            case 14:
+            case 13:
                 mainMenu_midiSynth = 1 - mainMenu_midiSynth;
                 midi_synth_set_enabled(mainMenu_midiSynth);
                 if (mainMenu_midiSynth)
@@ -2098,19 +2174,6 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
     const char *sound_out_names[4] = { "Disabled (Mute)", "22050 Hz (Low)", "44100 Hz (Standard Quality)", "48000 Hz (High Quality)" };
     const char *sound_stereo_names[2] = { "Mono", "Stereo" };
     const char *stereo_sep_names[4] = { "25% Separation", "50% (Recommended for Headphones)", "75% Separation", "100% (Hard Amiga L/R)" };
-    char cd_image_buf[160];
-    const char *cd_image_name = "No image selected";
-    if (current_cd_image[0]) {
-        if (cdrom_get_disc_count() > 1) {
-            const char *disc_path = cdrom_get_disc_path(cdrom_get_current_disc());
-            if (!disc_path) disc_path = current_cd_image;
-            snprintf(cd_image_buf, sizeof(cd_image_buf), "Disc %d/%d: %s",
-                cdrom_get_current_disc() + 1, cdrom_get_disc_count(), get_filename_only(disc_path));
-        } else
-            snprintf(cd_image_buf, sizeof(cd_image_buf), "%s", get_filename_only(current_cd_image));
-        cd_image_name = cd_image_buf;
-    }
-
     int curr_sound_idx = 0;
     if (!mainMenu_sound) curr_sound_idx = 0;
     else if (sound_rate == 22050) curr_sound_idx = 1;
@@ -2169,16 +2232,162 @@ void vita_view_hardware(VitaInputState *input, int *selected_item)
                 vita_draw_selector_item(card_x, y, card_w, item_h, "Stereo Separation", stereo_sep_names[mainMenu_soundStereoSep % 4], focused);
                 break;
             case 13:
-                vita_draw_selector_item(card_x, y, card_w, item_h, "CD32 CD Image", cd_image_name, focused);
-                break;
-            case 14:
                 vita_draw_switch_item(card_x, y, card_w, item_h, "MIDI / MT-32 Synth Emulation", mainMenu_midiSynth == 1, focused);
                 break;
         }
     }
     vita_draw_list_page_indicator(*selected_item, total_items, visible_items);
 }
-
+void vita_view_cd32(VitaInputState *input, int *selected_item)
+{
+    const int total_items = 14;
+    if (*selected_item < 0) *selected_item = 0;
+    if (*selected_item >= total_items) *selected_item = total_items - 1;
+    if (input->pressed & SCE_CTRL_UP) {
+        (*selected_item)--;
+        if (*selected_item < 0) *selected_item = total_items - 1;
+    }
+    if (input->pressed & SCE_CTRL_DOWN) {
+        (*selected_item)++;
+        if (*selected_item >= total_items) *selected_item = 0;
+    }
+    if (input->pressed & SCE_CTRL_CROSS && *selected_item == 0) {
+        char new_file[512];
+        new_file[0] = 0;
+        int res = vita_gui_run_browser(new_file, currentDir, 8);
+        input->pressed = 0;
+        if (res == 1) {
+            if (cdrom_open_image(new_file)) {
+                ApplyCd32Profile();
+                mainMenu_whdload_game[0] = 0;
+                vita_eject_all_floppies();
+                int ks_loaded = vita_set_kickstart(kickstart, 0);
+                bReloadKickstart = 1;
+                if (!ks_loaded)
+                    vita_show_message_box("Kickstart CD32 Missing", "CD inserted, but CD32 ROMs are missing.", "OK (X)");
+                else if (cdrom_get_disc_count() > 1)
+                    vita_show_message_box("CD32 Playlist", "M3U playlist inserted and CD32 profile applied.", "OK (X)");
+                else
+                    vita_show_message_box("CD32 Image", "CD image inserted and CD32 profile applied.", "OK (X)");
+            } else
+                vita_show_message_box("CD32 Image Error", "The selected image could not be opened.", "OK (X)");
+        }
+    }
+    if ((input->pressed & SCE_CTRL_CROSS && *selected_item == 1) || (input->pressed & SCE_CTRL_TRIANGLE && (*selected_item == 0 || *selected_item == 1))) {
+        cdrom_close_image();
+        vita_show_message_box("CD32 Image", "CD image ejected.", "OK (X)");
+        input->pressed = 0;
+    }
+    if (*selected_item == 2 && cdrom_get_disc_count() > 1) {
+        int disc_step = 0;
+        if (input->pressed & SCE_CTRL_RIGHT) disc_step = 1;
+        if (input->pressed & SCE_CTRL_LEFT) disc_step = -1;
+        if (disc_step != 0)
+            cdrom_select_disc(cdrom_get_current_disc() + disc_step);
+    }
+    if (input->pressed & SCE_CTRL_CROSS && *selected_item == 3) {
+        ApplyCd32Profile();
+        vita_eject_all_floppies();
+        vita_set_kickstart(kickstart, 0);
+        bReloadKickstart = 1;
+        vita_show_message_box("CD32 Preset", "Amiga CD32 profile applied.", "OK (X)");
+        input->pressed = 0;
+    }
+    if (input->pressed & SCE_CTRL_SQUARE && *selected_item == 3) {
+        ApplyCd32Profile();
+        bReloadKickstart = 1;
+        vita_show_message_box("CD32 Preset", "Amiga CD32 profile applied.", "OK (X)");
+        input->pressed = 0;
+    }
+    if (input->pressed & SCE_CTRL_CROSS && *selected_item == 4) {
+        remove("ux0:/data/uae4all/saves/cd32.nvram");
+        vita_show_message_box("CD32 NVRAM", "CD32 NVRAM cleared.", "OK (X)");
+        input->pressed = 0;
+    }
+    if (input->pressed & SCE_CTRL_CROSS && *selected_item == 5) {
+        char info[256];
+        if (cdrom_is_inserted)
+            snprintf(info, sizeof(info), "Inserted: %s Disc %d di %d", get_filename_only(current_cd_image), cdrom_get_current_disc() + 1, cdrom_get_disc_count());
+        else
+            snprintf(info, sizeof(info), "No disc inserted. Insert ISO CUE BIN CHD M3U.");
+        vita_show_message_box("CD32 Status", info, "OK (X)");
+        input->pressed = 0;
+    }
+    int dir = 0;
+    if (input->pressed & SCE_CTRL_RIGHT) dir = 1;
+    if (input->pressed & SCE_CTRL_LEFT) dir = -1;
+    if (dir != 0 && *selected_item == 2 && cdrom_get_disc_count() > 1) {
+        cdrom_select_disc(cdrom_get_current_disc() + dir);
+    }
+    if (dir != 0 && *selected_item == 6) {
+        mainMenu_cd32Remap = 1 - mainMenu_cd32Remap;
+    }
+    if (dir != 0 && *selected_item >= 7 && *selected_item <= 13) {
+        int idx = *selected_item - 7;
+        mainMenu_cd32Map[idx] = vita_cd32_cycle_source(mainMenu_cd32Map[idx], dir);
+        mainMenu_cd32Remap = 1;
+    }
+    float card_x = 20.0f;
+    float card_w = VITA_SCREEN_W - 40.0f;
+    const float start_y = VITA_LIST_START_Y;
+    const float item_h = 44.0f;
+    const float item_gap = 6.0f;
+    const int visible_items = vita_list_visible_rows(start_y, item_h, item_gap);
+    int first_item = *selected_item >= visible_items ? *selected_item - visible_items + 1 : 0;
+    char cd_image_buf[160];
+    const char *cd_image_name = "No image selected";
+    if (current_cd_image[0]) {
+        if (cdrom_get_disc_count() > 1) {
+            const char *disc_path = cdrom_get_disc_path(cdrom_get_current_disc());
+            if (!disc_path) disc_path = current_cd_image;
+            snprintf(cd_image_buf, sizeof(cd_image_buf), "Disc %d di %d: %s", cdrom_get_current_disc() + 1, cdrom_get_disc_count(), get_filename_only(disc_path));
+        } else
+            snprintf(cd_image_buf, sizeof(cd_image_buf), "%s", get_filename_only(current_cd_image));
+        cd_image_name = cd_image_buf;
+    }
+    char disc_buf[64];
+    if (cdrom_get_disc_count() > 1)
+        snprintf(disc_buf, sizeof(disc_buf), "Disc %d di %d", cdrom_get_current_disc() + 1, cdrom_get_disc_count());
+    else if (cdrom_is_inserted)
+        snprintf(disc_buf, sizeof(disc_buf), "Single disc");
+    else
+        snprintf(disc_buf, sizeof(disc_buf), "Empty");
+    for (int i = 0; i < visible_items; i++) {
+        int item = first_item + i;
+        if (item >= total_items) break;
+        float y = start_y + (float)i * (item_h + item_gap);
+        bool focused = (*selected_item == item);
+        if (item == 0)
+            vita_draw_selector_item(card_x, y, card_w, item_h, "CD32 CD Image", cd_image_name, focused);
+        else if (item == 1)
+            vita_draw_button_item(card_x, y, card_w, item_h, "Eject CD32 Disc", "Remove current disc", "EJECT", focused, false);
+        else if (item == 2)
+            vita_draw_selector_item(card_x, y, card_w, item_h, "CD32 Disc Select", disc_buf, focused);
+        else if (item == 3)
+            vita_draw_button_item(card_x, y, card_w, item_h, "Apply CD32 Preset", "68020 AGA Akiko CD32 ROM", "APPLY", focused, false);
+        else if (item == 4)
+            vita_draw_button_item(card_x, y, card_w, item_h, "Reset CD32 NVRAM", "Clear 1KB saves", "RESET", focused, false);
+        else if (item == 5)
+            vita_draw_button_item(card_x, y, card_w, item_h, "CD32 Status", "Show disc and drive state", "INFO", focused, false);
+        else if (item == 6)
+            vita_draw_switch_item(card_x, y, card_w, item_h, "CD32 Pad Remap", mainMenu_cd32Remap == 1, focused);
+        else if (item == 7)
+            vita_draw_selector_item(card_x, y, card_w, item_h, "CD32 Blue", vita_cd32_source_name(mainMenu_cd32Map[0]), focused);
+        else if (item == 8)
+            vita_draw_selector_item(card_x, y, card_w, item_h, "CD32 Red", vita_cd32_source_name(mainMenu_cd32Map[1]), focused);
+        else if (item == 9)
+            vita_draw_selector_item(card_x, y, card_w, item_h, "CD32 Yellow", vita_cd32_source_name(mainMenu_cd32Map[2]), focused);
+        else if (item == 10)
+            vita_draw_selector_item(card_x, y, card_w, item_h, "CD32 Green", vita_cd32_source_name(mainMenu_cd32Map[3]), focused);
+        else if (item == 11)
+            vita_draw_selector_item(card_x, y, card_w, item_h, "CD32 Forward", vita_cd32_source_name(mainMenu_cd32Map[4]), focused);
+        else if (item == 12)
+            vita_draw_selector_item(card_x, y, card_w, item_h, "CD32 Reverse", vita_cd32_source_name(mainMenu_cd32Map[5]), focused);
+        else if (item == 13)
+            vita_draw_selector_item(card_x, y, card_w, item_h, "CD32 Play", vita_cd32_source_name(mainMenu_cd32Map[6]), focused);
+    }
+    vita_draw_list_page_indicator(*selected_item, total_items, visible_items);
+}
 void vita_view_display(VitaInputState *input, int *selected_item)
 {
     const int total_items = 13;
@@ -2596,8 +2805,7 @@ void vita_view_controls(VitaInputState *input, int *selected_item)
         return;
     }
 
-    /* Main Controls Tab View */
-    const int total_items = 16;
+    const int total_items = 19;
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
 
@@ -2613,6 +2821,30 @@ void vita_view_controls(VitaInputState *input, int *selected_item)
     if (input->pressed & SCE_CTRL_CROSS && *selected_item == 0) {
         s_custom_controls_modal_open = true;
         s_custom_modal_selected = 0;
+        return;
+    }
+    if (input->pressed & SCE_CTRL_CROSS && *selected_item == 16) {
+        if (vita_remap_save_game())
+            vita_show_message_box("Per-Game Remap", "Remap salvato per questo gioco.", "OK (X)");
+        else
+            vita_show_message_box("Per-Game Remap", "Nessun gioco attivo per il salvataggio.", "OK (X)");
+        input->pressed = 0;
+        return;
+    }
+    if (input->pressed & SCE_CTRL_CROSS && *selected_item == 17) {
+        if (vita_remap_load_game())
+            vita_show_message_box("Per-Game Remap", "Remap caricato per questo gioco.", "OK (X)");
+        else
+            vita_show_message_box("Per-Game Remap", "Nessun remap trovato per questo gioco.", "OK (X)");
+        input->pressed = 0;
+        return;
+    }
+    if (input->pressed & SCE_CTRL_CROSS && *selected_item == 18) {
+        char del_path[300];
+        vita_remap_build_path(del_path, sizeof(del_path));
+        if (del_path[0] != 0) remove(del_path);
+        vita_show_message_box("Per-Game Remap", "Remap eliminato per questo gioco.", "OK (X)");
+        input->pressed = 0;
         return;
     }
 
@@ -2722,6 +2954,13 @@ void vita_view_controls(VitaInputState *input, int *selected_item)
     char custom_status_buf[64];
     snprintf(custom_status_buf, sizeof(custom_status_buf), "%s (Profile %d, Controller %d)",
         mainMenu_customControls ? "Active" : "Disabled", mainMenu_custom_controlSet + 1, mainMenu_custom_currentlyEditingControllerNr + 1);
+    char remap_game_buf[128];
+    char remap_state_buf[128];
+    vita_get_game_label(remap_game_buf, sizeof(remap_game_buf));
+    if (vita_remap_exists())
+        snprintf(remap_state_buf, sizeof(remap_state_buf), "Salvato per %s", remap_game_buf);
+    else
+        snprintf(remap_state_buf, sizeof(remap_state_buf), "Nessun remap per %s", remap_game_buf);
 
     for (int i = 0; i < visible_items; i++) {
         int item = first_item + i;
@@ -2777,11 +3016,19 @@ void vita_view_controls(VitaInputState *input, int *selected_item)
             case 15:
                 vita_draw_switch_item(card_x, y, card_w, item_h, "WHDLoad Auto-Eject Floppy on Launch", mainMenu_autoEjectFloppy == 1, focused);
                 break;
+            case 16:
+                vita_draw_button_item(card_x, y, card_w, item_h, "Save Remap For This Game", remap_state_buf, "SAVE", focused, false);
+                break;
+            case 17:
+                vita_draw_button_item(card_x, y, card_w, item_h, "Load Remap For This Game", remap_game_buf, "LOAD", focused, false);
+                break;
+            case 18:
+                vita_draw_button_item(card_x, y, card_w, item_h, "Delete Remap For This Game", remap_game_buf, "DEL", focused, false);
+                break;
         }
     }
     vita_draw_list_page_indicator(*selected_item, total_items, visible_items);
 }
-
 static bool vita_savestate_file_exists(const char *path)
 {
     if (!path || path[0] == '\0') return false;
@@ -3161,7 +3408,7 @@ void vita_view_system(VitaInputState *input, int *selected_item)
         return;
     }
 
-    const int total_items = 11;
+    const int total_items = 12;
     if (*selected_item < 0) *selected_item = 0;
     if (*selected_item >= total_items) *selected_item = total_items - 1;
 
@@ -3230,6 +3477,7 @@ void vita_view_system(VitaInputState *input, int *selected_item)
             case 5:
                 if (vita_show_confirm_box("Reset Settings", "Restore default settings for all parameters?", "Yes", "No")) {
                     SetDefaultMenuSettings(1);
+                    vita_library_autoscan_save();
                     int default_kickstart_loaded = vita_set_kickstart(kickstart, 1);
                     bReloadKickstart = 1;
                     UpdateChipsetSettings();
@@ -3248,9 +3496,13 @@ void vita_view_system(VitaInputState *input, int *selected_item)
                 mainMenu_autosave = 1 - mainMenu_autosave;
                 break;
             case 7:
-                mainMenu_case = MAIN_MENU_CASE_RESET;
+                mainMenu_libraryAutoScan = 1 - mainMenu_libraryAutoScan;
+                vita_library_autoscan_save();
                 break;
             case 8:
+                mainMenu_case = MAIN_MENU_CASE_RESET;
+                break;
+            case 9:
                 if (emulating) {
                     vita_screenshot_request = 1;
                     mainMenu_case = MAIN_MENU_CASE_RUN;
@@ -3258,15 +3510,15 @@ void vita_view_system(VitaInputState *input, int *selected_item)
                     vita_show_message_box("Screenshot", "Launch a game before taking a screenshot.", "OK (X)");
                 }
                 break;
-            case 9:
+            case 10:
                 if (vita_ftp_start() == 0) {
                     s_ftp_modal_open = true;
                 } else {
                     vita_show_message_box("FTP Server", "Unable to start FTP service. Check Wi-Fi connection.", "OK (X)");
                 }
                 break;
-            case 10:
-                if (vita_show_confirm_box("About", "Open UAE4All2 HD v1.13 and credits?", "Yes", "No")) {
+            case 11:
+                if (vita_show_confirm_box("About", "Open UAE4All2 HD v1.14 and credits?", "Yes", "No")) {
                     vita_show_about_box();
                 }
                 break;
@@ -3281,7 +3533,7 @@ void vita_view_system(VitaInputState *input, int *selected_item)
     const int visible_items = vita_list_visible_rows(start_y, item_h, item_gap);
     int first_item = *selected_item >= visible_items ? *selected_item - visible_items + 1 : 0;
 
-    static const char *system_titles[11] = {
+    static const char *system_titles[12] = {
         "Save Game Configuration",
         "Save Configuration As...",
         "Load Configuration...",
@@ -3289,12 +3541,13 @@ void vita_view_system(VitaInputState *input, int *selected_item)
         "Load Default Configuration",
         "Restore Default Settings",
         "Auto-save on Exit",
+        "Library Auto-Scan on Startup",
         "Reboot Amiga Emulation",
         "Take Screenshot",
         "FTP File Transfer",
-        "About UAE4All2 HD v1.13"
+        "About UAE4All2 HD v1.14"
     };
-    static const char *system_subtitles[11] = {
+    static const char *system_subtitles[12] = {
         "Save all disk, display, and hardware settings for current game",
         "Save current configuration with a custom filename via on-screen keyboard",
         "Browse and load custom configuration from ux0:/data/uae4all/conf/",
@@ -3302,12 +3555,13 @@ void vita_view_system(VitaInputState *input, int *selected_item)
         "Reload default settings from uaeconfig.conf",
         "Reset all emulator configurations to factory defaults",
         "Automatically save state when exiting the emulator",
+        "Scan the game library automatically when opening it",
         "Hard reset the Amiga virtual machine with current settings",
         "Capture the next emulated frame as a PNG in the screenshots folder",
         "Anonymous background FTP server for wireless file transfer",
         "Credits, original authors, contributors and project acknowledgements"
     };
-    static const char *system_badges[11] = { "SAVE", "SAVE AS", "LOAD", "SAVE DEF", "LOAD DEF", "RESET", "AUTO", "REBOOT", "SHOT", "FTP", "ABOUT" };
+    static const char *system_badges[12] = { "SAVE", "SAVE AS", "LOAD", "SAVE DEF", "LOAD DEF", "RESET", "AUTO", "SCAN", "REBOOT", "SHOT", "FTP", "ABOUT" };
 
     for (int i = 0; i < visible_items; i++) {
         int item = first_item + i;
@@ -3316,7 +3570,9 @@ void vita_view_system(VitaInputState *input, int *selected_item)
         bool focused = (*selected_item == item);
         if (item == 6) {
             vita_draw_switch_item(card_x, y, card_w, item_h, system_titles[item], mainMenu_autosave == 1, focused);
-        } else if (item == 9) {
+        } else if (item == 7) {
+            vita_draw_switch_item(card_x, y, card_w, item_h, system_titles[item], mainMenu_libraryAutoScan == 1, focused);
+        } else if (item == 10) {
             vita_draw_button_item(card_x, y, card_w, item_h, system_titles[item],
                 vita_ftp_is_running() ? "Anonymous upload server active" : "Start anonymous upload server",
                 vita_ftp_is_running() ? "ON" : "OFF", focused, vita_ftp_is_running());
@@ -3563,9 +3819,12 @@ static void vita_lib_rebuild_rows(void)
 
 static void vita_lib_rescan(void)
 {
-    vita_lib_show_scan_message("Building index, please wait...");
+    vita_lib_show_scan_message("Building index... TRIANGLE cancels");
     vita_library_scan(1);
-    s_lib_status[0] = '\0';
+    if (vita_library_scan_aborted())
+        snprintf(s_lib_status, sizeof(s_lib_status), "%s", "Scan cancelled, partial results");
+    else
+        s_lib_status[0] = '\0';
     vita_lib_rebuild_rows();
 }
 
@@ -3697,8 +3956,14 @@ static int vita_lib_prepare_row(int row_index)
 void vita_view_library(VitaInputState *input, int *selected_item)
 {
     if (!s_lib_rows_ready) {
-        vita_lib_show_scan_message("Loading game library...");
-        vita_library_scan(0);
+        if (mainMenu_libraryAutoScan) {
+            vita_lib_show_scan_message("Loading game library... TRIANGLE cancels");
+            vita_library_scan(0);
+            if (vita_library_scan_aborted())
+                snprintf(s_lib_status, sizeof(s_lib_status), "%s", "Scan cancelled, partial results");
+        } else {
+            snprintf(s_lib_status, sizeof(s_lib_status), "%s", "Auto-scan off, press SQUARE to scan");
+        }
         vita_lib_rebuild_rows();
     }
 

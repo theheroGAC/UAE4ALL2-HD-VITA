@@ -2,11 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/stat.h>
 
 #ifdef __PSP2__
 #include <psp2/types.h>
 #include <psp2/io/dirent.h>
 #include <psp2/io/stat.h>
+#include <psp2/ctrl.h>
 #endif
 
 #include "library_manager.h"
@@ -25,6 +27,38 @@ static char s_lib_roots[VITA_LIBRARY_MAX_ROOTS][VITA_LIBRARY_PATH_LEN];
 static unsigned long s_lib_sig_mtime[VITA_LIBRARY_MAX_ROOTS];
 static int s_lib_sig_ready = 0;
 static int s_lib_root_count = 0;
+extern int mainMenu_libraryAutoScan;
+static volatile int s_lib_abort = 0;
+static int s_lib_last_aborted = 0;
+static unsigned int s_lib_cancel_prev = 0;
+static int s_lib_cancel_tick = 0;
+int vita_library_scan_aborted(void)
+{
+    return s_lib_last_aborted;
+}
+static void lib_cancel_reset(void)
+{
+    SceCtrlData pad;
+    s_lib_abort = 0;
+    s_lib_last_aborted = 0;
+    s_lib_cancel_tick = 0;
+    if (sceCtrlPeekBufferPositive(0, &pad, 1) > 0)
+        s_lib_cancel_prev = pad.buttons;
+    else
+        s_lib_cancel_prev = 0;
+}
+static void lib_cancel_poll(void)
+{
+    SceCtrlData pad;
+    s_lib_cancel_tick++;
+    if ((s_lib_cancel_tick & 15) != 0)
+        return;
+    if (sceCtrlPeekBufferPositive(0, &pad, 1) <= 0)
+        return;
+    if ((pad.buttons & SCE_CTRL_TRIANGLE) != 0 && (s_lib_cancel_prev & SCE_CTRL_TRIANGLE) == 0)
+        s_lib_abort = 1;
+    s_lib_cancel_prev = pad.buttons;
+}
 
 int vita_library_kind_from_ext(const char *filename)
 {
@@ -506,11 +540,13 @@ static int lib_build_roots(void)
 {
     FILE *f;
     char line[VITA_LIBRARY_PATH_LEN + 16];
+    int had_file = 0;
 
     s_lib_root_count = 0;
 
     f = fopen(VITA_LIBRARY_ROOTS_FILE, "rb");
     if (f) {
+        had_file = 1;
         while (fgets(line, sizeof(line), f)) {
             char root[VITA_LIBRARY_PATH_LEN];
             if (vita_library_parse_root_line(line, root, sizeof(root)))
@@ -518,6 +554,9 @@ static int lib_build_roots(void)
         }
         fclose(f);
     }
+
+    if (had_file)
+        return s_lib_root_count;
 
     static const char *default_candidates[] = {
         VITA_LIBRARY_ROMS_DIR,
@@ -697,6 +736,11 @@ static void lib_scan_dir(const char *dir, int depth, int max_depth)
         char full[VITA_LIBRARY_PATH_LEN];
         int kind;
 
+        lib_cancel_poll();
+        if (s_lib_abort) {
+            sceIoDclose(dfd);
+            return;
+        }
         if (entry.d_name[0] == '.')
             continue;
 
@@ -846,8 +890,9 @@ static int lib_rebuild(void)
 {
     s_lib_count = 0;
 
+    lib_cancel_reset();
     lib_build_roots();
-    for (int i = 0; i < s_lib_root_count; i++)
+    for (int i = 0; i < s_lib_root_count && !s_lib_abort; i++)
         lib_scan_dir(s_lib_roots[i], 0, VITA_LIBRARY_MAX_DEPTH);
 
     if (s_lib_count > 1)
@@ -855,6 +900,13 @@ static int lib_rebuild(void)
 
     s_lib_count = vita_library_dedup_entries(s_lib_entries, s_lib_count);
     s_lib_count = vita_library_drop_sidecar_bins(s_lib_entries, s_lib_count);
+
+    if (s_lib_abort) {
+        s_lib_last_aborted = 1;
+        s_lib_abort = 0;
+        s_lib_stale = 1;
+        return s_lib_count;
+    }
 
     lib_save_cache();
 
@@ -887,11 +939,31 @@ int vita_library_check_stale(void)
     return 0;
 }
 
+void vita_library_autoscan_save(void)
+{
+    FILE *f;
+    mkdir("ux0:/data/uae4all", 0777);
+    mkdir("ux0:/data/uae4all/conf", 0777);
+    f = fopen("ux0:/data/uae4all/conf/library_autoscan.cfg", "wb");
+    if (!f) return;
+    fprintf(f, "%d\n", mainMenu_libraryAutoScan);
+    fclose(f);
+}
+void vita_library_autoscan_load(void)
+{
+    FILE *f = fopen("ux0:/data/uae4all/conf/library_autoscan.cfg", "rb");
+    int v = 1;
+    if (!f) return;
+    if (fscanf(f, "%d", &v) == 1)
+        mainMenu_libraryAutoScan = (v == 0) ? 0 : 1;
+    fclose(f);
+}
 int vita_library_preload(void)
 {
     if (s_lib_loaded)
         return s_lib_count;
 
+    vita_library_autoscan_load();
     s_lib_loaded = 1;
     s_lib_stale = 1;
     lib_build_roots();

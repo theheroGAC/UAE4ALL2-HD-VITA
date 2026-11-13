@@ -53,6 +53,7 @@ typedef enum {
     VITA_TAB_WHDLOAD,
     VITA_TAB_PRESETS,
     VITA_TAB_HARDWARE,
+    VITA_TAB_CD32,
     VITA_TAB_DISPLAY,
     VITA_TAB_CONTROLS,
     VITA_TAB_SAVESTATES,
@@ -156,6 +157,7 @@ void vita_view_hard_disk(VitaInputState *input, int *selected_item);
 void vita_view_whdload(VitaInputState *input, int *selected_item);
 void vita_view_presets(VitaInputState *input, int *selected_item);
 void vita_view_hardware(VitaInputState *input, int *selected_item);
+void vita_view_cd32(VitaInputState *input, int *selected_item);
 void vita_view_display(VitaInputState *input, int *selected_item);
 void vita_view_controls(VitaInputState *input, int *selected_item);
 void vita_view_savestates(VitaInputState *input, int *selected_item);

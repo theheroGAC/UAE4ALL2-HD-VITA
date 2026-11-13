@@ -25,6 +25,9 @@ typedef struct {
 } VitaLibraryEntry;
 
 int vita_library_scan(int force_rebuild);
+int vita_library_scan_aborted(void);
+void vita_library_autoscan_save(void);
+void vita_library_autoscan_load(void);
 int vita_library_preload(void);
 int vita_library_count(void);
 const VitaLibraryEntry *vita_library_entry(int index);

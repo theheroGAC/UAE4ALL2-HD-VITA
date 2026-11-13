@@ -203,16 +203,17 @@ static const unsigned char s_char_widths[96] = {
 };
 
 static const char *s_tab_names[VITA_TAB_COUNT] = {
-    "Library",
+    "Lib",
     "Floppy",
-    "Hard Disk",
-    "WHDLoad",
-    "Presets",
-    "Hardware",
-    "Display",
-    "Controls",
-    "Savestate",
-    "System"
+    "HDD",
+    "WHD",
+    "Preset",
+    "HW",
+    "CD32",
+    "Video",
+    "Pad",
+    "Save",
+    "Sys"
 };
 
 int vita_gui_init(void)
@@ -1025,6 +1026,9 @@ void vita_draw_footer(const char *left_hint, const char *right_hint)
         } else if (s_active_tab == VITA_TAB_HARD_DISK) {
             vita_draw_hint_item(145.0f, btn_y, VITA_BTN_TRIANGLE, "EJECT");
             vita_draw_hint_item(275.0f, btn_y, VITA_BTN_SQUARE, "MANAGER");
+        } else if (s_active_tab == VITA_TAB_CD32) {
+            vita_draw_hint_item(145.0f, btn_y, VITA_BTN_TRIANGLE, "EJECT");
+            vita_draw_hint_item(275.0f, btn_y, VITA_BTN_SQUARE, "PRESET");
         } else if (s_active_tab == VITA_TAB_SAVESTATES) {
             vita_draw_hint_item(145.0f, btn_y, VITA_BTN_SQUARE, "LOAD");
         } else if (s_active_tab == VITA_TAB_LIBRARY) {
@@ -1321,7 +1325,7 @@ void vita_show_about_box(void)
 {
     static const CreditLine credits[] = {
         { "UAE4ALL2 HD Vita", CR_TITLE },
-        { "Version 1.13 - Amiga Emulator for PS Vita", CR_SUBTITLE },
+        { "Version 1.14 - Amiga Emulator for PS Vita", CR_SUBTITLE },
         { "", CR_EMPTY },
         { "A high-definition port of the classic UAE4ALL Amiga emulator,", CR_TEXT },
         { "now with WHDLoad, HDF, IPF and CD32 support on the Vita.", CR_TEXT },
@@ -1421,7 +1425,7 @@ void vita_show_about_box(void)
         rot_x += 0.045f;
         rot_y += 0.065f;
         vita_draw_boing_ball_3d(dx + 46.0f, dy + 40.0f, 24.0f, rot_x, rot_y);
-        vita_draw_text(dx + 92.0f, dy + 20.0f, VITA_COLOR_AMIGA_RED, 1.15f, "UAE4ALL2 HD Vita v1.13");
+        vita_draw_text(dx + 92.0f, dy + 20.0f, VITA_COLOR_AMIGA_RED, 1.15f, "UAE4ALL2 HD Vita v1.14");
         vita_draw_text(dx + 92.0f, dy + 44.0f, VITA_COLOR_AMIGA_ORANGE, 0.85f, "About & Credits - WHDLoad Edition");
 
         vita_draw_rounded_rect_outline(dx + 16.0f, dy + 76.0f, dw - 32.0f, 1.0f, 0.0f, 1.0f, VITA_COLOR_CARD_BORDER);
@@ -2297,6 +2301,9 @@ int run_mainMenu_vita(void)
                 break;
             case VITA_TAB_HARDWARE:
                 vita_view_hardware(&input, cur_sel);
+                break;
+            case VITA_TAB_CD32:
+                vita_view_cd32(&input, cur_sel);
                 break;
             case VITA_TAB_DISPLAY:
                 vita_view_display(&input, cur_sel);

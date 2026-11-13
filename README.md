@@ -1,4 +1,4 @@
-# UAE4ALL2 HD — PlayStation Vita 1.13
+# UAE4ALL2 HD — PlayStation Vita 1.14
 
 A cleaned PlayStation Vita build of UAE4ALL2 HD, an Amiga emulator based on the UAE4ALL2 project.
 
@@ -37,12 +37,15 @@ uae4all2hd.vpk
 - Seamless game launch: clean black transition screen displaying "Caricamento in corso..." and game title, eliminating menu ghosting and 1-second freezes during WHDLoad loading
 - Fixed START button handling: toggles the virtual keyboard (VKBD) in non-CD32 games without triggering CD32 Play/Pause
 - Streamlined on-screen indicators: removed redundant top-right activity boxes so only the native UAE status bar renders when enabled
-- Vita menu with game library, floppy, hard disk, WHDLoad, presets, hardware, display, controls, savestates and system tabs
+- Vita menu with game library, floppy, hard disk, WHDLoad, presets, hardware, CD32, display, controls, savestates and system tabs (short labels: Lib, Floppy, HDD, WHD, Preset, HW, CD32, Video, Pad, Save, Sys)
 - Game Library tab with recursive scan of the configured folders, cached index, automatic stale check and per-type filtering (All, Favourites, Floppy, WHDLoad, Hard Disk, CD32)
 - One-press game launch from the Library for ADF/IPF, HDF, WHDLoad, LHA and CD32 images, plus TRIANGLE favourites shared with the WHDLoad tab
-- Custom library folders through `ux0:/data/uae4all/library_roots.txt` (up to 8 roots, one per line)
+- Custom library folders through `ux0:/data/uae4all/library_roots.txt` (one per line; only these folders are scanned, an empty file disables the scan)
+- Library scan can be cancelled with TRIANGLE and auto-scan disabled from `System -> Library Auto-Scan on Startup`
+- Per-game controller remap: save, load and delete a remap for the active game from the Controls tab (`remap_<game>.cfg`)
+- Dedicated CD32 tab with image insert/eject, multi-disc select, one-press CD32 preset, NVRAM reset and CD32 pad remap (Blue, Red, Yellow, Green, Forward, Reverse, Play onto Vita buttons)
 - Animated Boing Ball startup splash with real initialization stages and progress bar
-- About screen with version 1.13 and automatic scrolling credits
+- About screen with version 1.14 and automatic scrolling credits
 - Dedicated LHA filter in the Game Library tab with automatic extraction and launch
 - Enhanced IPF floppy compatibility with variable-density decoding and weak bit handling (CapsLib)
 - In-game menu seamless RESUME: changing display, control or audio settings resumes without restarting
@@ -192,12 +195,12 @@ The browser recognizes common Amiga disk formats including ADF, ADZ, DMS, IPF, Z
 
 ## CD32 support
 
-- Open `Hardware -> CD32 CD Image` and select an `.iso`, raw `.bin`, `.cue`, `.chd` or `.m3u`.
+- Open the `CD32` tab and select an `.iso`, raw `.bin`, `.cue`, `.chd` or `.m3u` in **CD32 CD Image**.
 - Mounting a CD image automatically selects the CD32 Kickstart pair, AGA chipset, 2 MiB chip RAM, 68020 CPU mode and one floppy drive; the settings can still be changed before rebooting.
 - CUE files can reference separate data and audio BIN files and can contain multiple tracks with INDEX 00/01, PREGAP and POSTGAP.
 - M3U playlists behave like WinUAE: every line lists a CD image (`.cue`, `.bin`, `.iso` or `.chd`), relative paths are resolved against the playlist folder and empty lines, `#` comments and missing entries are skipped. The item shows `Disc n/N` and LEFT / RIGHT switch disc while the game keeps running.
 - CD audio is mixed through the Vita SDL audio output.
-- The Hardware tab can eject or replace the mounted image while the emulator is paused in the menu.
+- The CD32 tab can eject or replace the mounted image while the emulator is paused in the menu.
 - Savestates include the mounted CD image and the playback position.
 
 ## Controls
@@ -216,7 +219,7 @@ The browser recognizes common Amiga disk formats including ADF, ADZ, DMS, IPF, Z
 - `R + START + D-Pad Left / Right`: Live display resolution switching. In Auto Display mode, this shortcut is safely locked to prevent display corruption, displaying an OSD overlay notification (`Auto Display: Locked`).
 - `L trigger`: Open Quick Menu (savestates, disk swapping, screenshot, resume).
 
-The Controls tab covers joystick port, autofire rate (Slow, Medium, Turbo), autofire trigger mode (Hold Button / Continuous), mouse multiplier, mouse emulation, stylus offset, tap delay, custom control sets (including the Pinball Dreams / Slam Tilt presets) and the Floppy/HDF sound volume.
+The Controls tab covers joystick port, autofire rate (Slow, Medium, Turbo), autofire trigger mode (Hold Button / Continuous), mouse multiplier, mouse emulation, stylus offset, tap delay, custom control sets (including the Pinball Dreams / Slam Tilt presets), per-game remap save/load/delete and the Floppy/HDF sound volume. The CD32 tab holds the CD32 pad remap.
 
 ## Display
 
@@ -250,7 +253,7 @@ The packaged copies are `psp2data/data/sounds/floppy_drive.ogg` and `psp2data/da
 - **Restore Default Settings**: resets CPU, chipset, memory, Kickstart, floppies, HDFs, CD, display, audio and controls to factory defaults in memory (does not write any file).
 - **Reboot Amiga Emulation**: hard resets the Amiga with the current settings.
 - **Take Screenshot**: captures the next emulated frame as a PNG.
-- **About**: version 1.12 with scrolling credits.
+- **About**: version 1.14 with scrolling credits.
 - **Startup**: displays `Loading UAE4ALL2 HD...` before the main interface is opened.
 - **Release notes**: see [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -266,7 +269,7 @@ cmake .. -DBUILD_PSP2=ON -DCMAKE_BUILD_TYPE=Release
 ninja uae4all2.vpk
 ```
 
-The build output is `uae4all2hd.vpk`. The Vita package uses Title ID `UAE4ALLHD` and application version `01.12`, so it installs separately from the legacy UAE4ALL2.
+The build output is `uae4all2hd.vpk`. The Vita package uses Title ID `UAE4ALLHD` and application version `01.14`, so it installs separately from the legacy UAE4ALL2.
 
 The FTP implementation links the VitaSDK `ftpvita` library, matching the service integration used by VitaArchive. Ensure the VitaSDK installation includes the `ftpvita` development library before building.
 
